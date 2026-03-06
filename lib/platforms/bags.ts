@@ -1,7 +1,8 @@
 import 'server-only';
 import { BAGS_API_BASE } from '@/lib/constants';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
-import { sanitizeAmountString, sanitizeTokenSymbol } from '@/lib/utils';
+// sanitizeAmountString/sanitizeTokenSymbol not needed — claimable-positions
+// returns numeric lamports and no token symbols.
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
   PlatformAdapter,
@@ -15,32 +16,47 @@ import type {
 // Bags.fm API Types
 // ═══════════════════════════════════════════════
 
-interface BagsWalletResponse {
-  data?: {
-    walletAddress?: string;
-    solanaWallet?: string;
+/**
+ * Bags API v2 wraps all responses in { success: boolean, response: T }.
+ * The `response` field contains the actual data payload.
+ */
+interface BagsApiResponse<T> {
+  success: boolean;
+  response?: T;
+}
+
+interface BagsWalletPayload {
+  platformData?: {
+    username?: string;
+    provider?: string;
   };
+  provider?: string;
+  wallet?: string;
 }
 
-interface BagsClaimStats {
-  data?: {
-    tokenMint: string;
-    tokenSymbol: string;
-    totalEarned: string;
-    totalClaimed: string;
-    totalUnclaimed: string;
-    royaltyBps: number;
-  }[];
+/** claim-stats response: per-token fee claimer stats (keyed by tokenMint) */
+interface BagsClaimStatEntry {
+  username?: string;
+  wallet?: string;
+  totalClaimed?: string;
+  royaltyBps?: number;
+  isCreator?: boolean;
+  twitterUsername?: string;
+  provider?: string;
 }
 
+/** claimable-positions response: unclaimed fee positions for a wallet */
 interface BagsClaimablePosition {
-  tokenMint: string;
-  tokenSymbol: string;
-  claimableAmount: string;
-}
-
-interface BagsClaimableResponse {
-  data?: BagsClaimablePosition[];
+  baseMint: string;
+  quoteMint?: string | null;
+  totalClaimableLamportsUserShare: number;
+  claimableDisplayAmount?: number | null;
+  userBps?: number | null;
+  isMigrated?: boolean;
+  isCustomFeeVault?: boolean;
+  virtualPool?: string;
+  virtualPoolAddress?: string | null;
+  dammPoolAddress?: string | null;
 }
 
 // ═══════════════════════════════════════════════
@@ -92,14 +108,12 @@ async function resolveHandleToWallet(
 ): Promise<string | null> {
   const bagsProvider = mapIdentityProvider(provider);
 
-  // Try the /token-launch/ prefixed path first (v2 API), then fallback
-  const data = await bagsFetch<BagsWalletResponse>(
+  // Bags API v2 returns { success, response: { wallet, platformData, provider } }
+  const data = await bagsFetch<BagsApiResponse<BagsWalletPayload>>(
     `/token-launch/fee-share/wallet/v2?provider=${bagsProvider}&username=${encodeURIComponent(handle)}`
-  ) ?? await bagsFetch<BagsWalletResponse>(
-    `/fee-share/wallet/v2?provider=${bagsProvider}&username=${encodeURIComponent(handle)}`
   );
 
-  const address = data?.data?.walletAddress || data?.data?.solanaWallet;
+  const address = data?.response?.wallet;
   if (!address || !isValidSolanaAddress(address)) return null;
   return address;
 }
@@ -141,132 +155,89 @@ export const bagsAdapter: PlatformAdapter = {
     const wallet = await resolveHandleToWallet(handle, provider);
     if (!wallet) return [];
 
-    // Step 2: Get claimable positions AND claim-stats for that wallet
-    const [claimable, stats] = await Promise.all([
-      bagsFetch<BagsClaimableResponse>(
-        `/token-launch/claimable-positions?wallet=${encodeURIComponent(wallet)}`
-      ) ?? bagsFetch<BagsClaimableResponse>(
-        `/claimable-positions?wallet=${encodeURIComponent(wallet)}`
-      ),
-      bagsFetch<BagsClaimStats>(
-        `/token-launch/claim-stats?wallet=${encodeURIComponent(wallet)}`
-      ) ?? bagsFetch<BagsClaimStats>(
-        `/claim-stats?wallet=${encodeURIComponent(wallet)}`
-      ),
-    ]);
+    // Step 2: Get claimable positions for that wallet.
+    // NOTE: claim-stats requires tokenMint (not wallet), so we can only use
+    // claimable-positions to discover fees by wallet address.
+    const claimableRes = await bagsFetch<BagsApiResponse<BagsClaimablePosition[]>>(
+      `/token-launch/claimable-positions?wallet=${encodeURIComponent(wallet)}`
+    );
+
+    const positions = Array.isArray(claimableRes?.response) ? claimableRes.response : [];
 
     const fees: TokenFee[] = [];
-    const seenTokens = new Set<string>();
+    for (const p of positions) {
+      if (!p.baseMint) continue;
+      // totalClaimableLamportsUserShare is in lamports (1 SOL = 1e9 lamports)
+      const lamports = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
+      if (lamports <= 0n) continue;
 
-    // Prefer claim-stats as it has more complete data (earned, claimed, unclaimed)
-    if (stats?.data) {
-      for (const s of stats.data) {
-        seenTokens.add(s.tokenMint);
-        fees.push({
-          tokenAddress: s.tokenMint,
-          tokenSymbol: sanitizeTokenSymbol(s.tokenSymbol),
-          chain: 'sol',
-          platform: 'bags',
-          totalEarned: sanitizeAmountString(s.totalEarned),
-          totalClaimed: sanitizeAmountString(s.totalClaimed),
-          totalUnclaimed: sanitizeAmountString(s.totalUnclaimed),
-          totalEarnedUsd: null,
-          royaltyBps: s.royaltyBps,
-        });
-      }
-    }
-
-    // Add any claimable positions not already covered by claim-stats
-    if (claimable?.data) {
-      for (const p of claimable.data) {
-        if (seenTokens.has(p.tokenMint)) continue;
-        try {
-          if (BigInt(p.claimableAmount || '0') <= 0n) continue;
-        } catch {
-          continue;
-        }
-        fees.push({
-          tokenAddress: p.tokenMint,
-          tokenSymbol: sanitizeTokenSymbol(p.tokenSymbol),
-          chain: 'sol',
-          platform: 'bags',
-          totalEarned: '0',
-          totalClaimed: '0',
-          totalUnclaimed: sanitizeAmountString(p.claimableAmount),
-          totalEarnedUsd: null,
-          royaltyBps: null,
-        });
-      }
+      fees.push({
+        tokenAddress: p.baseMint,
+        // claimable-positions doesn't return token symbol — would need a separate lookup
+        tokenSymbol: null,
+        chain: 'sol',
+        platform: 'bags',
+        totalEarned: '0',
+        totalClaimed: '0',
+        totalUnclaimed: lamports.toString(),
+        totalEarnedUsd: null,
+        royaltyBps: p.userBps ?? null,
+      });
     }
 
     return fees;
   },
 
   async getCreatorTokens(wallet: string): Promise<CreatorToken[]> {
-    // Bags doesn't have a dedicated "list creator tokens" endpoint.
-    // Tokens are discovered via claim-stats which returns all tokens
-    // that have fee allocations for this wallet.
-    const stats = await bagsFetch<BagsClaimStats>(
-      `/token-launch/claim-stats?wallet=${encodeURIComponent(wallet)}`
-    ) ?? await bagsFetch<BagsClaimStats>(
-      `/claim-stats?wallet=${encodeURIComponent(wallet)}`
+    // Bags doesn't have a "list tokens by creator" endpoint.
+    // We discover tokens via claimable-positions.
+    const res = await bagsFetch<BagsApiResponse<BagsClaimablePosition[]>>(
+      `/token-launch/claimable-positions?wallet=${encodeURIComponent(wallet)}`
     );
-    if (!stats?.data) return [];
+    const data = Array.isArray(res?.response) ? res.response : [];
 
-    return stats.data.map((s) => ({
-      tokenAddress: s.tokenMint,
-      chain: 'sol' as const,
-      platform: 'bags' as const,
-      symbol: sanitizeTokenSymbol(s.tokenSymbol),
-      name: null,
-      imageUrl: null,
-    }));
+    return data
+      .filter((p) => p.baseMint)
+      .map((p) => ({
+        tokenAddress: p.baseMint,
+        chain: 'sol' as const,
+        platform: 'bags' as const,
+        symbol: null,
+        name: null,
+        imageUrl: null,
+      }));
   },
 
   async getHistoricalFees(wallet: string): Promise<TokenFee[]> {
-    const stats = await bagsFetch<BagsClaimStats>(
-      `/token-launch/claim-stats?wallet=${encodeURIComponent(wallet)}`
-    ) ?? await bagsFetch<BagsClaimStats>(
-      `/claim-stats?wallet=${encodeURIComponent(wallet)}`
-    );
-    if (!stats?.data) return [];
-
-    return stats.data.map((s) => ({
-      tokenAddress: s.tokenMint,
-      tokenSymbol: sanitizeTokenSymbol(s.tokenSymbol),
-      chain: 'sol' as const,
-      platform: 'bags' as const,
-      totalEarned: sanitizeAmountString(s.totalEarned),
-      totalClaimed: sanitizeAmountString(s.totalClaimed),
-      totalUnclaimed: sanitizeAmountString(s.totalUnclaimed),
-      totalEarnedUsd: null,
-      royaltyBps: s.royaltyBps,
-    }));
+    // Bags doesn't expose historical fee totals per wallet.
+    // claim-stats requires tokenMint (not wallet).
+    // claimable-positions only shows current unclaimed balances.
+    // Return empty — historical data would require indexing claim events.
+    return [];
   },
 
   async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
-    const data = await bagsFetch<BagsClaimableResponse>(
+    const res = await bagsFetch<BagsApiResponse<BagsClaimablePosition[]>>(
       `/token-launch/claimable-positions?wallet=${encodeURIComponent(wallet)}`
-    ) ?? await bagsFetch<BagsClaimableResponse>(
-      `/claimable-positions?wallet=${encodeURIComponent(wallet)}`
     );
-    if (!data?.data) return [];
+    const data = Array.isArray(res?.response) ? res.response : [];
 
-    return data.data
-      .filter((p) => {
-        try { return BigInt(p.claimableAmount || '0') > 0n; } catch { return false; }
-      })
-      .map((p) => ({
-        tokenAddress: p.tokenMint,
-        tokenSymbol: sanitizeTokenSymbol(p.tokenSymbol),
-        chain: 'sol' as const,
-        platform: 'bags' as const,
-        totalEarned: '0',
-        totalClaimed: '0',
-        totalUnclaimed: sanitizeAmountString(p.claimableAmount),
-        totalEarnedUsd: null,
-        royaltyBps: null,
-      }));
+    return data
+      .filter((p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0)
+      .map((p) => {
+        const lamports = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
+        return {
+          tokenAddress: p.baseMint,
+          tokenSymbol: null,
+          chain: 'sol' as const,
+          platform: 'bags' as const,
+          totalEarned: '0',
+          totalClaimed: '0',
+          totalUnclaimed: lamports.toString(),
+          totalEarnedUsd: null,
+          royaltyBps: p.userBps ?? null,
+        };
+      });
   },
 
   async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
