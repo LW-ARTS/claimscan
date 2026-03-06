@@ -8,7 +8,13 @@ import type { Database, Platform } from '@/lib/supabase/types';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 
-export function PlatformBreakdown({ fees }: { fees: FeeRecord[] }) {
+interface PlatformBreakdownProps {
+  fees: FeeRecord[];
+  solPrice?: number;
+  ethPrice?: number;
+}
+
+export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: PlatformBreakdownProps) {
   const [activeTab, setActiveTab] = useState('all');
   const tabsId = useId();
 
@@ -117,7 +123,7 @@ export function PlatformBreakdown({ fees }: { fees: FeeRecord[] }) {
         aria-labelledby={`${tabsId}-tab-${activeTab}`}
         tabIndex={0}
       >
-        <TokenFeeTable fees={filteredFees} />
+        <TokenFeeTable fees={filteredFees} solPrice={solPrice} ethPrice={ethPrice} />
       </div>
     </div>
   );

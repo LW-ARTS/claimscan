@@ -27,11 +27,16 @@ interface ClankerToken {
   symbol: string;
   name: string;
   img_url: string | null;
+  admin?: string;
   fid?: number;
 }
 
-interface ClankerTokensResponse {
-  data?: ClankerToken[];
+/** /search-creator response shape */
+interface ClankerSearchCreatorResponse {
+  tokens?: ClankerToken[];
+  total?: number;
+  hasMore?: boolean;
+  searchedAddress?: string;
 }
 
 // ═══════════════════════════════════════════════
@@ -110,13 +115,33 @@ export const clankerAdapter: PlatformAdapter = {
   },
 
   async getCreatorTokens(wallet: string): Promise<CreatorToken[]> {
-    // Try to find tokens by wallet address
-    const data = await clankerFetch<ClankerTokensResponse>(
-      `/tokens?deployer=${encodeURIComponent(wallet)}`
-    );
-    if (!data?.data) return [];
+    if (!isValidEvmAddress(wallet)) return [];
 
-    return data.data.map((t) => ({
+    // Use /search-creator which correctly returns tokens where wallet is admin.
+    // The /tokens?deployer= endpoint is broken (ignores the deployer parameter).
+    const data = await clankerFetch<ClankerSearchCreatorResponse>(
+      `/search-creator?q=${encodeURIComponent(wallet)}`
+    );
+    if (!data?.tokens || data.tokens.length === 0) return [];
+
+    const normalizedWallet = normalizeEvmAddress(wallet);
+
+    // Deduplicate by contract address (API can return duplicates)
+    const seen = new Set<string>();
+    const unique: ClankerToken[] = [];
+    for (const t of data.tokens) {
+      if (!t.contract_address) continue;
+      const addr = normalizeEvmAddress(t.contract_address);
+      if (seen.has(addr)) continue;
+      seen.add(addr);
+
+      // Only include tokens where this wallet is the admin (fee recipient)
+      if (t.admin && normalizeEvmAddress(t.admin) !== normalizedWallet) continue;
+
+      unique.push(t);
+    }
+
+    return unique.map((t) => ({
       tokenAddress: t.contract_address,
       chain: 'base' as const,
       platform: 'clanker' as const,

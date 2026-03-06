@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
 import { safeBigInt, formatUsd } from '@/lib/utils';
+import { toUsdValue } from '@/lib/prices';
 
 interface LiveFee {
   totalUnclaimed: string;
@@ -17,6 +18,9 @@ interface WalletInput {
 
 interface FeeInput {
   total_earned_usd: number | null;
+  total_earned: string | null;
+  total_unclaimed: string | null;
+  chain: string;
   platform: string;
 }
 
@@ -91,10 +95,20 @@ export function FeeSummaryCard({
 
   const totalEarnedUsd = useMemo(
     () => initialFees.reduce((sum, fee) => {
-      const usd = fee.total_earned_usd;
-      return sum + (typeof usd === 'number' && Number.isFinite(usd) && usd >= 0 ? usd : 0);
+      // Prefer DB-stored USD; fall back to computing from amounts × native price
+      const dbUsd = fee.total_earned_usd;
+      if (typeof dbUsd === 'number' && Number.isFinite(dbUsd) && dbUsd > 0) {
+        return sum + dbUsd;
+      }
+      const unclaimed = safeBigInt(fee.total_unclaimed);
+      const earned = safeBigInt(fee.total_earned);
+      const amount = unclaimed > 0n ? unclaimed : earned;
+      if (amount === 0n) return sum;
+      const price = fee.chain === 'sol' ? solPrice : ethPrice;
+      const decimals = fee.chain === 'sol' ? 9 : 18;
+      return sum + toUsdValue(amount, decimals, price);
     }, 0),
-    [initialFees]
+    [initialFees, solPrice, ethPrice]
   );
 
   const platformCount = useMemo(

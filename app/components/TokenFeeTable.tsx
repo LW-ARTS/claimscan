@@ -1,13 +1,50 @@
 import { ClaimStatusBadge } from './ClaimStatusBadge';
 import { PlatformIcon } from './PlatformIcon';
 import { PLATFORM_CONFIG } from '@/lib/constants';
-import { formatTokenAmount, formatUsd } from '@/lib/utils';
+import { formatTokenAmount, formatUsd, safeBigInt } from '@/lib/utils';
+import { toUsdValue } from '@/lib/prices';
 import type { Database } from '@/lib/supabase/types';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 
-export function TokenFeeTable({ fees }: { fees: FeeRecord[] }) {
-  if (fees.length === 0) {
+interface TokenFeeTableProps {
+  fees: FeeRecord[];
+  solPrice?: number;
+  ethPrice?: number;
+}
+
+/**
+ * Compute the USD value for a fee record.
+ * Prefers the DB-stored total_earned_usd if available.
+ * Falls back to computing from the largest non-zero amount × native token price.
+ */
+function computeFeeUsd(fee: FeeRecord, solPrice: number, ethPrice: number): number {
+  if (fee.total_earned_usd != null && fee.total_earned_usd > 0) {
+    return fee.total_earned_usd;
+  }
+
+  // Pick the largest available amount (unclaimed > earned > claimed) for USD estimate
+  const unclaimed = safeBigInt(fee.total_unclaimed);
+  const earned = safeBigInt(fee.total_earned);
+  const amount = unclaimed > 0n ? unclaimed : earned;
+  if (amount === 0n) return 0;
+
+  const price = fee.chain === 'sol' ? solPrice : ethPrice;
+  const decimals = fee.chain === 'sol' ? 9 : 18;
+  return toUsdValue(amount, decimals, price);
+}
+
+export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTableProps) {
+  // Sort by computed USD value descending (largest fees first)
+  const sortedFees = [...fees].sort((a, b) => {
+    const aUsd = computeFeeUsd(a, solPrice, ethPrice);
+    const bUsd = computeFeeUsd(b, solPrice, ethPrice);
+    if (bUsd !== aUsd) return bUsd - aUsd;
+    // Secondary: sort by unclaimed amount descending
+    return Number(safeBigInt(b.total_unclaimed) - safeBigInt(a.total_unclaimed));
+  });
+
+  if (sortedFees.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16 text-center">
         <svg className="mb-3 h-10 w-10 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor" aria-hidden="true">
@@ -22,7 +59,7 @@ export function TokenFeeTable({ fees }: { fees: FeeRecord[] }) {
     <>
     {/* Mobile: stacked card layout */}
     <div className="space-y-3 md:hidden">
-      {fees.map((fee) => {
+      {sortedFees.map((fee) => {
         const platformConfig = PLATFORM_CONFIG[fee.platform];
         const decimals = fee.chain === 'sol' ? 9 : 18;
         const safeSymbol = (fee.token_symbol || '').replace(/[^\w\s\-\.]/g, '').slice(0, 20) || null;
@@ -50,7 +87,7 @@ export function TokenFeeTable({ fees }: { fees: FeeRecord[] }) {
               </div>
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">USD</p>
-                <p className="font-medium tabular-nums">{formatUsd(fee.total_earned_usd ?? 0)}</p>
+                <p className="font-medium tabular-nums">{formatUsd(computeFeeUsd(fee, solPrice, ethPrice))}</p>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Unclaimed</p>
@@ -97,7 +134,7 @@ export function TokenFeeTable({ fees }: { fees: FeeRecord[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {fees.map((fee) => {
+            {sortedFees.map((fee) => {
               const platformConfig = PLATFORM_CONFIG[fee.platform];
               const decimals = fee.chain === 'sol' ? 9 : 18;
               return (
@@ -137,7 +174,7 @@ export function TokenFeeTable({ fees }: { fees: FeeRecord[] }) {
                     {formatTokenAmount(fee.total_unclaimed, decimals)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium tabular-nums">
-                    {formatUsd(fee.total_earned_usd ?? 0)}
+                    {formatUsd(computeFeeUsd(fee, solPrice, ethPrice))}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     <ClaimStatusBadge status={fee.claim_status} />

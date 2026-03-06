@@ -1,6 +1,7 @@
 import { CHAIN_CONFIG } from '@/lib/constants';
 import { ChainIcon } from './ChainIcon';
-import { formatUsd } from '@/lib/utils';
+import { formatUsd, safeBigInt } from '@/lib/utils';
+import { toUsdValue } from '@/lib/prices';
 import type { Database, Chain } from '@/lib/supabase/types';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
@@ -14,8 +15,30 @@ interface ChainSummary {
   totalRecords: number;
 }
 
+interface ChainBreakdownProps {
+  fees: FeeRecord[];
+  solPrice?: number;
+  ethPrice?: number;
+}
 
-export function ChainBreakdown({ fees }: { fees: FeeRecord[] }) {
+/**
+ * Compute USD for a single fee record.
+ * Prefers DB-stored value; falls back to amount × native token price.
+ */
+function computeFeeUsd(fee: FeeRecord, solPrice: number, ethPrice: number): number {
+  if (fee.total_earned_usd != null && fee.total_earned_usd > 0) {
+    return fee.total_earned_usd;
+  }
+  const unclaimed = safeBigInt(fee.total_unclaimed);
+  const earned = safeBigInt(fee.total_earned);
+  const amount = unclaimed > 0n ? unclaimed : earned;
+  if (amount === 0n) return 0;
+  const price = fee.chain === 'sol' ? solPrice : ethPrice;
+  const decimals = fee.chain === 'sol' ? 9 : 18;
+  return toUsdValue(amount, decimals, price);
+}
+
+export function ChainBreakdown({ fees, solPrice = 0, ethPrice = 0 }: ChainBreakdownProps) {
   const byChain = new Map<Chain, ChainSummary>();
 
   for (const fee of fees) {
@@ -28,7 +51,7 @@ export function ChainBreakdown({ fees }: { fees: FeeRecord[] }) {
       totalRecords: 0,
     };
 
-    existing.totalUsd += fee.total_earned_usd ?? 0;
+    existing.totalUsd += computeFeeUsd(fee, solPrice, ethPrice);
     existing.totalRecords += 1;
     if (fee.claim_status === 'unclaimed') existing.unclaimedCount += 1;
 

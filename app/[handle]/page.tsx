@@ -101,7 +101,7 @@ export default async function ProfilePage({ params }: PageProps) {
           </h2>
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
         </div>
-        <ChainBreakdown fees={feeRecords} />
+        <ChainBreakdown fees={feeRecords} solPrice={prices.sol} ethPrice={prices.eth} />
       </section>
 
       {/* Platform breakdown section */}
@@ -113,7 +113,7 @@ export default async function ProfilePage({ params }: PageProps) {
           </h2>
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
         </div>
-        <PlatformBreakdown fees={feeRecords} key={creator.id} />
+        <PlatformBreakdown fees={feeRecords} solPrice={prices.sol} ethPrice={prices.eth} key={creator.id} />
       </section>
     </div>
   );
