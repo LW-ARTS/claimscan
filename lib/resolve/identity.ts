@@ -1,5 +1,6 @@
 import 'server-only';
 import { getIdentityResolvers, getAllAdapters, getHandleFeeAdapters } from '@/lib/platforms';
+import { resolveFarcasterWallets } from './farcaster';
 import type { ResolvedWallet, TokenFee } from '@/lib/platforms/types';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
@@ -63,6 +64,7 @@ export function parseSearchQuery(query: string): ParsedQuery {
 
 /**
  * Resolve a social handle to wallet addresses across all platforms.
+ * Runs platform-specific resolvers AND Farcaster/Neynar resolution in parallel.
  * Uses Promise.allSettled to tolerate individual platform failures.
  */
 export async function resolveWallets(
@@ -85,33 +87,51 @@ export async function resolveWallets(
   }
 
   const resolvers = getIdentityResolvers();
-  const results = await Promise.allSettled(
-    resolvers.map((adapter) =>
-      adapter.resolveIdentity(handle, provider)
-    )
-  );
+
+  // Run platform resolvers + Farcaster/Neynar resolver in parallel.
+  // Farcaster bridges the gap for EVM wallet resolution — most crypto creators
+  // have Farcaster accounts with verified ETH addresses.
+  const [platformResults, farcasterWallets] = await Promise.all([
+    Promise.allSettled(
+      resolvers.map((adapter) => adapter.resolveIdentity(handle, provider))
+    ),
+    resolveFarcasterWallets(handle, provider).catch((err) => {
+      console.warn('[identity] farcaster resolve failed:', err instanceof Error ? err.message : err);
+      return [] as ResolvedWallet[];
+    }),
+  ]);
 
   const wallets: ResolvedWallet[] = [];
   const seenAddresses = new Set<string>();
 
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
+  // Helper to add a wallet with dedup
+  const addWallet = (wallet: ResolvedWallet) => {
+    const normalizedAddress = (wallet.chain === 'base' || wallet.chain === 'eth')
+      ? normalizeEvmAddress(wallet.address)
+      : wallet.address;
+    const key = `${wallet.chain}:${normalizedAddress.toLowerCase()}`;
+    if (!seenAddresses.has(key)) {
+      seenAddresses.add(key);
+      wallets.push({ ...wallet, address: normalizedAddress });
+    }
+  };
+
+  // Process platform resolver results
+  for (let i = 0; i < platformResults.length; i++) {
+    const result = platformResults[i];
     if (result.status === 'fulfilled') {
       for (const wallet of result.value) {
-        // Normalize EVM addresses to checksummed form for consistent DB storage
-        const normalizedAddress = (wallet.chain === 'base' || wallet.chain === 'eth')
-          ? normalizeEvmAddress(wallet.address)
-          : wallet.address;
-        const key = `${wallet.chain}:${normalizedAddress.toLowerCase()}`;
-        if (!seenAddresses.has(key)) {
-          seenAddresses.add(key);
-          wallets.push({ ...wallet, address: normalizedAddress });
-        }
+        addWallet(wallet);
       }
     } else {
       const platform = resolvers[i]?.platform ?? 'unknown';
       console.warn(`[identity] ${platform} resolveIdentity failed:`, result.reason);
     }
+  }
+
+  // Process Farcaster-resolved wallets (EVM + SOL from verified addresses)
+  for (const wallet of farcasterWallets) {
+    addWallet(wallet);
   }
 
   return wallets;

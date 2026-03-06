@@ -34,6 +34,9 @@ export const HEAVEN_DATA_API = 'https://api.heaven.xyz';
 export const HEAVEN_TX_API = 'https://tx.api.heaven.xyz';
 export const BANKR_API_BASE = 'https://api.bankr.bot/agent';
 
+// Identity / Social APIs
+export const NEYNAR_API_BASE = 'https://api.neynar.com/v2';
+
 // Price APIs
 export const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 export const DEXSCREENER_API = 'https://api.dexscreener.com/latest/dex';
