@@ -1,0 +1,50 @@
+import { NextResponse } from 'next/server';
+import { resolveAndPersistCreator } from '@/lib/services/creator';
+
+export async function POST(request: Request) {
+  const contentType = request.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    return NextResponse.json(
+      { error: 'Content-Type must be application/json' },
+      { status: 415 }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const query = body.query?.trim();
+
+    if (!query || typeof query !== 'string' || query.length < 2 || query.length > 256) {
+      return NextResponse.json(
+        { error: 'Query must be 2-256 characters' },
+        { status: 400 }
+      );
+    }
+
+    const result = await resolveAndPersistCreator(query);
+
+    if (!result.creator) {
+      return NextResponse.json({
+        creator: null,
+        wallets: [],
+        fees: [],
+        cached: false,
+        message: 'No wallets found for this identity',
+      });
+    }
+
+    return NextResponse.json({
+      creator: result.creator,
+      wallets: result.wallets,
+      fees: result.fees,
+      cached: result.cached,
+      refreshing: false,
+    });
+  } catch (error) {
+    console.error('[search] error:', error instanceof Error ? error.message : error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

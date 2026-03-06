@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/refresh-prices",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/index-fees",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
