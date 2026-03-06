@@ -81,6 +81,29 @@ async function bagsFetch<T>(path: string): Promise<T | null> {
   }
 }
 
+/**
+ * Resolve a social handle to a wallet address on Bags.
+ * Bags creates fee claimer vaults tied to social identities, so this
+ * may return a wallet even if the user hasn't explicitly "connected" one.
+ */
+async function resolveHandleToWallet(
+  handle: string,
+  provider: IdentityProvider
+): Promise<string | null> {
+  const bagsProvider = mapIdentityProvider(provider);
+
+  // Try the /token-launch/ prefixed path first (v2 API), then fallback
+  const data = await bagsFetch<BagsWalletResponse>(
+    `/token-launch/fee-share/wallet/v2?provider=${bagsProvider}&username=${encodeURIComponent(handle)}`
+  ) ?? await bagsFetch<BagsWalletResponse>(
+    `/fee-share/wallet/v2?provider=${bagsProvider}&username=${encodeURIComponent(handle)}`
+  );
+
+  const address = data?.data?.walletAddress || data?.data?.solanaWallet;
+  if (!address || !isValidSolanaAddress(address)) return null;
+  return address;
+}
+
 // ═══════════════════════════════════════════════
 // Bags.fm Adapter
 // ═══════════════════════════════════════════════
@@ -90,19 +113,14 @@ export const bagsAdapter: PlatformAdapter = {
   chain: 'sol',
   supportsIdentityResolution: true,
   supportsLiveFees: true,
+  supportsHandleBasedFees: true,
 
   async resolveIdentity(
     handle: string,
     provider: IdentityProvider
   ): Promise<ResolvedWallet[]> {
-    const bagsProvider = mapIdentityProvider(provider);
-    const data = await bagsFetch<BagsWalletResponse>(
-      `/fee-share/wallet/v2?provider=${bagsProvider}&username=${encodeURIComponent(handle)}`
-    );
-
-    const address = data?.data?.walletAddress || data?.data?.solanaWallet;
-    // Validate API-returned address before trusting it
-    if (!address || !isValidSolanaAddress(address)) return [];
+    const address = await resolveHandleToWallet(handle, provider);
+    if (!address) return [];
 
     return [
       {
@@ -113,11 +131,84 @@ export const bagsAdapter: PlatformAdapter = {
     ];
   },
 
+  async getFeesByHandle(
+    handle: string,
+    provider: IdentityProvider
+  ): Promise<TokenFee[]> {
+    if (provider === 'wallet') return [];
+
+    // Step 1: Resolve handle → wallet (Bags manages wallets for fee claimers)
+    const wallet = await resolveHandleToWallet(handle, provider);
+    if (!wallet) return [];
+
+    // Step 2: Get claimable positions AND claim-stats for that wallet
+    const [claimable, stats] = await Promise.all([
+      bagsFetch<BagsClaimableResponse>(
+        `/token-launch/claimable-positions?wallet=${encodeURIComponent(wallet)}`
+      ) ?? bagsFetch<BagsClaimableResponse>(
+        `/claimable-positions?wallet=${encodeURIComponent(wallet)}`
+      ),
+      bagsFetch<BagsClaimStats>(
+        `/token-launch/claim-stats?wallet=${encodeURIComponent(wallet)}`
+      ) ?? bagsFetch<BagsClaimStats>(
+        `/claim-stats?wallet=${encodeURIComponent(wallet)}`
+      ),
+    ]);
+
+    const fees: TokenFee[] = [];
+    const seenTokens = new Set<string>();
+
+    // Prefer claim-stats as it has more complete data (earned, claimed, unclaimed)
+    if (stats?.data) {
+      for (const s of stats.data) {
+        seenTokens.add(s.tokenMint);
+        fees.push({
+          tokenAddress: s.tokenMint,
+          tokenSymbol: sanitizeTokenSymbol(s.tokenSymbol),
+          chain: 'sol',
+          platform: 'bags',
+          totalEarned: sanitizeAmountString(s.totalEarned),
+          totalClaimed: sanitizeAmountString(s.totalClaimed),
+          totalUnclaimed: sanitizeAmountString(s.totalUnclaimed),
+          totalEarnedUsd: null,
+          royaltyBps: s.royaltyBps,
+        });
+      }
+    }
+
+    // Add any claimable positions not already covered by claim-stats
+    if (claimable?.data) {
+      for (const p of claimable.data) {
+        if (seenTokens.has(p.tokenMint)) continue;
+        try {
+          if (BigInt(p.claimableAmount || '0') <= 0n) continue;
+        } catch {
+          continue;
+        }
+        fees.push({
+          tokenAddress: p.tokenMint,
+          tokenSymbol: sanitizeTokenSymbol(p.tokenSymbol),
+          chain: 'sol',
+          platform: 'bags',
+          totalEarned: '0',
+          totalClaimed: '0',
+          totalUnclaimed: sanitizeAmountString(p.claimableAmount),
+          totalEarnedUsd: null,
+          royaltyBps: null,
+        });
+      }
+    }
+
+    return fees;
+  },
+
   async getCreatorTokens(wallet: string): Promise<CreatorToken[]> {
     // Bags doesn't have a dedicated "list creator tokens" endpoint.
     // Tokens are discovered via claim-stats which returns all tokens
     // that have fee allocations for this wallet.
     const stats = await bagsFetch<BagsClaimStats>(
+      `/token-launch/claim-stats?wallet=${encodeURIComponent(wallet)}`
+    ) ?? await bagsFetch<BagsClaimStats>(
       `/claim-stats?wallet=${encodeURIComponent(wallet)}`
     );
     if (!stats?.data) return [];
@@ -134,6 +225,8 @@ export const bagsAdapter: PlatformAdapter = {
 
   async getHistoricalFees(wallet: string): Promise<TokenFee[]> {
     const stats = await bagsFetch<BagsClaimStats>(
+      `/token-launch/claim-stats?wallet=${encodeURIComponent(wallet)}`
+    ) ?? await bagsFetch<BagsClaimStats>(
       `/claim-stats?wallet=${encodeURIComponent(wallet)}`
     );
     if (!stats?.data) return [];
@@ -153,6 +246,8 @@ export const bagsAdapter: PlatformAdapter = {
 
   async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
     const data = await bagsFetch<BagsClaimableResponse>(
+      `/token-launch/claimable-positions?wallet=${encodeURIComponent(wallet)}`
+    ) ?? await bagsFetch<BagsClaimableResponse>(
       `/claimable-positions?wallet=${encodeURIComponent(wallet)}`
     );
     if (!data?.data) return [];

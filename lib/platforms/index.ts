@@ -54,6 +54,13 @@ export function getLiveFeeAdapters(): PlatformAdapter[] {
 }
 
 /**
+ * Get adapters that support handle-based fee queries.
+ */
+export function getHandleFeeAdapters(): PlatformAdapter[] {
+  return Object.values(adapters).filter((a) => a.supportsHandleBasedFees);
+}
+
+/**
  * Register a new adapter (used for Tier 2 adapters added later).
  */
 export function registerAdapter(adapter: PlatformAdapter): void {

@@ -62,6 +62,7 @@ export const clankerAdapter: PlatformAdapter = {
   chain: 'base',
   supportsIdentityResolution: true,
   supportsLiveFees: true,
+  supportsHandleBasedFees: false,
 
   async resolveIdentity(
     handle: string,
@@ -102,6 +103,10 @@ export const clankerAdapter: PlatformAdapter = {
         sourcePlatform: 'clanker',
       },
     ];
+  },
+
+  async getFeesByHandle(): Promise<TokenFee[]> {
+    return [];
   },
 
   async getCreatorTokens(wallet: string): Promise<CreatorToken[]> {

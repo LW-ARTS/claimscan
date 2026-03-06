@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: PageProps) {
       card: 'summary_large_image' as const,
     },
     alternates: {
-      canonical: `https://claimscan.io/${encodeURIComponent(safeName)}`,
+      canonical: `https://claimscan.com/${encodeURIComponent(safeName)}`,
     },
   };
 }

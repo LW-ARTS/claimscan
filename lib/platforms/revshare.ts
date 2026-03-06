@@ -27,11 +27,16 @@ export const revshareAdapter: PlatformAdapter = {
   chain: 'sol',
   supportsIdentityResolution: false,
   supportsLiveFees: true,
+  supportsHandleBasedFees: false,
 
   async resolveIdentity(
     _handle: string,
     _provider: IdentityProvider
   ): Promise<ResolvedWallet[]> {
+    return [];
+  },
+
+  async getFeesByHandle(): Promise<TokenFee[]> {
     return [];
   },
 

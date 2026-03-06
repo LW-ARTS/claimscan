@@ -56,12 +56,17 @@ export const heavenAdapter: PlatformAdapter = {
   chain: 'sol',
   supportsIdentityResolution: false,
   supportsLiveFees: true,
+  supportsHandleBasedFees: false,
 
   async resolveIdentity(
     _handle: string,
     _provider: IdentityProvider
   ): Promise<ResolvedWallet[]> {
     // Heaven doesn't have identity resolution.
+    return [];
+  },
+
+  async getFeesByHandle(): Promise<TokenFee[]> {
     return [];
   },
 

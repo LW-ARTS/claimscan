@@ -23,6 +23,7 @@ export const pumpAdapter: PlatformAdapter = {
   chain: 'sol',
   supportsIdentityResolution: false,
   supportsLiveFees: true,
+  supportsHandleBasedFees: false,
 
   async resolveIdentity(
     _handle: string,
@@ -30,6 +31,10 @@ export const pumpAdapter: PlatformAdapter = {
   ): Promise<ResolvedWallet[]> {
     // Pump.fun doesn't have identity resolution.
     // Relies on Bags.fm or other platforms to resolve wallets first.
+    return [];
+  },
+
+  async getFeesByHandle(): Promise<TokenFee[]> {
     return [];
   },
 

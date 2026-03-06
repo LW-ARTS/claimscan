@@ -45,11 +45,16 @@ export const believeAdapter: PlatformAdapter = {
   // Disabled: all fee methods return empty arrays until token discovery
   // and correct PDA derivation are implemented.
   supportsLiveFees: false,
+  supportsHandleBasedFees: false,
 
   async resolveIdentity(
     _handle: string,
     _provider: IdentityProvider
   ): Promise<ResolvedWallet[]> {
+    return [];
+  },
+
+  async getFeesByHandle(): Promise<TokenFee[]> {
     return [];
   },
 

@@ -57,6 +57,7 @@ export const zoraAdapter: PlatformAdapter = {
   chain: 'base',
   supportsIdentityResolution: false,
   supportsLiveFees: true,
+  supportsHandleBasedFees: false,
 
   async resolveIdentity(
     _handle: string,
@@ -64,6 +65,10 @@ export const zoraAdapter: PlatformAdapter = {
   ): Promise<ResolvedWallet[]> {
     // Zora requires wallet address directly.
     // Identity resolution handled by other platforms.
+    return [];
+  },
+
+  async getFeesByHandle(): Promise<TokenFee[]> {
     return [];
   },
 

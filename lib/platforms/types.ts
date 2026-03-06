@@ -67,6 +67,8 @@ export interface PlatformAdapter {
   supportsIdentityResolution: boolean;
   /** Can this platform query live unclaimed fees onchain? */
   supportsLiveFees: boolean;
+  /** Can this platform query fees designated to a social handle directly? */
+  supportsHandleBasedFees: boolean;
 
   /**
    * Resolve a social identity (twitter, github, etc.) to wallet addresses.
@@ -76,6 +78,17 @@ export interface PlatformAdapter {
     handle: string,
     provider: IdentityProvider
   ): Promise<ResolvedWallet[]>;
+
+  /**
+   * Get fees designated to a social handle (e.g., @VitalikButerin on Twitter).
+   * Works even if the handle owner hasn't connected a wallet — the platform
+   * tracks fee allocations by social identity, not wallet address.
+   * Only available if supportsHandleBasedFees is true.
+   */
+  getFeesByHandle(
+    handle: string,
+    provider: IdentityProvider
+  ): Promise<TokenFee[]>;
 
   /**
    * Get tokens created/launched by this wallet on this platform.

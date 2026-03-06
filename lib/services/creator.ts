@@ -8,6 +8,7 @@ import {
   parseSearchQuery,
   resolveWallets,
   fetchAllFees,
+  fetchFeesByHandle,
 } from '@/lib/resolve/identity';
 
 // ═══════════════════════════════════════════════
@@ -141,9 +142,16 @@ async function freshResolve(
 ): Promise<ResolveResult> {
   // Wrap in try/catch to prevent crashing the server component
   try {
-    const wallets = await resolveWallets(parsed.value, parsed.provider);
+    // Run handle-based fee lookups IN PARALLEL with wallet resolution.
+    // Handle-based fees (e.g. Bags.fm) work even if no wallet is connected,
+    // so we don't want wallet resolution failure to block fee discovery.
+    const [wallets, handleFees] = await Promise.all([
+      resolveWallets(parsed.value, parsed.provider),
+      fetchFeesByHandle(parsed.value, parsed.provider),
+    ]);
 
-    if (wallets.length === 0 && !existingCreatorId) {
+    // If no wallets AND no handle-based fees AND no existing creator → nothing found
+    if (wallets.length === 0 && handleFees.length === 0 && !existingCreatorId) {
       return { creator: null, wallets: [], fees: [], cached: false };
     }
 
@@ -217,12 +225,27 @@ async function freshResolve(
       }
     }
 
-    // Fetch fees across all platforms
-    const fees = await fetchAllFees(wallets);
+    // Fetch wallet-based fees across all platforms (only if wallets found)
+    const walletFees = wallets.length > 0 ? await fetchAllFees(wallets) : [];
+
+    // Merge handle-based fees + wallet-based fees, dedup by platform+chain+tokenAddress.
+    // Handle-based fees take priority (they come from the authoritative source).
+    const feeMap = new Map<string, typeof handleFees[number]>();
+    for (const fee of handleFees) {
+      const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
+      feeMap.set(key, fee);
+    }
+    for (const fee of walletFees) {
+      const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
+      if (!feeMap.has(key)) {
+        feeMap.set(key, fee);
+      }
+    }
+    const allFees = Array.from(feeMap.values());
 
     // Batch upsert fee records
-    if (fees.length > 0) {
-      const feeRows = fees.map((fee) => ({
+    if (allFees.length > 0) {
+      const feeRows = allFees.map((fee) => ({
         creator_id: creatorId!,
         creator_token_id: null,
         platform: fee.platform,

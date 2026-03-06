@@ -109,6 +109,7 @@ export const bankrAdapter: PlatformAdapter = {
   chain: 'base',
   supportsIdentityResolution: true,
   supportsLiveFees: true,
+  supportsHandleBasedFees: false,
 
   async resolveIdentity(
     handle: string,
@@ -130,6 +131,10 @@ export const bankrAdapter: PlatformAdapter = {
         sourcePlatform: 'bankr',
       },
     ];
+  },
+
+  async getFeesByHandle(): Promise<TokenFee[]> {
+    return [];
   },
 
   async getCreatorTokens(_wallet: string): Promise<CreatorToken[]> {

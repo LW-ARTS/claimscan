@@ -1,5 +1,5 @@
 import 'server-only';
-import { getIdentityResolvers, getAllAdapters } from '@/lib/platforms';
+import { getIdentityResolvers, getAllAdapters, getHandleFeeAdapters } from '@/lib/platforms';
 import type { ResolvedWallet, TokenFee } from '@/lib/platforms/types';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
@@ -150,6 +150,40 @@ export async function fetchAllFees(
     } else {
       const meta = taskMeta[i];
       console.warn(`[fees] ${meta?.platform} getHistoricalFees failed:`, result.reason);
+    }
+  }
+
+  return allFees;
+}
+
+/**
+ * Fetch fees designated to a social handle across all platforms that support it.
+ * This works independently of wallet resolution — platforms like Bags.fm track
+ * fee allocations by social identity (Twitter, GitHub, etc.), so fees can
+ * accumulate even if the recipient hasn't connected a wallet.
+ * Uses Promise.allSettled to tolerate individual adapter failures.
+ */
+export async function fetchFeesByHandle(
+  handle: string,
+  provider: IdentityProvider
+): Promise<TokenFee[]> {
+  if (provider === 'wallet') return [];
+
+  const adapters = getHandleFeeAdapters();
+  if (adapters.length === 0) return [];
+
+  const results = await Promise.allSettled(
+    adapters.map((adapter) => adapter.getFeesByHandle(handle, provider))
+  );
+
+  const allFees: TokenFee[] = [];
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === 'fulfilled') {
+      allFees.push(...result.value);
+    } else {
+      const platform = adapters[i]?.platform ?? 'unknown';
+      console.warn(`[fees] ${platform} getFeesByHandle failed:`, result.reason);
     }
   }
 
