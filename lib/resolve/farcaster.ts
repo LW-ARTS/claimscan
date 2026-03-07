@@ -1,5 +1,6 @@
 import 'server-only';
 import { isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
+import { isValidSolanaAddress } from '@/lib/chains/solana';
 import type { ResolvedWallet } from '@/lib/platforms/types';
 import type { IdentityProvider } from '@/lib/supabase/types';
 
@@ -151,8 +152,13 @@ function decodeHubAddress(raw: string, protocol: string): string | null {
   return null;
 }
 
-async function getVerifiedAddresses(fid: number): Promise<string[]> {
-  const ethAddresses: string[] = [];
+interface VerifiedAddress {
+  address: string;
+  chain: 'base' | 'sol';
+}
+
+async function getVerifiedAddresses(fid: number): Promise<VerifiedAddress[]> {
+  const addresses: VerifiedAddress[] = [];
 
   try {
     const controller = new AbortController();
@@ -162,7 +168,7 @@ async function getVerifiedAddresses(fid: number): Promise<string[]> {
       { signal: controller.signal }
     );
     clearTimeout(timeout);
-    if (!res.ok) return ethAddresses;
+    if (!res.ok) return addresses;
 
     const data = (await res.json()) as HubVerificationsResponse;
     const messages = data?.messages ?? [];
@@ -177,7 +183,12 @@ async function getVerifiedAddresses(fid: number): Promise<string[]> {
       if (protocol === 'PROTOCOL_ETHEREUM') {
         const decoded = decodeHubAddress(body.address, protocol);
         if (decoded && isValidEvmAddress(decoded)) {
-          ethAddresses.push(normalizeEvmAddress(decoded));
+          addresses.push({ address: normalizeEvmAddress(decoded), chain: 'base' });
+        }
+      } else if (protocol === 'PROTOCOL_SOLANA') {
+        // Hub returns Solana addresses as base58 strings directly
+        if (isValidSolanaAddress(body.address)) {
+          addresses.push({ address: body.address, chain: 'sol' });
         }
       }
     }
@@ -185,7 +196,7 @@ async function getVerifiedAddresses(fid: number): Promise<string[]> {
     console.warn('[farcaster] Hub verifications failed:', err instanceof Error ? err.message : err);
   }
 
-  return ethAddresses;
+  return addresses;
 }
 
 // ═══════════════════════════════════════════════
@@ -193,14 +204,14 @@ async function getVerifiedAddresses(fid: number): Promise<string[]> {
 // ═══════════════════════════════════════════════
 
 /**
- * Resolve a social handle to verified EVM wallet addresses via Farcaster.
+ * Resolve a social handle to verified wallet addresses via Farcaster.
  *
  * Uses two public, no-auth-required APIs:
  *   1. Warpcast search → find matching Farcaster user by name/display name
- *   2. Farcaster Hub → get their verified ETH addresses
+ *   2. Farcaster Hub → get their verified ETH + Solana addresses
  *
- * This bridges social identity → EVM wallet resolution. Most crypto creators
- * have Farcaster accounts with verified ETH addresses.
+ * This bridges social identity → multi-chain wallet resolution. Most crypto
+ * creators have Farcaster accounts with verified ETH and/or Solana addresses.
  *
  * Strategy: Run multiple search terms (full handle + prefix) in parallel,
  * then pick the best match using name similarity + follower count to
@@ -268,20 +279,20 @@ export async function resolveFarcasterWallets(
     // Require minimum score to avoid false positives
     if (!bestUser || bestScore < 5) return [];
 
-    // Get verified ETH addresses from Farcaster Hub
-    const ethAddresses = await getVerifiedAddresses(bestUser.fid);
+    // Get verified ETH + Solana addresses from Farcaster Hub
+    const verifiedAddresses = await getVerifiedAddresses(bestUser.fid);
 
     const wallets: ResolvedWallet[] = [];
     const seenAddresses = new Set<string>();
 
-    for (const addr of ethAddresses) {
-      const key = `base:${addr.toLowerCase()}`;
+    for (const verified of verifiedAddresses) {
+      const key = `${verified.chain}:${verified.address.toLowerCase()}`;
       if (!seenAddresses.has(key)) {
         seenAddresses.add(key);
         wallets.push({
-          address: addr,
-          chain: 'base',
-          sourcePlatform: 'clanker',
+          address: verified.address,
+          chain: verified.chain,
+          sourcePlatform: verified.chain === 'sol' ? 'pump' : 'clanker',
         });
       }
     }
