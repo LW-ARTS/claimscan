@@ -6,6 +6,7 @@ import {
   getTransferFeeConfig,
 } from '@solana/spl-token';
 import { getConnection, isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
+import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
   PlatformAdapter,
@@ -152,7 +153,7 @@ export const revshareAdapter: PlatformAdapter = {
         }
       }
 
-      return fees;
+      return enrichSolanaTokenSymbols(fees);
     } catch (err) {
       console.warn(
         '[revshare] getLiveUnclaimedFees failed:',

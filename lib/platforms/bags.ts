@@ -1,8 +1,7 @@
 import 'server-only';
 import { BAGS_API_BASE } from '@/lib/constants';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
-// sanitizeAmountString/sanitizeTokenSymbol not needed — claimable-positions
-// returns numeric lamports and no token symbols.
+import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
   PlatformAdapter,
@@ -173,7 +172,6 @@ export const bagsAdapter: PlatformAdapter = {
 
       fees.push({
         tokenAddress: p.baseMint,
-        // claimable-positions doesn't return token symbol — would need a separate lookup
         tokenSymbol: null,
         chain: 'sol',
         platform: 'bags',
@@ -185,7 +183,7 @@ export const bagsAdapter: PlatformAdapter = {
       });
     }
 
-    return fees;
+    return enrichSolanaTokenSymbols(fees);
   },
 
   async getCreatorTokens(wallet: string): Promise<CreatorToken[]> {
@@ -222,13 +220,13 @@ export const bagsAdapter: PlatformAdapter = {
     );
     const data = Array.isArray(res?.response) ? res.response : [];
 
-    return data
+    const fees = data
       .filter((p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0)
       .map((p) => {
         const lamports = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
         return {
           tokenAddress: p.baseMint,
-          tokenSymbol: null,
+          tokenSymbol: null as string | null,
           chain: 'sol' as const,
           platform: 'bags' as const,
           totalEarned: '0',
@@ -238,6 +236,8 @@ export const bagsAdapter: PlatformAdapter = {
           royaltyBps: p.userBps ?? null,
         };
       });
+
+    return enrichSolanaTokenSymbols(fees);
   },
 
   async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {

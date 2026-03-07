@@ -3,6 +3,7 @@ import { PublicKey } from '@solana/web3.js';
 import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { getConnection, isValidSolanaAddress, withRpcFallback, lamportsToSol } from '@/lib/chains/solana';
 import { sanitizeTokenSymbol } from '@/lib/utils';
+import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
   PlatformAdapter,
@@ -197,7 +198,7 @@ export const believeAdapter: PlatformAdapter = {
         }
       }
 
-      return fees;
+      return enrichSolanaTokenSymbols(fees);
     } catch (err) {
       console.warn(
         '[believe] getLiveUnclaimedFees failed:',

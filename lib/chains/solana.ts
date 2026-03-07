@@ -245,6 +245,120 @@ export function isValidSolanaAddress(address: string): boolean {
   }
 }
 
+// ═══════════════════════════════════════════════
+// Metaplex Token Metadata
+// ═══════════════════════════════════════════════
+
+/** Metaplex Token Metadata program ID. */
+const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
+  'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+);
+
+/**
+ * Derive Metaplex metadata PDA for a given mint.
+ * Seeds: ["metadata", TOKEN_METADATA_PROGRAM_ID, mint]
+ */
+function deriveMetadataPda(mint: PublicKey): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from('metadata'),
+      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+      mint.toBuffer(),
+    ],
+    TOKEN_METADATA_PROGRAM_ID
+  );
+  return pda;
+}
+
+/**
+ * Parse a Borsh string from metadata account data at the given offset.
+ * Layout: 4-byte LE length prefix + raw bytes (null-padded).
+ * Returns [parsedString, nextOffset].
+ */
+function parseBorshString(
+  data: Buffer,
+  offset: number,
+  maxBytes: number
+): [string, number] {
+  if (offset + 4 > data.length) return ['', offset + 4 + maxBytes];
+  const len = data.readUInt32LE(offset);
+  const strLen = Math.min(len, maxBytes, data.length - offset - 4);
+  const raw = data.subarray(offset + 4, offset + 4 + strLen);
+  // Strip null bytes and trim
+  const str = Buffer.from(raw).toString('utf8').replace(/\0/g, '').trim();
+  return [str, offset + 4 + maxBytes];
+}
+
+export interface TokenMetadata {
+  mint: string;
+  name: string;
+  symbol: string;
+}
+
+/**
+ * Fetch on-chain Metaplex token metadata for a batch of mint addresses.
+ * Uses getMultipleAccountsInfo (up to 100 per RPC call) and parses
+ * name/symbol from the raw account data — no Metaplex SDK needed.
+ *
+ * Returns a Map<mintAddress, TokenMetadata> for found tokens.
+ */
+export async function fetchTokenMetadataBatch(
+  mints: string[]
+): Promise<Map<string, TokenMetadata>> {
+  const result = new Map<string, TokenMetadata>();
+  if (mints.length === 0) return result;
+
+  // Derive metadata PDAs
+  const mintKeys = mints.map((m) => new PublicKey(m));
+  const pdas = mintKeys.map(deriveMetadataPda);
+
+  // Batch in groups of 100 (RPC limit for getMultipleAccountsInfo)
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < pdas.length; i += BATCH_SIZE) {
+    const batchPdas = pdas.slice(i, i + BATCH_SIZE);
+    const batchMints = mints.slice(i, i + BATCH_SIZE);
+
+    try {
+      const accounts = await withRpcFallback(
+        (c) => c.getMultipleAccountsInfo(batchPdas),
+        'token-metadata'
+      );
+
+      for (let j = 0; j < accounts.length; j++) {
+        const account = accounts[j];
+        if (!account?.data) continue;
+
+        const data = Buffer.from(account.data);
+        // Metadata account layout:
+        // offset 0:   key (1 byte)
+        // offset 1:   update_authority (32 bytes)
+        // offset 33:  mint (32 bytes)
+        // offset 65:  name (Borsh string: 4-byte len + 32 bytes padded)
+        // offset 101: symbol (Borsh string: 4-byte len + 10 bytes padded)
+        if (data.length < 115) continue;
+
+        const [name, nameEnd] = parseBorshString(data, 65, 32);
+        const [symbol] = parseBorshString(data, nameEnd, 10);
+
+        if (symbol || name) {
+          result.set(batchMints[j], { mint: batchMints[j], name, symbol });
+        }
+      }
+    } catch (err) {
+      console.warn(
+        '[solana] Failed to fetch token metadata batch:',
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  return result;
+}
+
+// ═══════════════════════════════════════════════
+// Formatting
+// ═══════════════════════════════════════════════
+
 /**
  * Format lamports to SOL string with full precision.
  * Uses integer division + remainder to avoid Number precision loss.
