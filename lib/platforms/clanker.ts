@@ -173,17 +173,24 @@ export const clankerAdapter: PlatformAdapter = {
     // Claimed totals are not readable onchain — they require event log parsing.
     // totalEarned is set to the same as totalUnclaimed (best available data).
     const validTokenMap = new Map(validTokens.map((t) => [getAddress(t.tokenAddress) as string, t]));
-    return feeResults.map((f) => ({
-      tokenAddress: f.token,
-      tokenSymbol: validTokenMap.get(f.token)?.symbol ?? null,
-      chain: 'base' as const,
-      platform: 'clanker' as const,
-      totalEarned: f.available.toString(),
-      totalClaimed: '0',
-      totalUnclaimed: f.available.toString(),
-      totalEarnedUsd: null,
-      royaltyBps: null,
-    }));
+
+    // Filter out tokens with zero available fees.
+    // Since the FeeLocker doesn't expose claimedFees(), we can't tell if 0 means
+    // "already claimed" or "not yet distributed from v4 hook". Showing them as
+    // "claimed" with $0 is misleading, so we exclude them entirely.
+    return feeResults
+      .filter((f) => f.available > 0n)
+      .map((f) => ({
+        tokenAddress: f.token,
+        tokenSymbol: validTokenMap.get(f.token)?.symbol ?? null,
+        chain: 'base' as const,
+        platform: 'clanker' as const,
+        totalEarned: f.available.toString(),
+        totalClaimed: '0',
+        totalUnclaimed: f.available.toString(),
+        totalEarnedUsd: null,
+        royaltyBps: null,
+      }));
   },
 
   async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {

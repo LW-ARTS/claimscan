@@ -1,5 +1,5 @@
 import 'server-only';
-import { getIdentityResolvers, getAllAdapters, getHandleFeeAdapters } from '@/lib/platforms';
+import { getIdentityResolvers, getAllAdapters, getLiveFeeAdapters, getHandleFeeAdapters } from '@/lib/platforms';
 import { resolveFarcasterWallets } from './farcaster';
 import type { ResolvedWallet, TokenFee } from '@/lib/platforms/types';
 import type { IdentityProvider } from '@/lib/supabase/types';
@@ -148,32 +148,55 @@ export async function resolveWallets(
 export async function fetchAllFees(
   wallets: ResolvedWallet[]
 ): Promise<TokenFee[]> {
-  const adapters = getAllAdapters();
+  const allAdapters = getAllAdapters();
+  const liveAdapters = getLiveFeeAdapters();
   const allFees: TokenFee[] = [];
 
-  // Build tasks with adapter metadata for error logging
-  const taskMeta: Array<{ platform: string; wallet: string }> = [];
-  const tasks = wallets.flatMap((wallet) =>
-    adapters
-      .filter((a) => a.chain === wallet.chain)
-      .map((adapter) => {
-        taskMeta.push({ platform: adapter.platform, wallet: wallet.address });
-        return adapter.getHistoricalFees(wallet.address);
-      })
-  );
+  // Build tasks for historical fees (all adapters)
+  const taskMeta: Array<{ platform: string; wallet: string; type: string }> = [];
+  const tasks: Promise<TokenFee[]>[] = [];
 
-  const results = await Promise.allSettled(tasks);
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
-    if (result.status === 'fulfilled') {
-      allFees.push(...result.value);
-    } else {
-      const meta = taskMeta[i];
-      console.warn(`[fees] ${meta?.platform} getHistoricalFees failed:`, result.reason);
+  for (const wallet of wallets) {
+    for (const adapter of allAdapters) {
+      if (adapter.chain !== wallet.chain) continue;
+      taskMeta.push({ platform: adapter.platform, wallet: wallet.address, type: 'historical' });
+      tasks.push(adapter.getHistoricalFees(wallet.address));
     }
   }
 
-  return allFees;
+  // Also fetch live unclaimed fees from adapters that support it.
+  // Many adapters (pump, zora, etc.) have stub getHistoricalFees but working
+  // getLiveUnclaimedFees — this ensures their fees appear in the platform tabs.
+  for (const wallet of wallets) {
+    for (const adapter of liveAdapters) {
+      if (adapter.chain !== wallet.chain) continue;
+      taskMeta.push({ platform: adapter.platform, wallet: wallet.address, type: 'live' });
+      tasks.push(adapter.getLiveUnclaimedFees(wallet.address));
+    }
+  }
+
+  const results = await Promise.allSettled(tasks);
+
+  // Collect all fees, dedup by platform+chain+tokenAddress (historical takes priority)
+  const feeMap = new Map<string, TokenFee>();
+
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    const meta = taskMeta[i];
+    if (result.status === 'fulfilled') {
+      for (const fee of result.value) {
+        const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
+        const existing = feeMap.get(key);
+        if (!existing || meta.type === 'historical') {
+          feeMap.set(key, fee);
+        }
+      }
+    } else {
+      console.warn(`[fees] ${meta?.platform} ${meta?.type} failed:`, result.reason);
+    }
+  }
+
+  return Array.from(feeMap.values());
 }
 
 /**
