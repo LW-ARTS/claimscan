@@ -38,6 +38,12 @@ interface BankrSearchResponse {
   };
 }
 
+/** Paginated search response (cursor-based) */
+interface BankrPaginatedResponse {
+  results: BankrTokenLaunch[];
+  nextCursor?: string | null;
+}
+
 interface BankrTokenFeeResponse {
   address: string;
   chain: string;
@@ -68,8 +74,62 @@ const BANKR_PUBLIC_API = 'https://api.bankr.bot/public/doppler';
 const BANKR_BEARER = process.env.BANKR_BEARER_TOKEN ?? '9WG1CEmcVRoKZWy1FNis21IWmKy3ZWE1';
 
 /**
- * Search Bankr token launches by handle or wallet address.
- * Uses the structured REST API (same one bankr.bot frontend uses).
+ * Search Bankr token launches using the paginated endpoint.
+ * The non-paginated /search endpoint caps at 5 results per group.
+ * The /search/paginated endpoint uses cursor-based pagination and returns 10+ per page.
+ * We fetch up to maxPages to collect all fee-recipient tokens.
+ */
+async function searchLaunchesPaginated(
+  query: string,
+  maxPages = 3
+): Promise<BankrTokenLaunch[]> {
+  const all: BankrTokenLaunch[] = [];
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+
+  for (let page = 0; page < maxPages; page++) {
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        group: 'byFeeRecipient',
+      });
+      if (cursor) params.set('cursor', cursor);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12_000);
+      const res = await fetch(
+        `${BANKR_LAUNCHES_API}/search/paginated?${params.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${BANKR_BEARER}` },
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(timeout);
+      if (!res.ok) break;
+
+      const data = (await res.json()) as BankrPaginatedResponse;
+      for (const token of data.results ?? []) {
+        if (!token.tokenAddress) continue;
+        const key = token.tokenAddress.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          all.push(token);
+        }
+      }
+
+      if (!data.nextCursor) break;
+      cursor = data.nextCursor;
+    } catch {
+      break;
+    }
+  }
+
+  return all;
+}
+
+/**
+ * Fallback: non-paginated search for identity resolution.
+ * Returns the first page of results with group metadata (fee recipient wallets).
  */
 async function searchLaunches(query: string): Promise<BankrSearchResponse> {
   try {
@@ -115,8 +175,11 @@ async function getTokenFees(tokenAddress: string): Promise<BankrTokenFeeResponse
  */
 function wethToWei(val: string | null | undefined): string {
   if (!val) return '0';
-  const str = val.trim();
+  let str = val.trim();
   if (!str || str === '0' || str === '0.000000') return '0';
+
+  // Handle "<0.000001" format from API (treat as 1 wei = negligible but non-zero)
+  if (str.startsWith('<')) str = str.slice(1);
 
   // Already a large integer (wei)
   if (/^\d{15,}$/.test(str)) return str;
@@ -132,25 +195,6 @@ function wethToWei(val: string | null | undefined): string {
 }
 
 /**
- * Collect token addresses from search results where query matches as fee recipient.
- * Also includes tokens from the general "tokens" group that have a fee recipient.
- */
-function extractFeeRecipientTokens(data: BankrSearchResponse): BankrTokenLaunch[] {
-  const results: BankrTokenLaunch[] = [];
-  const seen = new Set<string>();
-
-  // Primary: tokens where the searched identity is the fee recipient
-  for (const token of data.groups?.byFeeRecipient?.results ?? []) {
-    if (token.tokenAddress && !seen.has(token.tokenAddress.toLowerCase())) {
-      seen.add(token.tokenAddress.toLowerCase());
-      results.push(token);
-    }
-  }
-
-  return results;
-}
-
-/**
  * Fetch fee amounts for a list of token launches in parallel.
  * Uses the public Doppler token-fees endpoint.
  */
@@ -158,7 +202,7 @@ async function fetchFeesForTokens(tokens: BankrTokenLaunch[]): Promise<TokenFee[
   if (tokens.length === 0) return [];
 
   // Limit concurrent requests
-  const batch = tokens.slice(0, 20);
+  const batch = tokens.slice(0, 30);
 
   const feeResults = await Promise.allSettled(
     batch.map((t) => getTokenFees(t.tokenAddress))
@@ -219,11 +263,11 @@ export const bankrAdapter: PlatformAdapter = {
   ): Promise<ResolvedWallet[]> {
     if (provider === 'wallet') return [];
 
+    // Use non-paginated search for identity — we only need the wallet address
     const data = await searchLaunches(handle);
     const wallets: ResolvedWallet[] = [];
     const seen = new Set<string>();
 
-    // Extract unique fee recipient wallet addresses
     for (const token of data.groups?.byFeeRecipient?.results ?? []) {
       const addr = token.feeRecipient?.walletAddress;
       if (!addr || !isValidEvmAddress(addr)) continue;
@@ -247,8 +291,7 @@ export const bankrAdapter: PlatformAdapter = {
   ): Promise<TokenFee[]> {
     if (provider === 'wallet') return [];
 
-    const data = await searchLaunches(handle);
-    const tokens = extractFeeRecipientTokens(data);
+    const tokens = await searchLaunchesPaginated(handle);
     return fetchFeesForTokens(tokens);
   },
 
@@ -259,17 +302,14 @@ export const bankrAdapter: PlatformAdapter = {
   async getHistoricalFees(wallet: string): Promise<TokenFee[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
-    // Search by wallet address — Bankr API supports this
-    const data = await searchLaunches(wallet);
-    const tokens = extractFeeRecipientTokens(data);
+    const tokens = await searchLaunchesPaginated(wallet);
     return fetchFeesForTokens(tokens);
   },
 
   async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
-    const data = await searchLaunches(wallet);
-    const tokens = extractFeeRecipientTokens(data);
+    const tokens = await searchLaunchesPaginated(wallet);
     const allFees = await fetchFeesForTokens(tokens);
 
     // Filter to only unclaimed
