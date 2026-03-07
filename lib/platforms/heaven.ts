@@ -49,6 +49,9 @@ async function heavenFetch<T>(
 
 // ═══════════════════════════════════════════════
 // Heaven Adapter
+// WARNING: api.heaven.xyz DNS does not resolve as of 2026-03-07.
+// All API calls will silently fail and return empty arrays.
+// Kept as-is in case Heaven restores their API.
 // ═══════════════════════════════════════════════
 
 export const heavenAdapter: PlatformAdapter = {

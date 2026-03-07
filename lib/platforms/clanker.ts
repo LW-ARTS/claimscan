@@ -16,10 +16,19 @@ import type {
 // Clanker API Types
 // ═══════════════════════════════════════════════
 
+/** /search-creator response includes resolved address + user info */
 interface ClankerCreatorResult {
   fid?: number;
   walletAddress?: string;
   custodyAddress?: string;
+  /** API actually returns searchedAddress, not walletAddress */
+  searchedAddress?: string;
+  users?: Array<{
+    platform?: string;
+    fid?: number;
+    username?: string;
+    verifiedAddresses?: string[];
+  }>;
 }
 
 interface ClankerToken {
@@ -73,41 +82,42 @@ export const clankerAdapter: PlatformAdapter = {
     handle: string,
     provider: IdentityProvider
   ): Promise<ResolvedWallet[]> {
-    // Clanker resolves via Farcaster primarily
-    if (provider !== 'farcaster' && provider !== 'wallet') {
-      // Try searching by username which may resolve Farcaster handles
-      const data = await clankerFetch<ClankerCreatorResult>(
-        `/search-creator?q=${encodeURIComponent(handle)}`
-      );
-      const address = data?.walletAddress;
-      if (!address || !isValidEvmAddress(address)) return [];
-      return [
-        {
-          address: normalizeEvmAddress(address),
-          chain: 'base',
-          sourcePlatform: 'clanker',
-        },
-      ];
-    }
-
     if (provider === 'wallet') {
       if (!isValidEvmAddress(handle)) return [];
       return [{ address: normalizeEvmAddress(handle), chain: 'base', sourcePlatform: 'clanker' }];
     }
 
-    // Farcaster: search by handle
+    // Search Clanker by handle — API resolves Farcaster handles internally
+    // and returns the wallet as `searchedAddress` (not `walletAddress`)
     const data = await clankerFetch<ClankerCreatorResult>(
       `/search-creator?q=${encodeURIComponent(handle)}`
     );
-    const address = data?.walletAddress;
-    if (!address || !isValidEvmAddress(address)) return [];
-    return [
-      {
-        address: normalizeEvmAddress(address),
-        chain: 'base',
-        sourcePlatform: 'clanker',
-      },
-    ];
+
+    const wallets: ResolvedWallet[] = [];
+    const seen = new Set<string>();
+
+    // Primary: searchedAddress is the resolved wallet
+    const primary = data?.searchedAddress;
+    if (primary && isValidEvmAddress(primary)) {
+      const normalized = normalizeEvmAddress(primary);
+      seen.add(normalized);
+      wallets.push({ address: normalized, chain: 'base', sourcePlatform: 'clanker' });
+    }
+
+    // Secondary: extract verified addresses from user profiles
+    for (const user of data?.users ?? []) {
+      for (const addr of user.verifiedAddresses ?? []) {
+        if (isValidEvmAddress(addr)) {
+          const normalized = normalizeEvmAddress(addr);
+          if (!seen.has(normalized)) {
+            seen.add(normalized);
+            wallets.push({ address: normalized, chain: 'base', sourcePlatform: 'clanker' });
+          }
+        }
+      }
+    }
+
+    return wallets;
   },
 
   async getFeesByHandle(): Promise<TokenFee[]> {
