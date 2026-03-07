@@ -1,8 +1,7 @@
 import 'server-only';
 import { PublicKey } from '@solana/web3.js';
 import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
-import { getConnection, isValidSolanaAddress, withRpcFallback, lamportsToSol } from '@/lib/chains/solana';
-import { sanitizeTokenSymbol } from '@/lib/utils';
+import { getConnection, isValidSolanaAddress } from '@/lib/chains/solana';
 import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -17,18 +16,21 @@ import type {
 // Believe.app Adapter
 //
 // Believe uses Meteora DBC (Dynamic Bonding Curve).
-// We query pools by creator using getProgramAccounts
-// with a memcmp filter at offset 104 (the `creator` field).
+// All methods share a single getPoolsByCreator GPA call
+// to minimize expensive getProgramAccounts queries.
 //
 // Fee fields in the VirtualPool account:
 //   creatorBaseFee  — unclaimed base token (meme coin) fees
 //   creatorQuoteFee — unclaimed quote token (SOL) fees
-//   metrics.totalTradingBaseFee  — lifetime base trading fees
-//   metrics.totalTradingQuoteFee — lifetime quote trading fees
 // ═══════════════════════════════════════════════
 
 /** Per-call timeout for the getProgramAccounts query (can be slow). */
 const GPA_TIMEOUT_MS = 20_000;
+
+/** Simple in-memory cache for GPA results to avoid redundant calls within a scan cycle. */
+type PoolEntry = { publicKey: PublicKey; account: Record<string, unknown> };
+const poolCache = new Map<string, { pools: PoolEntry[]; ts: number }>();
+const POOL_CACHE_TTL_MS = 60_000; // 1 minute
 
 /**
  * Safely convert a BN (or BN-like object from Anchor) to bigint.
@@ -43,6 +45,27 @@ function bnToBigInt(bn: unknown): bigint {
   }
 }
 
+/**
+ * Shared GPA call — fetches all pools by creator once and caches briefly.
+ * All adapter methods use this instead of making separate GPA calls.
+ */
+async function getPoolsByCreatorCached(wallet: string): Promise<PoolEntry[]> {
+  const cached = poolCache.get(wallet);
+  if (cached && Date.now() - cached.ts < POOL_CACHE_TTL_MS) {
+    return cached.pools;
+  }
+
+  const client = DynamicBondingCurveClient.create(getConnection());
+  const pools = await raceGpaTimeout(
+    client.state.getPoolsByCreator(new PublicKey(wallet)),
+    'believe-pools'
+  );
+
+  const result = (pools ?? []) as PoolEntry[];
+  poolCache.set(wallet, { pools: result, ts: Date.now() });
+  return result;
+}
+
 export const believeAdapter: PlatformAdapter = {
   platform: 'believe',
   chain: 'sol',
@@ -54,7 +77,6 @@ export const believeAdapter: PlatformAdapter = {
     _handle: string,
     _provider: IdentityProvider
   ): Promise<ResolvedWallet[]> {
-    // Believe doesn't expose identity resolution.
     return [];
   },
 
@@ -66,21 +88,19 @@ export const believeAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
-      const client = DynamicBondingCurveClient.create(getConnection());
-      const pools = await raceGpaTimeout(
-        client.state.getPoolsByCreator(new PublicKey(wallet)),
-        'believe-creator-tokens'
-      );
-      if (!pools || pools.length === 0) return [];
+      const pools = await getPoolsByCreatorCached(wallet);
+      if (pools.length === 0) return [];
 
-      return pools.map((pool) => ({
-        tokenAddress: pool.account.baseMint.toBase58(),
-        chain: 'sol' as const,
-        platform: 'believe' as const,
-        symbol: null,
-        name: null,
-        imageUrl: null,
-      }));
+      return pools
+        .filter((p) => !isMigrated(p.account))
+        .map((pool) => ({
+          tokenAddress: (pool.account.baseMint as PublicKey).toBase58(),
+          chain: 'sol' as const,
+          platform: 'believe' as const,
+          symbol: null,
+          name: null,
+          imageUrl: null,
+        }));
     } catch (err) {
       console.warn(
         '[believe] getCreatorTokens failed:',
@@ -94,37 +114,26 @@ export const believeAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
-      const client = DynamicBondingCurveClient.create(getConnection());
-      const feeData = await raceGpaTimeout(
-        client.state.getPoolsFeesByCreator(new PublicKey(wallet)),
-        'believe-historical-fees'
-      );
-      if (!feeData || feeData.length === 0) return [];
+      // Use shared GPA instead of separate getPoolsFeesByCreator call.
+      // This gives us baseMint (which getPoolsFeesByCreator drops).
+      const pools = await getPoolsByCreatorCached(wallet);
+      if (pools.length === 0) return [];
 
       const fees: TokenFee[] = [];
 
-      for (const pool of feeData) {
-        const totalQuote = bnToBigInt(pool.totalTradingQuoteFee);
-        const creatorQuote = bnToBigInt(pool.creatorQuoteFee);
+      for (const pool of pools) {
+        const creatorQuote = bnToBigInt(pool.account.creatorQuoteFee);
 
-        // Only include pools that have had any trading activity
-        if (totalQuote === 0n && creatorQuote === 0n) continue;
+        if (creatorQuote === 0n) continue;
 
-        // We use the pool address as the token identifier since we
-        // don't have the baseMint from getPoolsFeesByCreator directly.
-        // The pool address is unique per token.
-        const poolAddress = pool.poolAddress instanceof PublicKey
-          ? pool.poolAddress.toBase58()
-          : String(pool.poolAddress);
+        const poolAddress = pool.publicKey.toBase58();
 
         fees.push({
           tokenAddress: `SOL:believe:${poolAddress}`,
           tokenSymbol: 'SOL',
           chain: 'sol',
           platform: 'believe',
-          // totalTradingQuoteFee tracks all quote (SOL) fees ever generated,
-          // but only a portion goes to the creator. We report what's available.
-          totalEarned: '0', // can't derive exact lifetime creator fees from onchain data
+          totalEarned: '0',
           totalClaimed: '0',
           totalUnclaimed: creatorQuote.toString(),
           totalEarnedUsd: null,
@@ -146,25 +155,21 @@ export const believeAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
-      const client = DynamicBondingCurveClient.create(getConnection());
-      const pools = await raceGpaTimeout(
-        client.state.getPoolsByCreator(new PublicKey(wallet)),
-        'believe-live-fees'
-      );
-      if (!pools || pools.length === 0) return [];
+      const pools = await getPoolsByCreatorCached(wallet);
+      if (pools.length === 0) return [];
 
       const fees: TokenFee[] = [];
 
       for (const pool of pools) {
+        // Skip graduated/migrated pools — fees should have been claimed pre-migration
+        if (isMigrated(pool.account)) continue;
+
         const creatorQuoteFee = bnToBigInt(pool.account.creatorQuoteFee);
-        // creatorBaseFee is in the meme coin — less useful for display
-        // but we track it for completeness
         const creatorBaseFee = bnToBigInt(pool.account.creatorBaseFee);
 
-        // Skip pools with no unclaimed fees
         if (creatorQuoteFee === 0n && creatorBaseFee === 0n) continue;
 
-        const baseMint = pool.account.baseMint.toBase58();
+        const baseMint = (pool.account.baseMint as PublicKey).toBase58();
         const poolAddress = pool.publicKey.toBase58();
 
         // Report SOL (quote) fees
@@ -186,7 +191,7 @@ export const believeAdapter: PlatformAdapter = {
         if (creatorBaseFee > 0n) {
           fees.push({
             tokenAddress: baseMint,
-            tokenSymbol: null, // Would need token metadata lookup
+            tokenSymbol: null,
             chain: 'sol',
             platform: 'believe',
             totalEarned: '0',
@@ -209,10 +214,20 @@ export const believeAdapter: PlatformAdapter = {
   },
 
   async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
-    // Would require indexing claim transactions from Meteora DBC.
     return [];
   },
 };
+
+/**
+ * Check if a pool has been migrated (graduated to DAMM).
+ * The isMigrated field is a u8 on the VirtualPool struct.
+ */
+function isMigrated(account: Record<string, unknown>): boolean {
+  const val = account.isMigrated;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  return false;
+}
 
 /**
  * Race a GPA promise against a timeout.

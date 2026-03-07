@@ -108,9 +108,13 @@ async function fetchJupiterPrice(
   tokenAddress: string
 ): Promise<number | null> {
   try {
+    const headers: Record<string, string> = {};
+    if (process.env.JUP_API_KEY) {
+      headers['x-api-key'] = process.env.JUP_API_KEY;
+    }
     const res = await fetchWithTimeout(
       `${JUPITER_PRICE_API}?ids=${encodeURIComponent(tokenAddress)}`,
-      { next: { revalidate: 300 } }
+      { headers, next: { revalidate: 300 } }
     );
     if (!res.ok) return null;
     const data = await res.json();
