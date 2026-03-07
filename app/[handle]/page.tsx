@@ -6,6 +6,8 @@ import { ProfileHeader } from '../components/ProfileHeader';
 import { FeeSummaryCard } from '../components/FeeSummaryCard';
 import { PlatformBreakdown } from '../components/PlatformBreakdown';
 import { ChainBreakdown } from '../components/ChainBreakdown';
+import { ScanStatusLog } from '../components/ScanStatusLog';
+import type { Chain } from '@/lib/supabase/types';
 
 interface PageProps {
   params: Promise<{ handle: string }>;
@@ -79,6 +81,9 @@ export default async function ProfilePage({ params }: PageProps) {
     sourcePlatform: w.source_platform,
   }));
 
+  // Determine which chains have resolved wallets (for scan status)
+  const resolvedChains = [...new Set(wallets.map((w) => w.chain))] as Chain[];
+
   return (
     <div className="space-y-5 sm:space-y-8">
       <SearchBar />
@@ -115,6 +120,9 @@ export default async function ProfilePage({ params }: PageProps) {
         </div>
         <PlatformBreakdown fees={feeRecords} solPrice={prices.sol} ethPrice={prices.eth} key={creator.id} />
       </section>
+
+      {/* Scan status log */}
+      <ScanStatusLog fees={feeRecords} resolvedChains={resolvedChains} />
     </div>
   );
 }

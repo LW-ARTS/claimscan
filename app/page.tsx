@@ -1,5 +1,6 @@
 import { SearchBar } from './components/SearchBar';
 import { PlatformIcon } from './components/PlatformIcon';
+import { OrbitingLogos } from './components/OrbitingLogos';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 import TrueFocus from './components/TrueFocus';
 import MoneyFaceEmoji from './components/MoneyFaceEmoji';
@@ -8,6 +9,11 @@ export default function Home() {
 
   return (
     <div className="flex min-h-[calc(75vh-4rem)] flex-col items-center justify-center pt-8 sm:pt-0">
+      {/* Orbiting logos — homepage only, hidden on mobile */}
+      <div className="fixed pointer-events-none -z-10 opacity-50 hidden md:block md:bottom-0 md:left-0 md:-translate-x-1/3 md:translate-y-1/3 md:w-[500px] md:h-[500px]">
+        <OrbitingLogos />
+      </div>
+
       <div className="relative w-full max-w-3xl text-center">
         {/* Status line */}
         <div className="animate-fade-in-up mb-8 inline-flex items-center gap-3 font-mono text-xs tracking-wide text-muted-foreground">

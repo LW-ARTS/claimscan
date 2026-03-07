@@ -8,6 +8,9 @@ import type { Database, Platform } from '@/lib/supabase/types';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 
+/** Ordered list of all platforms to always show in tabs */
+const ALL_PLATFORMS = Object.keys(PLATFORM_CONFIG) as Platform[];
+
 interface PlatformBreakdownProps {
   fees: FeeRecord[];
   solPrice?: number;
@@ -49,18 +52,13 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
     byPlatform.set(fee.platform, existing);
   }
 
-  const platforms = Array.from(byPlatform.keys());
-
-  if (platforms.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16 text-center">
-        <p className="text-sm text-muted-foreground">No platform data available</p>
-      </div>
-    );
-  }
+  // Always show all platforms, sorted: platforms with data first, then empty ones
+  const platformsWithData = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) > 0);
+  const platformsEmpty = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) === 0);
+  const orderedPlatforms = [...platformsWithData, ...platformsEmpty];
 
   const filteredFees = activeTab === 'all' ? fees : (byPlatform.get(activeTab as Platform) ?? []);
-  const tabKeys = ['all', ...platforms];
+  const tabKeys = ['all', ...orderedPlatforms];
 
   return (
     <div className="space-y-4">
@@ -86,9 +84,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
             {fees.length}
           </span>
         </button>
-        {platforms.map((platform) => {
+        {orderedPlatforms.map((platform) => {
           const config = PLATFORM_CONFIG[platform];
           const count = byPlatform.get(platform)?.length ?? 0;
+          const isEmpty = count === 0;
           return (
             <button
               key={platform}
@@ -101,10 +100,12 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
               className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 sm:py-1.5 text-sm font-medium transition-all duration-200 ${
                 activeTab === platform
                   ? 'bg-foreground text-background'
-                  : 'border border-border bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground'
+                  : isEmpty
+                    ? 'border border-border/50 bg-card/50 text-muted-foreground/40 hover:border-foreground/10 hover:text-muted-foreground/60'
+                    : 'border border-border bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground'
               }`}
             >
-              <PlatformIcon platform={platform} className="h-3.5 w-3.5" aria-hidden />
+              <PlatformIcon platform={platform} className={`h-3.5 w-3.5 ${isEmpty ? 'opacity-40' : ''}`} aria-hidden />
               <span>{config?.name ?? platform}</span>
               <span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
                 activeTab === platform ? 'bg-background/20' : 'bg-muted'
@@ -123,7 +124,17 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
         aria-labelledby={`${tabsId}-tab-${activeTab}`}
         tabIndex={0}
       >
-        <TokenFeeTable fees={filteredFees} solPrice={solPrice} ethPrice={ethPrice} />
+        {filteredFees.length > 0 ? (
+          <TokenFeeTable fees={filteredFees} solPrice={solPrice} ethPrice={ethPrice} />
+        ) : (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-border/50 bg-card/30 py-12 text-center">
+            <p className="text-sm text-muted-foreground/60">
+              {activeTab === 'all'
+                ? 'No fees found across any platform'
+                : `No fees found on ${PLATFORM_CONFIG[activeTab as Platform]?.name ?? activeTab}`}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

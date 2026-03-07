@@ -30,6 +30,11 @@ const connections: Connection[] = RPC_URLS.map(
   (url) => new Connection(url, { commitment: 'confirmed' })
 );
 
+/** Get the primary Solana connection (for SDKs that need a Connection object). */
+export function getConnection(): Connection {
+  return connections[0];
+}
+
 /** Track consecutive failures per RPC for adaptive ordering. */
 const rpcFailures: number[] = new Array(connections.length).fill(0);
 

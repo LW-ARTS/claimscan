@@ -13,6 +13,8 @@ export const PUMPSWAP_PROGRAM_ID = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'
 // 56-character string (Solana pubkeys are max 44 chars base58).
 // Re-add with the correct program ID when Bags publishes their V2 address.
 export const METEORA_DBC_PROGRAM = 'dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN';
+export const COINBARREL_PROGRAM_ID = '7HxbxHnTUBaUfWjVPbPLs8gqqScmjmBWjRnETBjS9DMj';
+export const RAYDIUM_LAUNCHLAB_PROGRAM_ID = 'LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj';
 // NOTE: HEAVEN_AMM_PROGRAM is not currently used — Heaven fees are read via API.
 // Kept as reference for potential future onchain integration.
 
@@ -33,6 +35,7 @@ export const ZORA_API_BASE = 'https://api-sdk.zora.engineering/api';
 export const HEAVEN_DATA_API = 'https://api.heaven.xyz';
 export const HEAVEN_TX_API = 'https://tx.api.heaven.xyz';
 export const BANKR_API_BASE = 'https://api.bankr.bot/agent';
+export const RAYDIUM_LAUNCHLAB_API = 'https://launch-mint-v1.raydium.io';
 
 // Identity / Social APIs
 export const NEYNAR_API_BASE = 'https://api.neynar.com/v2';
@@ -82,6 +85,8 @@ export const PLATFORM_CONFIG = {
   bankr: { name: 'Bankr', chain: 'base' as const, color: '#1DA1F2' },
   believe: { name: 'Believe', chain: 'sol' as const, color: '#E91E63' },
   revshare: { name: 'RevShare', chain: 'sol' as const, color: '#4CAF50' },
+  coinbarrel: { name: 'Coinbarrel', chain: 'sol' as const, color: '#FF8C00' },
+  raydium: { name: 'Raydium', chain: 'sol' as const, color: '#6C5CE7' },
 } as const;
 
 // ═══════════════════════════════════════════════

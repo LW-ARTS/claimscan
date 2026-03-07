@@ -1,6 +1,7 @@
 import 'server-only';
 import { ZORA_API_BASE } from '@/lib/constants';
 import { getZoraProtocolRewardsBalance, isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
+import { getZoraProtocolRewardsBalanceEth } from '@/lib/chains/eth';
 import { getAddress } from 'viem';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -12,44 +13,12 @@ import type {
 } from './types';
 
 // ═══════════════════════════════════════════════
-// Zora API Types
-// ═══════════════════════════════════════════════
-
-interface ZoraCoin {
-  address: string;
-  symbol: string;
-  name: string;
-  mediaContent?: { previewImage?: { medium?: string } };
-}
-
-// ═══════════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════════
-
-async function zoraFetch<T>(path: string): Promise<T | null> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (process.env.ZORA_API_KEY) {
-      headers['x-api-key'] = process.env.ZORA_API_KEY;
-    }
-    const res = await fetch(`${ZORA_API_BASE}${path}`, {
-      headers,
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    if (!res.ok) return null;
-    return await res.json() as T;
-  } catch {
-    return null;
-  }
-}
-
-// ═══════════════════════════════════════════════
 // Zora Adapter
+//
+// Checks ProtocolRewards balance on BOTH Base and ETH mainnet.
+// The same contract 0x7777777F279eba3d3Ad8F4E708545291A6fDBA8B is
+// deployed on both chains. Since EVM addresses work cross-chain,
+// we query both when called for a Base wallet.
 // ═══════════════════════════════════════════════
 
 export const zoraAdapter: PlatformAdapter = {
@@ -63,8 +32,6 @@ export const zoraAdapter: PlatformAdapter = {
     _handle: string,
     _provider: IdentityProvider
   ): Promise<ResolvedWallet[]> {
-    // Zora requires wallet address directly.
-    // Identity resolution handled by other platforms.
     return [];
   },
 
@@ -72,45 +39,58 @@ export const zoraAdapter: PlatformAdapter = {
     return [];
   },
 
-  async getCreatorTokens(wallet: string): Promise<CreatorToken[]> {
-    // Zora's API allows querying coins by creator.
-    // For now, we rely on fee_records from previous scans.
+  async getCreatorTokens(_wallet: string): Promise<CreatorToken[]> {
     return [];
   },
 
   async getHistoricalFees(_wallet: string): Promise<TokenFee[]> {
-    // Zora v4 auto-distributes fees — no "unclaimed" concept.
-    // Zora v3 had ProtocolRewards with claimable balance.
-    // Historical data would need event log parsing.
     return [];
   },
 
   async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
     if (!isValidEvmAddress(wallet)) return [];
-    try {
-      // Check Zora v3 ProtocolRewards balance
-      const balance = await getZoraProtocolRewardsBalance(
-        getAddress(wallet)
-      );
 
-      if (balance === 0n) return [];
+    const checksummed = getAddress(wallet);
+    const fees: TokenFee[] = [];
 
-      return [
-        {
-          tokenAddress: '0x0000000000000000000000000000000000000000',
-          tokenSymbol: 'ETH (Zora Rewards)',
-          chain: 'base',
-          platform: 'zora',
-          totalEarned: '0',
-          totalClaimed: '0',
-          totalUnclaimed: balance.toString(),
-          totalEarnedUsd: null,
-          royaltyBps: null,
-        },
-      ];
-    } catch {
-      return [];
+    // Query Base and ETH mainnet ProtocolRewards in parallel
+    const [baseBalance, ethBalance] = await Promise.allSettled([
+      getZoraProtocolRewardsBalance(checksummed),
+      getZoraProtocolRewardsBalanceEth(checksummed),
+    ]);
+
+    const baseBal = baseBalance.status === 'fulfilled' ? baseBalance.value : 0n;
+    const ethBal = ethBalance.status === 'fulfilled' ? ethBalance.value : 0n;
+
+    if (baseBal > 0n) {
+      fees.push({
+        tokenAddress: 'ETH:zora:base',
+        tokenSymbol: 'ETH (Zora Base)',
+        chain: 'base',
+        platform: 'zora',
+        totalEarned: '0',
+        totalClaimed: '0',
+        totalUnclaimed: baseBal.toString(),
+        totalEarnedUsd: null,
+        royaltyBps: null,
+      });
     }
+
+    if (ethBal > 0n) {
+      fees.push({
+        tokenAddress: 'ETH:zora:eth',
+        tokenSymbol: 'ETH (Zora Mainnet)',
+        chain: 'eth',
+        platform: 'zora',
+        totalEarned: '0',
+        totalClaimed: '0',
+        totalUnclaimed: ethBal.toString(),
+        totalEarnedUsd: null,
+        royaltyBps: null,
+      });
+    }
+
+    return fees;
   },
 
   async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {

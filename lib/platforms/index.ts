@@ -9,6 +9,8 @@ import { heavenAdapter } from './heaven';
 import { bankrAdapter } from './bankr';
 import { believeAdapter } from './believe';
 import { revshareAdapter } from './revshare';
+import { coinbarrelAdapter } from './coinbarrel';
+import { raydiumAdapter } from './raydium';
 
 // ═══════════════════════════════════════════════
 // Platform Registry
@@ -23,6 +25,8 @@ const adapters: Record<Platform, PlatformAdapter> = {
   bankr: bankrAdapter,
   believe: believeAdapter,
   revshare: revshareAdapter,
+  coinbarrel: coinbarrelAdapter,
+  raydium: raydiumAdapter,
 };
 
 /**

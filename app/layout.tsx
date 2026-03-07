@@ -4,7 +4,6 @@ import './globals.css';
 import { JsonLd } from './components/JsonLd';
 import { GrainientBackground } from './components/GrainientBackground';
 import { SiteFooter } from './components/SiteFooter';
-import { OrbitingLogos } from './components/OrbitingLogos';
 import Link from 'next/link';
 
 const exo2 = Exo_2({
@@ -87,11 +86,6 @@ export default function RootLayout({
         <div className="relative min-h-screen flex flex-col">
           {/* Animated grain background */}
           <GrainientBackground />
-
-          {/* Orbiting logos — hidden on mobile, bottom-left on md+ */}
-          <div className="fixed pointer-events-none -z-10 opacity-50 hidden md:block md:bottom-0 md:left-0 md:-translate-x-1/3 md:translate-y-1/3 md:w-[500px] md:h-[500px]">
-            <OrbitingLogos />
-          </div>
 
           {/* Navigation */}
           <header className="animate-fade-in-down sticky top-0 z-50 border-b border-white/10 bg-background/20 backdrop-blur-xl shadow-sm dark:shadow-none">

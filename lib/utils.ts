@@ -70,7 +70,7 @@ export function formatTokenAmount(raw: string, decimals: number): string {
  * Validate a wallet object shape for API input validation.
  */
 export const VALID_CHAINS = new Set(['sol', 'base', 'eth']);
-export const VALID_PLATFORMS = new Set(['bags', 'clanker', 'pump', 'zora', 'heaven', 'bankr', 'believe', 'revshare']);
+export const VALID_PLATFORMS = new Set(['bags', 'clanker', 'pump', 'zora', 'heaven', 'bankr', 'believe', 'revshare', 'coinbarrel', 'raydium']);
 
 /**
  * Validate that a value is a valid non-negative integer string (safe for BigInt storage).
