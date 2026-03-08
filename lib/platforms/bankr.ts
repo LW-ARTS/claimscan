@@ -14,12 +14,13 @@ import type {
 // Bankr Agent API (primary — prompt-based)
 // ═══════════════════════════════════════════════
 
-const BANKR_AGENT_URL = 'https://api.bankr.bot/agent';
+const BANKR_API_URL = process.env.BANKR_API_URL || 'https://api.bankr.bot';
+const BANKR_AGENT_URL = `${BANKR_API_URL}/agent`;
 const BANKR_API_KEY = process.env.BANKR_API_KEY;
 
-/** Max polling attempts × interval = 10 × 3s = 30s timeout */
-const AGENT_POLL_MAX = 10;
-const AGENT_POLL_INTERVAL_MS = 3_000;
+/** Max polling attempts × interval = 60 × 2s = 2min timeout */
+const AGENT_POLL_MAX = 60;
+const AGENT_POLL_INTERVAL_MS = 2_000;
 
 interface AgentPromptResponse {
   jobId?: string;
@@ -43,7 +44,7 @@ async function promptBankrAgent(prompt: string): Promise<string | null> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': BANKR_API_KEY,
+        'x-api-key': BANKR_API_KEY,
       },
       body: JSON.stringify({ prompt }),
       signal: controller.signal,
@@ -55,7 +56,13 @@ async function promptBankrAgent(prompt: string): Promise<string | null> {
       return null;
     }
 
-    const data = (await submitRes.json()) as AgentPromptResponse;
+    const data = (await submitRes.json()) as AgentPromptResponse & { success?: boolean };
+
+    // Check success field per Bankr API spec
+    if (data.success === false) {
+      console.warn('[bankr] agent prompt returned success=false');
+      return null;
+    }
 
     // Some queries return result immediately
     if (data.result) return data.result;
@@ -69,7 +76,7 @@ async function promptBankrAgent(prompt: string): Promise<string | null> {
       const pollController = new AbortController();
       const pollTimeout = setTimeout(() => pollController.abort(), 10_000);
       const pollRes = await fetch(`${BANKR_AGENT_URL}/job/${data.jobId}`, {
-        headers: { 'X-API-Key': BANKR_API_KEY },
+        headers: { 'x-api-key': BANKR_API_KEY },
         signal: pollController.signal,
       });
       clearTimeout(pollTimeout);
@@ -79,7 +86,7 @@ async function promptBankrAgent(prompt: string): Promise<string | null> {
 
       if (job.status === 'completed') return job.response || job.result || null;
       if (job.status === 'failed' || job.status === 'cancelled') {
-        console.warn(`[bankr] agent job ${data.jobId} ${job.status}`);
+        console.warn(`[bankr] agent job ${data.jobId} ${job.status}`, (job as Record<string, unknown>).error || '');
         return null;
       }
       // still pending/processing — keep polling
