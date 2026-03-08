@@ -18,8 +18,10 @@ const BANKR_API_URL = process.env.BANKR_API_URL || 'https://api.bankr.bot';
 const BANKR_AGENT_URL = `${BANKR_API_URL}/agent`;
 const BANKR_API_KEY = process.env.BANKR_API_KEY;
 
-/** Max polling attempts × interval = 60 × 2s = 2min timeout */
-const AGENT_POLL_MAX = 60;
+/** Max polling attempts × interval = 5 × 2s = 10s polling window.
+ * Keep short — Agent API runs inside the 30s RESOLVE_TIMEOUT_MS pipeline.
+ * Background resolve continues if the hot path times out. */
+const AGENT_POLL_MAX = 5;
 const AGENT_POLL_INTERVAL_MS = 2_000;
 
 interface AgentPromptResponse {
@@ -39,7 +41,7 @@ async function promptBankrAgent(prompt: string): Promise<string | null> {
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15_000);
+    const timeout = setTimeout(() => controller.abort(), 8_000);
     const submitRes = await fetch(`${BANKR_AGENT_URL}/prompt`, {
       method: 'POST',
       headers: {

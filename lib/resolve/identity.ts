@@ -176,7 +176,7 @@ export async function fetchAllFees(
     'coinbarrel', // historical → getLiveUnclaimedFees
     'clanker',    // live → getHistoricalFees
     'heaven',     // live → getHistoricalFees
-    'bankr',      // both call searchLaunchesPaginated independently
+    'bankr',      // Agent API handles both historical + live in one call
     'bags',       // both call getClaimablePositionsCached (30s cache)
   ]);
 
