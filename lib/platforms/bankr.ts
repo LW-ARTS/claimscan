@@ -18,13 +18,17 @@ const BANKR_API_URL = process.env.BANKR_API_URL || 'https://api.bankr.bot';
 const BANKR_AGENT_URL = `${BANKR_API_URL}/agent`;
 const BANKR_API_KEY = process.env.BANKR_API_KEY;
 
-/** Total budget for a single Agent API call (submit + poll).
- * Must be short — the resolve pipeline has a 30s hard timeout, and
- * Promise.allSettled waits for ALL adapters. A slow Bankr call blocks
- * every other adapter's results from reaching the page.
- * Agent API jobs typically take 30s–2min so they almost never complete here;
- * this timeout prevents them from starving faster adapters. */
-const AGENT_TOTAL_TIMEOUT_MS = 5_000;
+/** Budget for Agent API calls running inside Promise.allSettled with other adapters.
+ * Must be short — Promise.allSettled waits for ALL adapters, so a slow Bankr call
+ * blocks every other adapter's results. 5s prevents starvation. */
+const AGENT_SHORT_TIMEOUT_MS = 5_000;
+
+/** Budget for Agent API calls in getFeesByHandle, which runs in parallel (Promise.all)
+ * with wallet resolution — NOT inside Promise.allSettled with other adapters.
+ * A longer timeout here doesn't block other adapters from completing.
+ * The pipeline has a 30s hard timeout; leaving 10s headroom for Step 2. */
+const AGENT_LONG_TIMEOUT_MS = 20_000;
+
 const AGENT_POLL_INTERVAL_MS = 2_000;
 
 interface AgentPromptResponse {
@@ -39,16 +43,17 @@ interface AgentPromptResponse {
  * Submit a natural-language prompt to Bankr's Agent API and poll until complete.
  * Returns the text response or null on failure/timeout.
  *
- * The ENTIRE call is capped at AGENT_TOTAL_TIMEOUT_MS (5s) because
- * Promise.allSettled in the resolve pipeline waits for ALL adapters.
- * If Bankr's Agent API is slow, it blocks pump/bags/clanker results too.
+ * The ENTIRE call is capped at `timeoutMs` because slow Bankr calls
+ * can block the resolve pipeline. Use AGENT_SHORT_TIMEOUT_MS (5s) for
+ * calls inside Promise.allSettled, AGENT_LONG_TIMEOUT_MS (20s) for
+ * calls that run in parallel with the rest of the pipeline.
  */
-async function promptBankrAgent(prompt: string): Promise<string | null> {
+async function promptBankrAgent(prompt: string, timeoutMs = AGENT_SHORT_TIMEOUT_MS): Promise<string | null> {
   if (!BANKR_API_KEY) return null;
 
   // Single AbortController for the entire call — submit + any polls
   const controller = new AbortController();
-  const deadline = setTimeout(() => controller.abort(), AGENT_TOTAL_TIMEOUT_MS);
+  const deadline = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const submitRes = await fetch(`${BANKR_AGENT_URL}/prompt`, {
@@ -216,7 +221,7 @@ function parseAgentFeeResponse(response: string): ParsedAgentFee[] {
  * Use the Agent API to fetch fees for a handle (Twitter/Farcaster username).
  * Asks for structured JSON output for reliable parsing.
  */
-async function fetchFeesByAgent(handle: string): Promise<TokenFee[]> {
+async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_MS): Promise<TokenFee[]> {
   // Ask for structured JSON output — the Bankr agent understands JSON requests well
   const prompt = [
     `List all Bankr tokens where @${handle} is the fee recipient.`,
@@ -225,7 +230,7 @@ async function fetchFeesByAgent(handle: string): Promise<TokenFee[]> {
     'Use numeric strings for WETH values (e.g. "0.005417"). Return [] if no tokens found.',
   ].join(' ');
 
-  const response = await promptBankrAgent(prompt);
+  const response = await promptBankrAgent(prompt, timeoutMs);
   if (!response) return [];
 
   console.log(`[bankr] agent response for @${handle}:`, response.slice(0, 200));
@@ -536,9 +541,11 @@ export const bankrAdapter: PlatformAdapter = {
       if (fees.length > 0) return fees;
     }
 
-    // Fallback: Agent API (slow, ~12s+ — only if legacy unavailable or empty)
+    // Fallback: Agent API — use long timeout here because getFeesByHandle runs
+    // in parallel with resolveWallets (Promise.all), NOT inside Promise.allSettled
+    // with other adapters. A 20s timeout won't block pump/bags/clanker.
     if (BANKR_API_KEY) {
-      return fetchFeesByAgent(handle);
+      return fetchFeesByAgent(handle, AGENT_LONG_TIMEOUT_MS);
     }
 
     return [];
