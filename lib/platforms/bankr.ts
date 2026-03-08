@@ -314,6 +314,17 @@ const BANKR_LAUNCHES_API = 'https://api.bankr.bot/token-launches';
 const BANKR_PUBLIC_API = 'https://api.bankr.bot/public/doppler';
 const BANKR_BEARER = process.env.BANKR_BEARER_TOKEN;
 
+/** Build auth headers for Bankr Search API.
+ * Prefers bearer token if available, falls back to API key (x-api-key). */
+function bankrAuthHeaders(): Record<string, string> {
+  if (BANKR_BEARER) return { Authorization: `Bearer ${BANKR_BEARER}` };
+  if (BANKR_API_KEY) return { 'x-api-key': BANKR_API_KEY };
+  return {};
+}
+
+/** Whether we have ANY Bankr auth (bearer OR API key) for Search API */
+const HAS_BANKR_AUTH = !!(BANKR_BEARER || BANKR_API_KEY);
+
 interface BankrTokenLaunch {
   tokenName: string;
   tokenSymbol: string;
@@ -360,7 +371,7 @@ async function searchLaunchesPaginated(
   query: string,
   maxPages = 3
 ): Promise<BankrTokenLaunch[]> {
-  if (!BANKR_BEARER) return [];
+  if (!HAS_BANKR_AUTH) return [];
 
   const all: BankrTokenLaunch[] = [];
   const seen = new Set<string>();
@@ -375,7 +386,7 @@ async function searchLaunchesPaginated(
       const timeout = setTimeout(() => controller.abort(), 12_000);
       const res = await fetch(
         `${BANKR_LAUNCHES_API}/search/paginated?${params.toString()}`,
-        { headers: { Authorization: `Bearer ${BANKR_BEARER}` }, signal: controller.signal }
+        { headers: bankrAuthHeaders(), signal: controller.signal }
       );
       clearTimeout(timeout);
       if (!res.ok) break;
@@ -396,13 +407,13 @@ async function searchLaunchesPaginated(
 }
 
 async function searchLaunches(query: string): Promise<BankrSearchResponse> {
-  if (!BANKR_BEARER) return {};
+  if (!HAS_BANKR_AUTH) return {};
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12_000);
     const res = await fetch(
       `${BANKR_LAUNCHES_API}/search?q=${encodeURIComponent(query)}`,
-      { headers: { Authorization: `Bearer ${BANKR_BEARER}` }, signal: controller.signal }
+      { headers: bankrAuthHeaders(), signal: controller.signal }
     );
     clearTimeout(timeout);
     if (!res.ok) return {};
@@ -503,8 +514,8 @@ export const bankrAdapter: PlatformAdapter = {
   ): Promise<ResolvedWallet[]> {
     if (provider === 'wallet') return [];
 
-    // Primary: legacy search (fast, ~2s)
-    if (BANKR_BEARER) {
+    // Primary: Search API (fast, ~2s) — works with bearer OR API key
+    if (HAS_BANKR_AUTH) {
       const data = await searchLaunches(handle);
       const wallets: ResolvedWallet[] = [];
       const seen = new Set<string>();
@@ -520,7 +531,7 @@ export const bankrAdapter: PlatformAdapter = {
       if (wallets.length > 0) return wallets;
     }
 
-    // Fallback: Agent API (slow, ~12s+ — only if legacy unavailable or empty)
+    // Fallback: Agent API (slow, ~12s+)
     if (BANKR_API_KEY) {
       return resolveWalletByAgent(handle);
     }
@@ -535,7 +546,7 @@ export const bankrAdapter: PlatformAdapter = {
     if (provider === 'wallet') return [];
 
     // Primary: legacy search + Doppler (fast, ~5s)
-    if (BANKR_BEARER) {
+    if (HAS_BANKR_AUTH) {
       const tokens = await searchLaunchesPaginated(handle);
       const fees = await fetchFeesForTokens(tokens);
       if (fees.length > 0) return fees;
@@ -559,7 +570,7 @@ export const bankrAdapter: PlatformAdapter = {
     if (!isValidEvmAddress(wallet)) return [];
 
     // Primary: legacy search + Doppler (fast, ~5s)
-    if (BANKR_BEARER) {
+    if (HAS_BANKR_AUTH) {
       const tokens = await searchLaunchesPaginated(wallet);
       const fees = await fetchFeesForTokens(tokens);
       if (fees.length > 0) return fees;
