@@ -18,10 +18,13 @@ const BANKR_API_URL = process.env.BANKR_API_URL || 'https://api.bankr.bot';
 const BANKR_AGENT_URL = `${BANKR_API_URL}/agent`;
 const BANKR_API_KEY = process.env.BANKR_API_KEY;
 
-/** Max polling attempts × interval = 5 × 2s = 10s polling window.
- * Keep short — Agent API runs inside the 30s RESOLVE_TIMEOUT_MS pipeline.
- * Background resolve continues if the hot path times out. */
-const AGENT_POLL_MAX = 5;
+/** Total budget for a single Agent API call (submit + poll).
+ * Must be short — the resolve pipeline has a 30s hard timeout, and
+ * Promise.allSettled waits for ALL adapters. A slow Bankr call blocks
+ * every other adapter's results from reaching the page.
+ * Agent API jobs typically take 30s–2min so they almost never complete here;
+ * this timeout prevents them from starving faster adapters. */
+const AGENT_TOTAL_TIMEOUT_MS = 5_000;
 const AGENT_POLL_INTERVAL_MS = 2_000;
 
 interface AgentPromptResponse {
@@ -35,13 +38,19 @@ interface AgentPromptResponse {
 /**
  * Submit a natural-language prompt to Bankr's Agent API and poll until complete.
  * Returns the text response or null on failure/timeout.
+ *
+ * The ENTIRE call is capped at AGENT_TOTAL_TIMEOUT_MS (5s) because
+ * Promise.allSettled in the resolve pipeline waits for ALL adapters.
+ * If Bankr's Agent API is slow, it blocks pump/bags/clanker results too.
  */
 async function promptBankrAgent(prompt: string): Promise<string | null> {
   if (!BANKR_API_KEY) return null;
 
+  // Single AbortController for the entire call — submit + any polls
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), AGENT_TOTAL_TIMEOUT_MS);
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8_000);
     const submitRes = await fetch(`${BANKR_AGENT_URL}/prompt`, {
       method: 'POST',
       headers: {
@@ -51,7 +60,6 @@ async function promptBankrAgent(prompt: string): Promise<string | null> {
       body: JSON.stringify({ prompt }),
       signal: controller.signal,
     });
-    clearTimeout(timeout);
 
     if (!submitRes.ok) {
       console.warn(`[bankr] agent prompt returned HTTP ${submitRes.status}`);
@@ -71,17 +79,16 @@ async function promptBankrAgent(prompt: string): Promise<string | null> {
     if (data.response) return data.response;
     if (!data.jobId) return null;
 
-    // Poll for async job completion
-    for (let i = 0; i < AGENT_POLL_MAX; i++) {
+    // Poll for async job completion (remaining budget from the 5s total)
+    // Agent API jobs typically take 30s–2min, so this rarely completes.
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
       await new Promise((r) => setTimeout(r, AGENT_POLL_INTERVAL_MS));
 
-      const pollController = new AbortController();
-      const pollTimeout = setTimeout(() => pollController.abort(), 10_000);
       const pollRes = await fetch(`${BANKR_AGENT_URL}/job/${data.jobId}`, {
         headers: { 'x-api-key': BANKR_API_KEY },
-        signal: pollController.signal,
+        signal: controller.signal,
       });
-      clearTimeout(pollTimeout);
 
       if (!pollRes.ok) continue;
       const job = (await pollRes.json()) as AgentPromptResponse;
@@ -91,14 +98,17 @@ async function promptBankrAgent(prompt: string): Promise<string | null> {
         console.warn(`[bankr] agent job ${data.jobId} ${job.status}`, (job as Record<string, unknown>).error || '');
         return null;
       }
-      // still pending/processing — keep polling
+      // still pending/processing — loop will be killed by abort controller
     }
-
-    console.warn(`[bankr] agent job ${data.jobId} timed out after polling`);
-    return null;
   } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      // Expected — 5s budget exhausted
+      return null;
+    }
     console.warn('[bankr] agent prompt failed:', err instanceof Error ? err.message : err);
     return null;
+  } finally {
+    clearTimeout(deadline);
   }
 }
 
