@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { PlatformIcon } from './PlatformIcon';
 import { PLATFORM_CONFIG } from '@/lib/constants';
@@ -44,14 +44,21 @@ function CheckIcon({ className }: { className?: string }) {
 /** Individual wallet row with copy functionality */
 function WalletRow({ wallet }: { wallet: Wallet }) {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const meta = chainMeta[wallet.chain] ?? { label: wallet.chain, color: 'text-muted-foreground', bg: 'bg-muted border-border' };
   const platformConfig = PLATFORM_CONFIG[wallet.source_platform as keyof typeof PLATFORM_CONFIG];
 
+  // Cleanup timer on unmount to avoid setting state on unmounted component
+  useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+
   const handleCopy = useCallback(async () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
     try {
       await navigator.clipboard.writeText(wallet.address);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // Fallback for insecure contexts
       const ta = document.createElement('textarea');
@@ -60,10 +67,12 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
       ta.style.opacity = '0';
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand('copy');
+      const ok = document.execCommand('copy');
       document.body.removeChild(ta);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (ok) {
+        setCopied(true);
+        timerRef.current = setTimeout(() => setCopied(false), 2000);
+      }
     }
   }, [wallet.address]);
 
@@ -84,6 +93,7 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
       {/* Copy button */}
       <button
         onClick={handleCopy}
+        aria-label={copied ? 'Copied!' : 'Copy address'}
         title={copied ? 'Copied!' : 'Copy address'}
         className={`inline-flex shrink-0 items-center justify-center rounded-md p-1 transition-all ${
           copied

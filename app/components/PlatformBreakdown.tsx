@@ -58,7 +58,8 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
   const orderedPlatforms = [...platformsWithData, ...platformsEmpty];
 
   const filteredFees = activeTab === 'all' ? fees : (byPlatform.get(activeTab as Platform) ?? []);
-  const tabKeys = ['all', ...orderedPlatforms];
+  // Only cycle through visible tabs (All + platforms with data) for keyboard nav
+  const tabKeys = ['all', ...platformsWithData];
 
   return (
     <div className="space-y-4">
@@ -85,7 +86,8 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
             <button
               key={platform}
               onClick={() => setActiveTab(isActive ? 'all' : platform)}
-              title={`${config?.name ?? platform}: ${count} tokens`}
+              aria-pressed={isActive}
+              aria-label={`${config?.name ?? platform}: ${count} tokens`}
               className={`group relative flex flex-col items-center gap-1 rounded-xl border px-1 py-2.5 transition-all duration-200 ${
                 isActive
                   ? 'border-foreground/30 bg-foreground/10 shadow-sm'
