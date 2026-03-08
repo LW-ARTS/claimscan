@@ -11,8 +11,284 @@ import type {
 } from './types';
 
 // ═══════════════════════════════════════════════
-// Bankr Structured API Types
+// Bankr Agent API (primary — prompt-based)
 // ═══════════════════════════════════════════════
+
+const BANKR_AGENT_URL = 'https://api.bankr.bot/agent';
+const BANKR_API_KEY = process.env.BANKR_API_KEY;
+
+/** Max polling attempts × interval = 10 × 3s = 30s timeout */
+const AGENT_POLL_MAX = 10;
+const AGENT_POLL_INTERVAL_MS = 3_000;
+
+interface AgentPromptResponse {
+  jobId?: string;
+  threadId?: string;
+  status?: string;
+  result?: string;
+  response?: string;
+}
+
+/**
+ * Submit a natural-language prompt to Bankr's Agent API and poll until complete.
+ * Returns the text response or null on failure/timeout.
+ */
+async function promptBankrAgent(prompt: string): Promise<string | null> {
+  if (!BANKR_API_KEY) return null;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    const submitRes = await fetch(`${BANKR_AGENT_URL}/prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': BANKR_API_KEY,
+      },
+      body: JSON.stringify({ prompt }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!submitRes.ok) {
+      console.warn(`[bankr] agent prompt returned HTTP ${submitRes.status}`);
+      return null;
+    }
+
+    const data = (await submitRes.json()) as AgentPromptResponse;
+
+    // Some queries return result immediately
+    if (data.result) return data.result;
+    if (data.response) return data.response;
+    if (!data.jobId) return null;
+
+    // Poll for async job completion
+    for (let i = 0; i < AGENT_POLL_MAX; i++) {
+      await new Promise((r) => setTimeout(r, AGENT_POLL_INTERVAL_MS));
+
+      const pollController = new AbortController();
+      const pollTimeout = setTimeout(() => pollController.abort(), 10_000);
+      const pollRes = await fetch(`${BANKR_AGENT_URL}/job/${data.jobId}`, {
+        headers: { 'X-API-Key': BANKR_API_KEY },
+        signal: pollController.signal,
+      });
+      clearTimeout(pollTimeout);
+
+      if (!pollRes.ok) continue;
+      const job = (await pollRes.json()) as AgentPromptResponse;
+
+      if (job.status === 'completed') return job.response || job.result || null;
+      if (job.status === 'failed' || job.status === 'cancelled') {
+        console.warn(`[bankr] agent job ${data.jobId} ${job.status}`);
+        return null;
+      }
+      // still pending/processing — keep polling
+    }
+
+    console.warn(`[bankr] agent job ${data.jobId} timed out after polling`);
+    return null;
+  } catch (err) {
+    console.warn('[bankr] agent prompt failed:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Agent Response Parsing
+// ═══════════════════════════════════════════════
+
+interface ParsedAgentFee {
+  tokenAddress: string;
+  tokenSymbol: string;
+  earnedWeth: string;
+  claimedWeth: string;
+  unclaimedWeth: string;
+}
+
+/**
+ * Parse the Agent API's natural-language response into structured fee data.
+ * Tries JSON extraction first, then falls back to regex line-by-line parsing.
+ */
+function parseAgentFeeResponse(response: string): ParsedAgentFee[] {
+  // Strategy 1: Try to extract a JSON array from the response
+  const jsonMatch = response.match(/\[[\s\S]*?\]/);
+  if (jsonMatch) {
+    try {
+      const arr = JSON.parse(jsonMatch[0]) as Record<string, string>[];
+      if (Array.isArray(arr) && arr.length > 0) {
+        const fees: ParsedAgentFee[] = [];
+        for (const item of arr) {
+          const addr = item.a || item.address || item.tokenAddress || '';
+          if (!addr || !isValidEvmAddress(addr)) continue;
+          fees.push({
+            tokenAddress: addr,
+            tokenSymbol: item.s || item.symbol || item.tokenSymbol || 'UNKNOWN',
+            earnedWeth: item.e || item.earned || item.totalEarned || '0',
+            claimedWeth: item.c || item.claimed || item.totalClaimed || '0',
+            unclaimedWeth: item.u || item.unclaimed || item.totalUnclaimed || '0',
+          });
+        }
+        if (fees.length > 0) return fees;
+      }
+    } catch {
+      // JSON parse failed — fall through to regex
+    }
+  }
+
+  // Strategy 2: Line-by-line regex parsing for pipe-delimited format
+  // Matches: 0xADDRESS|SYMBOL|0.005|0.002|0.003
+  const pipeRegex = /^(0x[a-fA-F0-9]{40})\|([^|]+)\|([\d.]+)\|([\d.]+)\|([\d.]+)/;
+  const lines = response.split('\n');
+  const fees: ParsedAgentFee[] = [];
+
+  for (const line of lines) {
+    const match = line.trim().match(pipeRegex);
+    if (match) {
+      fees.push({
+        tokenAddress: match[1],
+        tokenSymbol: match[2].trim(),
+        earnedWeth: match[3],
+        claimedWeth: match[4],
+        unclaimedWeth: match[5],
+      });
+    }
+  }
+  if (fees.length > 0) return fees;
+
+  // Strategy 3: Extract individual token blocks from natural language
+  // Pattern: token address + WETH amounts nearby
+  const addrRegex = /0x[a-fA-F0-9]{40}/g;
+  const wethRegex = /([\d.]+)\s*WETH/gi;
+  const addresses = [...response.matchAll(addrRegex)].map((m) => m[0]);
+  const wethAmounts = [...response.matchAll(wethRegex)].map((m) => m[1]);
+
+  if (addresses.length > 0 && wethAmounts.length > 0) {
+    // If we have both addresses and WETH amounts, try to associate them
+    // Simple heuristic: each address gets the next available WETH amounts
+    const symbolRegex = /\b([A-Z$][A-Z0-9$]{1,9})\b/g;
+    const symbols = [...response.matchAll(symbolRegex)]
+      .map((m) => m[1])
+      .filter((s) => !['WETH', 'ETH', 'USD', 'TOKEN', 'TOTAL', 'NONE', 'JSON'].includes(s));
+
+    for (let i = 0; i < addresses.length; i++) {
+      const addr = addresses[i];
+      if (!isValidEvmAddress(addr)) continue;
+
+      // Try to find 2-3 WETH values near this address
+      const earnedIdx = i * 3;
+      const earned = wethAmounts[earnedIdx] || wethAmounts[i * 2] || '0';
+      const claimed = wethAmounts[earnedIdx + 1] || '0';
+      const unclaimed = wethAmounts[earnedIdx + 2] || wethAmounts[i * 2 + 1] || earned;
+
+      fees.push({
+        tokenAddress: addr,
+        tokenSymbol: symbols[i] || 'UNKNOWN',
+        earnedWeth: earned,
+        claimedWeth: claimed,
+        unclaimedWeth: unclaimed,
+      });
+    }
+  }
+
+  return fees;
+}
+
+/**
+ * Use the Agent API to fetch fees for a handle (Twitter/Farcaster username).
+ * Asks for structured JSON output for reliable parsing.
+ */
+async function fetchFeesByAgent(handle: string): Promise<TokenFee[]> {
+  // Ask for structured JSON output — the Bankr agent understands JSON requests well
+  const prompt = [
+    `List all Bankr tokens where @${handle} is the fee recipient.`,
+    'For each token, return ONLY a JSON array with this exact format, no explanation text:',
+    '[{"a":"TOKEN_ADDRESS","s":"SYMBOL","e":"EARNED_WETH","c":"CLAIMED_WETH","u":"UNCLAIMED_WETH"}]',
+    'Use numeric strings for WETH values (e.g. "0.005417"). Return [] if no tokens found.',
+  ].join(' ');
+
+  const response = await promptBankrAgent(prompt);
+  if (!response) return [];
+
+  console.log(`[bankr] agent response for @${handle}:`, response.slice(0, 200));
+
+  const parsed = parseAgentFeeResponse(response);
+  if (parsed.length === 0) {
+    // Check if response explicitly says no tokens
+    if (/no (token|fee|result)|not found|\[\s*\]|none|zero|empty/i.test(response)) {
+      return [];
+    }
+    console.warn('[bankr] could not parse agent response:', response.slice(0, 300));
+    return [];
+  }
+
+  return parsed
+    .filter((p) => {
+      const earned = wethToWei(p.earnedWeth);
+      const unclaimed = wethToWei(p.unclaimedWeth);
+      // Skip zero-value entries
+      return earned !== '0' || unclaimed !== '0';
+    })
+    .map((p) => {
+      const earned = wethToWei(p.earnedWeth);
+      const claimed = wethToWei(p.claimedWeth);
+      const unclaimed = wethToWei(p.unclaimedWeth);
+
+      // Recalculate earned if needed
+      let totalEarned = earned;
+      if (earned === '0' && (claimed !== '0' || unclaimed !== '0')) {
+        try {
+          totalEarned = (BigInt(claimed) + BigInt(unclaimed)).toString();
+        } catch {
+          totalEarned = unclaimed;
+        }
+      }
+
+      return {
+        tokenAddress: normalizeEvmAddress(p.tokenAddress),
+        tokenSymbol: sanitizeTokenSymbol(p.tokenSymbol),
+        chain: 'base' as const,
+        platform: 'bankr' as const,
+        totalEarned: totalEarned,
+        totalClaimed: claimed,
+        totalUnclaimed: unclaimed,
+        totalEarnedUsd: null,
+        royaltyBps: null,
+      };
+    });
+}
+
+/**
+ * Use the Agent API to resolve a handle's Base wallet address.
+ */
+async function resolveWalletByAgent(handle: string): Promise<ResolvedWallet[]> {
+  const prompt = `What is the Base/Ethereum wallet address associated with @${handle} on Bankr? Reply with ONLY the 0x address, nothing else.`;
+  const response = await promptBankrAgent(prompt);
+  if (!response) return [];
+
+  const wallets: ResolvedWallet[] = [];
+  const seen = new Set<string>();
+  const addrRegex = /0x[a-fA-F0-9]{40}/g;
+
+  for (const match of response.matchAll(addrRegex)) {
+    const addr = match[0];
+    if (!isValidEvmAddress(addr)) continue;
+    const normalized = normalizeEvmAddress(addr);
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      wallets.push({ address: normalized, chain: 'base', sourcePlatform: 'bankr' });
+    }
+  }
+
+  return wallets;
+}
+
+// ═══════════════════════════════════════════════
+// Legacy: Search + Doppler API (fallback)
+// ═══════════════════════════════════════════════
+
+const BANKR_LAUNCHES_API = 'https://api.bankr.bot/token-launches';
+const BANKR_PUBLIC_API = 'https://api.bankr.bot/public/doppler';
+const BANKR_BEARER = process.env.BANKR_BEARER_TOKEN;
 
 interface BankrTokenLaunch {
   tokenName: string;
@@ -20,14 +296,13 @@ interface BankrTokenLaunch {
   tokenAddress: string;
   chain: string;
   poolId: string;
-  feeRecipient?: {
-    walletAddress: string;
-    xUsername?: string;
-  };
-  deployer?: {
-    walletAddress: string;
-    xUsername?: string;
-  };
+  feeRecipient?: { walletAddress: string; xUsername?: string };
+  deployer?: { walletAddress: string; xUsername?: string };
+}
+
+interface BankrPaginatedResponse {
+  results: BankrTokenLaunch[];
+  nextCursor?: string | null;
 }
 
 interface BankrSearchResponse {
@@ -36,12 +311,6 @@ interface BankrSearchResponse {
     byDeployer?: { results: BankrTokenLaunch[]; hasMore: boolean };
     byFeeRecipient?: { results: BankrTokenLaunch[]; hasMore: boolean };
   };
-}
-
-/** Paginated search response (cursor-based) */
-interface BankrPaginatedResponse {
-  results: BankrTokenLaunch[];
-  nextCursor?: string | null;
 }
 
 interface BankrTokenFeeResponse {
@@ -63,22 +332,6 @@ interface BankrTokenFeeResponse {
   };
 }
 
-// ═══════════════════════════════════════════════
-// API Helpers
-// ═══════════════════════════════════════════════
-
-const BANKR_LAUNCHES_API = 'https://api.bankr.bot/token-launches';
-const BANKR_PUBLIC_API = 'https://api.bankr.bot/public/doppler';
-
-/** Bearer token for the launches search API — must be set via env var. */
-const BANKR_BEARER = process.env.BANKR_BEARER_TOKEN;
-
-/**
- * Search Bankr token launches using the paginated endpoint.
- * The non-paginated /search endpoint caps at 5 results per group.
- * The /search/paginated endpoint uses cursor-based pagination and returns 10+ per page.
- * We fetch up to maxPages to collect all fee-recipient tokens.
- */
 async function searchLaunchesPaginated(
   query: string,
   maxPages = 3
@@ -91,52 +344,33 @@ async function searchLaunchesPaginated(
 
   for (let page = 0; page < maxPages; page++) {
     try {
-      const params = new URLSearchParams({
-        q: query,
-        group: 'byFeeRecipient',
-      });
+      const params = new URLSearchParams({ q: query, group: 'byFeeRecipient' });
       if (cursor) params.set('cursor', cursor);
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 12_000);
       const res = await fetch(
         `${BANKR_LAUNCHES_API}/search/paginated?${params.toString()}`,
-        {
-          headers: { Authorization: `Bearer ${BANKR_BEARER}` },
-          signal: controller.signal,
-        }
+        { headers: { Authorization: `Bearer ${BANKR_BEARER}` }, signal: controller.signal }
       );
       clearTimeout(timeout);
-      if (!res.ok) {
-        console.warn(`[bankr] paginated search returned HTTP ${res.status}`);
-        break;
-      }
+      if (!res.ok) break;
 
       const data = (await res.json()) as BankrPaginatedResponse;
       for (const token of data.results ?? []) {
         if (!token.tokenAddress) continue;
         const key = token.tokenAddress.toLowerCase();
-        if (!seen.has(key)) {
-          seen.add(key);
-          all.push(token);
-        }
+        if (!seen.has(key)) { seen.add(key); all.push(token); }
       }
-
       if (!data.nextCursor) break;
       cursor = data.nextCursor;
-    } catch (err) {
-      console.warn('[bankr] paginated search failed:', err instanceof Error ? err.message : err);
+    } catch {
       break;
     }
   }
-
   return all;
 }
 
-/**
- * Fallback: non-paginated search for identity resolution.
- * Returns the first page of results with group metadata (fee recipient wallets).
- */
 async function searchLaunches(query: string): Promise<BankrSearchResponse> {
   if (!BANKR_BEARER) return {};
   try {
@@ -144,40 +378,27 @@ async function searchLaunches(query: string): Promise<BankrSearchResponse> {
     const timeout = setTimeout(() => controller.abort(), 12_000);
     const res = await fetch(
       `${BANKR_LAUNCHES_API}/search?q=${encodeURIComponent(query)}`,
-      {
-        headers: { Authorization: `Bearer ${BANKR_BEARER}` },
-        signal: controller.signal,
-      }
+      { headers: { Authorization: `Bearer ${BANKR_BEARER}` }, signal: controller.signal }
     );
     clearTimeout(timeout);
-    if (!res.ok) {
-      console.warn(`[bankr] search returned HTTP ${res.status}`);
-      return {};
-    }
+    if (!res.ok) return {};
     return (await res.json()) as BankrSearchResponse;
-  } catch (err) {
-    console.warn('[bankr] search failed:', err instanceof Error ? err.message : err);
+  } catch {
     return {};
   }
 }
 
-/**
- * Get fee details for a specific token from the public Doppler API.
- * Returns fee recipient address, claimable/claimed WETH amounts.
- */
 async function getTokenFees(tokenAddress: string): Promise<BankrTokenFeeResponse | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
-    const res = await fetch(
-      `${BANKR_PUBLIC_API}/token-fees/${tokenAddress}`,
-      { signal: controller.signal }
-    );
+    const res = await fetch(`${BANKR_PUBLIC_API}/token-fees/${tokenAddress}`, {
+      signal: controller.signal,
+    });
     clearTimeout(timeout);
     if (!res.ok) return null;
     return (await res.json()) as BankrTokenFeeResponse;
-  } catch (err) {
-    console.warn(`[bankr] getTokenFees failed for ${tokenAddress}:`, err instanceof Error ? err.message : err);
+  } catch {
     return null;
   }
 }
@@ -190,36 +411,22 @@ function wethToWei(val: string | null | undefined): string {
   let str = val.trim();
   if (!str || str === '0' || str === '0.000000') return '0';
 
-  // Handle "<0.000001" format from API (treat as 1 wei = negligible but non-zero)
   if (str.startsWith('<')) str = str.slice(1);
-
-  // Already a large integer (wei)
   if (/^\d{15,}$/.test(str)) return str;
 
   const num = parseFloat(str);
   if (!Number.isFinite(num) || num <= 0) return '0';
 
-  // String manipulation to avoid floating point precision loss
   const parts = str.split('.');
   const whole = parts[0] || '0';
   const frac = (parts[1] || '').padEnd(18, '0').slice(0, 18);
   return (whole + frac).replace(/^0+/, '') || '0';
 }
 
-/**
- * Fetch fee amounts for a list of token launches in parallel.
- * Uses the public Doppler token-fees endpoint.
- */
 async function fetchFeesForTokens(tokens: BankrTokenLaunch[]): Promise<TokenFee[]> {
   if (tokens.length === 0) return [];
-
-  // Limit concurrent requests
   const batch = tokens.slice(0, 30);
-
-  const feeResults = await Promise.allSettled(
-    batch.map((t) => getTokenFees(t.tokenAddress))
-  );
-
+  const feeResults = await Promise.allSettled(batch.map((t) => getTokenFees(t.tokenAddress)));
   const fees: TokenFee[] = [];
 
   for (let i = 0; i < feeResults.length; i++) {
@@ -227,24 +434,17 @@ async function fetchFeesForTokens(tokens: BankrTokenLaunch[]): Promise<TokenFee[
     const token = batch[i];
     if (result.status !== 'fulfilled' || !result.value) continue;
 
-    const feeData = result.value;
-    const totals = feeData.totals;
-
+    const totals = result.value.totals;
     const claimableWei = wethToWei(totals?.claimableWeth);
     const claimedWei = wethToWei(totals?.claimedWeth);
 
-    // Calculate total earned = claimable + claimed
     let totalEarnedWei: string;
     try {
-      const earned = BigInt(claimableWei) + BigInt(claimedWei);
-      totalEarnedWei = earned.toString();
-    } catch (err) {
-      console.warn('[bankr] BigInt conversion failed for earned calculation:', err instanceof Error ? err.message : err);
+      totalEarnedWei = (BigInt(claimableWei) + BigInt(claimedWei)).toString();
+    } catch {
       totalEarnedWei = claimableWei;
     }
 
-    // Skip tokens where the API returned no fee data (all zeros)
-    // — prevents inserting misleading "0 earned / 0 claimed" rows
     if (totalEarnedWei === '0' && claimableWei === '0' && claimedWei === '0') continue;
 
     fees.push({
@@ -259,7 +459,6 @@ async function fetchFeesForTokens(tokens: BankrTokenLaunch[]): Promise<TokenFee[
       royaltyBps: null,
     });
   }
-
   return fees;
 }
 
@@ -280,26 +479,30 @@ export const bankrAdapter: PlatformAdapter = {
   ): Promise<ResolvedWallet[]> {
     if (provider === 'wallet') return [];
 
-    // Use non-paginated search for identity — we only need the wallet address
-    const data = await searchLaunches(handle);
-    const wallets: ResolvedWallet[] = [];
-    const seen = new Set<string>();
-
-    for (const token of data.groups?.byFeeRecipient?.results ?? []) {
-      const addr = token.feeRecipient?.walletAddress;
-      if (!addr || !isValidEvmAddress(addr)) continue;
-      const normalized = normalizeEvmAddress(addr);
-      if (!seen.has(normalized)) {
-        seen.add(normalized);
-        wallets.push({
-          address: normalized,
-          chain: 'base',
-          sourcePlatform: 'bankr',
-        });
-      }
+    // Primary: Agent API
+    if (BANKR_API_KEY) {
+      const wallets = await resolveWalletByAgent(handle);
+      if (wallets.length > 0) return wallets;
     }
 
-    return wallets;
+    // Fallback: legacy search
+    if (BANKR_BEARER) {
+      const data = await searchLaunches(handle);
+      const wallets: ResolvedWallet[] = [];
+      const seen = new Set<string>();
+      for (const token of data.groups?.byFeeRecipient?.results ?? []) {
+        const addr = token.feeRecipient?.walletAddress;
+        if (!addr || !isValidEvmAddress(addr)) continue;
+        const normalized = normalizeEvmAddress(addr);
+        if (!seen.has(normalized)) {
+          seen.add(normalized);
+          wallets.push({ address: normalized, chain: 'base', sourcePlatform: 'bankr' });
+        }
+      }
+      return wallets;
+    }
+
+    return [];
   },
 
   async getFeesByHandle(
@@ -308,8 +511,19 @@ export const bankrAdapter: PlatformAdapter = {
   ): Promise<TokenFee[]> {
     if (provider === 'wallet') return [];
 
-    const tokens = await searchLaunchesPaginated(handle);
-    return fetchFeesForTokens(tokens);
+    // Primary: Agent API
+    if (BANKR_API_KEY) {
+      const fees = await fetchFeesByAgent(handle);
+      if (fees.length > 0) return fees;
+    }
+
+    // Fallback: legacy search + Doppler
+    if (BANKR_BEARER) {
+      const tokens = await searchLaunchesPaginated(handle);
+      return fetchFeesForTokens(tokens);
+    }
+
+    return [];
   },
 
   async getCreatorTokens(_wallet: string): Promise<CreatorToken[]> {
@@ -319,17 +533,57 @@ export const bankrAdapter: PlatformAdapter = {
   async getHistoricalFees(wallet: string): Promise<TokenFee[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
-    const tokens = await searchLaunchesPaginated(wallet);
-    return fetchFeesForTokens(tokens);
+    // Primary: Agent API (ask by wallet address)
+    if (BANKR_API_KEY) {
+      const prompt = [
+        `List all Bankr tokens where ${wallet} is the fee recipient.`,
+        'Return ONLY a JSON array: [{"a":"TOKEN_ADDRESS","s":"SYMBOL","e":"EARNED_WETH","c":"CLAIMED_WETH","u":"UNCLAIMED_WETH"}]',
+        'Use [] if none.',
+      ].join(' ');
+
+      const response = await promptBankrAgent(prompt);
+      if (response) {
+        const parsed = parseAgentFeeResponse(response);
+        const fees = parsed
+          .filter((p) => wethToWei(p.earnedWeth) !== '0' || wethToWei(p.unclaimedWeth) !== '0')
+          .map((p) => {
+            const earned = wethToWei(p.earnedWeth);
+            const claimed = wethToWei(p.claimedWeth);
+            const unclaimed = wethToWei(p.unclaimedWeth);
+            let totalEarned = earned;
+            if (earned === '0' && (claimed !== '0' || unclaimed !== '0')) {
+              try { totalEarned = (BigInt(claimed) + BigInt(unclaimed)).toString(); } catch { totalEarned = unclaimed; }
+            }
+            return {
+              tokenAddress: normalizeEvmAddress(p.tokenAddress),
+              tokenSymbol: sanitizeTokenSymbol(p.tokenSymbol),
+              chain: 'base' as const,
+              platform: 'bankr' as const,
+              totalEarned: totalEarned,
+              totalClaimed: claimed,
+              totalUnclaimed: unclaimed,
+              totalEarnedUsd: null,
+              royaltyBps: null,
+            };
+          });
+        if (fees.length > 0) return fees;
+      }
+    }
+
+    // Fallback: legacy search + Doppler
+    if (BANKR_BEARER) {
+      const tokens = await searchLaunchesPaginated(wallet);
+      return fetchFeesForTokens(tokens);
+    }
+
+    return [];
   },
 
   async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
-    const tokens = await searchLaunchesPaginated(wallet);
-    const allFees = await fetchFeesForTokens(tokens);
-
-    // Filter to only unclaimed
+    // Use getHistoricalFees and filter to unclaimed only
+    const allFees = await bankrAdapter.getHistoricalFees(wallet);
     return allFees.filter((f) => {
       try {
         return BigInt(f.totalUnclaimed) > 0n;
