@@ -68,19 +68,19 @@ const BelieveIcon = () => (
 
 const CoinbarrelIcon = () => (
     <svg viewBox="0 0 24 24" className="size-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="12" cy="6" rx="7" ry="3" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M5 6v5c0 1.657 3.134 3 7 3s7-1.343 7-3V6" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M5 11v5c0 1.657 3.134 3 7 3s7-1.343 7-3v-5" stroke="currentColor" strokeWidth="1.6" />
-        <circle cx="12" cy="13" r="1" fill="currentColor" />
+        <path d="M5 7c0-1.657 3.134-3 7-3s7 1.343 7 3v10c0 1.657-3.134 3-7 3s-7-1.343-7-3V7Z" fill="currentColor" opacity="0.2" />
+        <ellipse cx="12" cy="7" rx="7" ry="3" fill="currentColor" />
+        <path d="M5 12c0 1.657 3.134 3 7 3s7-1.343 7-3" stroke="currentColor" strokeWidth="1.5" opacity="0.5" />
+        <path d="M5 7v10c0 1.657 3.134 3 7 3s7-1.343 7-3V7" stroke="currentColor" strokeWidth="1.5" />
     </svg>
 );
 
 const RaydiumIcon = () => (
     <svg viewBox="0 0 24 24" className="size-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2L4 7v10l8 5 8-5V7l-8-5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M12 2v10l8-5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M12 12v10" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M12 12L4 7" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M12 2L4 7v10l8 5 8-5V7l-8-5Z" fill="currentColor" opacity="0.15" />
+        <path d="M12 2L4 7l8 5 8-5-8-5Z" fill="currentColor" opacity="0.4" />
+        <path d="M12 12v10l8-5V7l-8 5Z" fill="currentColor" opacity="0.25" />
+        <path d="M12 2L4 7v10l8 5 8-5V7l-8-5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
     </svg>
 );
 
