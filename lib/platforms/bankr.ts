@@ -243,6 +243,10 @@ async function fetchFeesForTokens(tokens: BankrTokenLaunch[]): Promise<TokenFee[
       totalEarnedWei = claimableWei;
     }
 
+    // Skip tokens where the API returned no fee data (all zeros)
+    // — prevents inserting misleading "0 earned / 0 claimed" rows
+    if (totalEarnedWei === '0' && claimableWei === '0' && claimedWei === '0') continue;
+
     fees.push({
       tokenAddress: normalizeEvmAddress(token.tokenAddress),
       tokenSymbol: sanitizeTokenSymbol(token.tokenSymbol ?? token.tokenName),

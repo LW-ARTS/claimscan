@@ -57,6 +57,11 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
   const currentPage = Math.min(page, totalPages);
   const pagedFees = sortedFees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
+  /** Currency label based on chain — shown after formatted amounts */
+  const currencyLabel = (chain: string) => (
+    <span className="ml-1 text-[10px] font-medium uppercase text-muted-foreground/60">{chain === 'sol' ? 'SOL' : 'ETH'}</span>
+  );
+
   if (sortedFees.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16 text-center">
@@ -96,7 +101,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
             <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Earned</p>
-                <p className="font-mono tabular-nums">{formatTokenAmount(fee.total_earned, decimals)}</p>
+                <p className="font-mono tabular-nums">{formatTokenAmount(fee.total_earned, decimals)}{currencyLabel(fee.chain)}</p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">USD</p>
@@ -104,11 +109,11 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Unclaimed</p>
-                <p className="font-mono tabular-nums">{formatTokenAmount(fee.total_unclaimed, decimals)}</p>
+                <p className="font-mono tabular-nums">{formatTokenAmount(fee.total_unclaimed, decimals)}{currencyLabel(fee.chain)}</p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Claimed</p>
-                <p className="font-mono tabular-nums text-muted-foreground">{formatTokenAmount(fee.total_claimed, decimals)}</p>
+                <p className="font-mono tabular-nums text-muted-foreground">{formatTokenAmount(fee.total_claimed, decimals)}{currencyLabel(fee.chain)}</p>
               </div>
             </div>
           </div>
@@ -177,13 +182,13 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-sm tabular-nums">
-                    {formatTokenAmount(fee.total_earned, decimals)}
+                    {formatTokenAmount(fee.total_earned, decimals)}{currencyLabel(fee.chain)}
                   </td>
                   <td className="hidden whitespace-nowrap px-4 py-3 text-right font-mono text-sm tabular-nums text-muted-foreground md:table-cell">
-                    {formatTokenAmount(fee.total_claimed, decimals)}
+                    {formatTokenAmount(fee.total_claimed, decimals)}{currencyLabel(fee.chain)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-sm tabular-nums">
-                    {formatTokenAmount(fee.total_unclaimed, decimals)}
+                    {formatTokenAmount(fee.total_unclaimed, decimals)}{currencyLabel(fee.chain)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium tabular-nums">
                     {formatUsd(computeFeeUsd(fee, solPrice, ethPrice))}
