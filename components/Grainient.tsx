@@ -167,7 +167,7 @@ const Grainient: React.FC<GrainientProps> = ({
         webgl: 2,
         alpha: true,
         antialias: false,
-        dpr: Math.min(window.devicePixelRatio || 1, 2)
+        dpr: Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1 : 2)
       });
 
       const gl = renderer.gl;
@@ -175,6 +175,8 @@ const Grainient: React.FC<GrainientProps> = ({
       canvasEl.style.width = '100%';
       canvasEl.style.height = '100%';
       canvasEl.style.display = 'block';
+      canvasEl.style.willChange = 'transform';
+      canvasEl.style.backfaceVisibility = 'hidden';
 
       container.appendChild(canvasEl);
 

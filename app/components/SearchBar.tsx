@@ -114,7 +114,7 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             disabled={loading}
-            className={`w-full bg-transparent outline-none placeholder:text-muted-foreground/40 ${isLarge ? 'h-12 pl-11 pr-2 text-lg' : 'h-9 pl-9 text-sm'
+            className={`w-full select-text bg-transparent outline-none placeholder:text-muted-foreground/40 ${isLarge ? 'h-12 pl-11 pr-2 text-lg' : 'h-9 pl-9 text-sm'
               }`}
           />
           {/* Keyboard shortcut hint — visible only on large variant when not focused */}

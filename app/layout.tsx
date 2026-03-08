@@ -4,6 +4,7 @@ import './globals.css';
 import { JsonLd } from './components/JsonLd';
 import { GrainientBackground } from './components/GrainientBackground';
 import { SiteFooter } from './components/SiteFooter';
+import { AntiCopy } from './components/AntiCopy';
 import Link from 'next/link';
 
 const exo2 = Exo_2({
@@ -81,8 +82,9 @@ export default function RootLayout({
         <JsonLd />
       </head>
       <body
-        className={`${exo2.variable} ${jetbrainsMono.variable} font-sans antialiased min-h-screen bg-background text-foreground`}
+        className={`${exo2.variable} ${jetbrainsMono.variable} font-sans antialiased min-h-screen bg-background text-foreground select-none`}
       >
+        <AntiCopy />
         <div className="relative min-h-screen flex flex-col">
           {/* Animated grain background */}
           <GrainientBackground />
@@ -100,15 +102,7 @@ export default function RootLayout({
                   ClaimScan
                 </span>
               </Link>
-              <div className="flex items-center gap-3">
-                <span className="hidden items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground sm:inline-flex">
-                  <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
-                    <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-foreground/40 opacity-75" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-foreground" />
-                  </span>
-                  Solana + Base
-                </span>
-              </div>
+              <div className="flex items-center gap-2" />
             </nav>
           </header>
 

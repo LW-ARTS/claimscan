@@ -88,6 +88,7 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-DNS-Prefetch-Control', 'on');
+  response.headers.set('X-Robots-Tag', 'noarchive, noimageindex');
   response.headers.set(
     'Permissions-Policy',
     'camera=(), microphone=(), geolocation=(), payment=()'
@@ -117,7 +118,8 @@ export function middleware(request: NextRequest) {
   }
 
   // CORS — fail closed to production URL; never reflect attacker-controlled origin
-  const allowedOrigin = process.env.NEXT_PUBLIC_APP_URL || 'https://claimscan.com';
+  const rawOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const allowedOrigin = rawOrigin && rawOrigin.startsWith('https://') ? rawOrigin : 'https://claimscan.com';
   response.headers.set('Access-Control-Allow-Origin', allowedOrigin);
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -139,6 +141,11 @@ export function middleware(request: NextRequest) {
     if (!authHeader || !safeCompare(authHeader, `Bearer ${secret}`)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+  }
+
+  // Prevent caching of API responses
+  if (pathname.startsWith('/api/')) {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   }
 
   // Rate limit public API endpoints

@@ -56,8 +56,7 @@ export default function Home() {
         </div>
 
         <p className="animate-fade-in-up delay-200 mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
-          Discover earned, claimed, and unclaimed fees across DeFi launchpads.
-          One search. Every chain.
+          Paste any @handle or wallet. See what you&apos;ve earned, claimed, and left on the table across 10 launchpads.
         </p>
 
         {/* Search bar */}

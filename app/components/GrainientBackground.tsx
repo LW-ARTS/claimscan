@@ -4,7 +4,7 @@ import Grainient from '@/components/Grainient';
 
 export function GrainientBackground() {
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10">
+    <div className="pointer-events-none fixed inset-0 -z-10 will-change-transform bg-[#c4c4c4]">
       <Grainient
         color1="#ffffff"
         color2="#919191"
