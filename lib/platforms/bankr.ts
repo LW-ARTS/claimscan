@@ -488,13 +488,7 @@ export const bankrAdapter: PlatformAdapter = {
   ): Promise<ResolvedWallet[]> {
     if (provider === 'wallet') return [];
 
-    // Primary: Agent API
-    if (BANKR_API_KEY) {
-      const wallets = await resolveWalletByAgent(handle);
-      if (wallets.length > 0) return wallets;
-    }
-
-    // Fallback: legacy search
+    // Primary: legacy search (fast, ~2s)
     if (BANKR_BEARER) {
       const data = await searchLaunches(handle);
       const wallets: ResolvedWallet[] = [];
@@ -508,7 +502,12 @@ export const bankrAdapter: PlatformAdapter = {
           wallets.push({ address: normalized, chain: 'base', sourcePlatform: 'bankr' });
         }
       }
-      return wallets;
+      if (wallets.length > 0) return wallets;
+    }
+
+    // Fallback: Agent API (slow, ~12s+ — only if legacy unavailable or empty)
+    if (BANKR_API_KEY) {
+      return resolveWalletByAgent(handle);
     }
 
     return [];
@@ -520,16 +519,16 @@ export const bankrAdapter: PlatformAdapter = {
   ): Promise<TokenFee[]> {
     if (provider === 'wallet') return [];
 
-    // Primary: Agent API
-    if (BANKR_API_KEY) {
-      const fees = await fetchFeesByAgent(handle);
+    // Primary: legacy search + Doppler (fast, ~5s)
+    if (BANKR_BEARER) {
+      const tokens = await searchLaunchesPaginated(handle);
+      const fees = await fetchFeesForTokens(tokens);
       if (fees.length > 0) return fees;
     }
 
-    // Fallback: legacy search + Doppler
-    if (BANKR_BEARER) {
-      const tokens = await searchLaunchesPaginated(handle);
-      return fetchFeesForTokens(tokens);
+    // Fallback: Agent API (slow, ~12s+ — only if legacy unavailable or empty)
+    if (BANKR_API_KEY) {
+      return fetchFeesByAgent(handle);
     }
 
     return [];
@@ -542,7 +541,14 @@ export const bankrAdapter: PlatformAdapter = {
   async getHistoricalFees(wallet: string): Promise<TokenFee[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
-    // Primary: Agent API (ask by wallet address)
+    // Primary: legacy search + Doppler (fast, ~5s)
+    if (BANKR_BEARER) {
+      const tokens = await searchLaunchesPaginated(wallet);
+      const fees = await fetchFeesForTokens(tokens);
+      if (fees.length > 0) return fees;
+    }
+
+    // Fallback: Agent API (slow, ~12s+ — only if legacy unavailable or empty)
     if (BANKR_API_KEY) {
       const prompt = [
         `List all Bankr tokens where ${wallet} is the fee recipient.`,
@@ -577,12 +583,6 @@ export const bankrAdapter: PlatformAdapter = {
           });
         if (fees.length > 0) return fees;
       }
-    }
-
-    // Fallback: legacy search + Doppler
-    if (BANKR_BEARER) {
-      const tokens = await searchLaunchesPaginated(wallet);
-      return fetchFeesForTokens(tokens);
     }
 
     return [];
