@@ -31,6 +31,7 @@ const GPA_TIMEOUT_MS = 20_000;
 type PoolEntry = { publicKey: PublicKey; account: Record<string, unknown> };
 const poolCache = new Map<string, { pools: PoolEntry[]; ts: number }>();
 const POOL_CACHE_TTL_MS = 60_000; // 1 minute
+const POOL_CACHE_MAX_SIZE = 200; // Prevent unbounded memory growth
 
 /**
  * Safely convert a BN (or BN-like object from Anchor) to bigint.
@@ -40,7 +41,8 @@ function bnToBigInt(bn: unknown): bigint {
   if (bn === null || bn === undefined) return 0n;
   try {
     return BigInt(String(bn));
-  } catch {
+  } catch (err) {
+    console.warn('[believe] bnToBigInt conversion failed for value:', String(bn), err instanceof Error ? err.message : err);
     return 0n;
   }
 }
@@ -62,6 +64,22 @@ async function getPoolsByCreatorCached(wallet: string): Promise<PoolEntry[]> {
   );
 
   const result = (pools ?? []) as PoolEntry[];
+
+  // Evict expired entries and cap size to prevent unbounded memory growth
+  if (poolCache.size >= POOL_CACHE_MAX_SIZE) {
+    const now = Date.now();
+    for (const [key, entry] of poolCache) {
+      if (now - entry.ts > POOL_CACHE_TTL_MS) poolCache.delete(key);
+    }
+    // If still over limit after TTL sweep, delete oldest half
+    if (poolCache.size >= POOL_CACHE_MAX_SIZE) {
+      const entries = [...poolCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+      for (let i = 0; i < Math.floor(entries.length / 2); i++) {
+        poolCache.delete(entries[i][0]);
+      }
+    }
+  }
+
   poolCache.set(wallet, { pools: result, ts: Date.now() });
   return result;
 }

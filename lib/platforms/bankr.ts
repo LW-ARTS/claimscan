@@ -70,8 +70,8 @@ interface BankrTokenFeeResponse {
 const BANKR_LAUNCHES_API = 'https://api.bankr.bot/token-launches';
 const BANKR_PUBLIC_API = 'https://api.bankr.bot/public/doppler';
 
-/** Bearer token for the launches search API (sourced from Bankr frontend) */
-const BANKR_BEARER = process.env.BANKR_BEARER_TOKEN ?? '9WG1CEmcVRoKZWy1FNis21IWmKy3ZWE1';
+/** Bearer token for the launches search API — must be set via env var. */
+const BANKR_BEARER = process.env.BANKR_BEARER_TOKEN;
 
 /**
  * Search Bankr token launches using the paginated endpoint.
@@ -83,6 +83,8 @@ async function searchLaunchesPaginated(
   query: string,
   maxPages = 3
 ): Promise<BankrTokenLaunch[]> {
+  if (!BANKR_BEARER) return [];
+
   const all: BankrTokenLaunch[] = [];
   const seen = new Set<string>();
   let cursor: string | undefined;
@@ -105,7 +107,10 @@ async function searchLaunchesPaginated(
         }
       );
       clearTimeout(timeout);
-      if (!res.ok) break;
+      if (!res.ok) {
+        console.warn(`[bankr] paginated search returned HTTP ${res.status}`);
+        break;
+      }
 
       const data = (await res.json()) as BankrPaginatedResponse;
       for (const token of data.results ?? []) {
@@ -119,7 +124,8 @@ async function searchLaunchesPaginated(
 
       if (!data.nextCursor) break;
       cursor = data.nextCursor;
-    } catch {
+    } catch (err) {
+      console.warn('[bankr] paginated search failed:', err instanceof Error ? err.message : err);
       break;
     }
   }
@@ -132,6 +138,7 @@ async function searchLaunchesPaginated(
  * Returns the first page of results with group metadata (fee recipient wallets).
  */
 async function searchLaunches(query: string): Promise<BankrSearchResponse> {
+  if (!BANKR_BEARER) return {};
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12_000);
@@ -143,9 +150,13 @@ async function searchLaunches(query: string): Promise<BankrSearchResponse> {
       }
     );
     clearTimeout(timeout);
-    if (!res.ok) return {};
+    if (!res.ok) {
+      console.warn(`[bankr] search returned HTTP ${res.status}`);
+      return {};
+    }
     return (await res.json()) as BankrSearchResponse;
-  } catch {
+  } catch (err) {
+    console.warn('[bankr] search failed:', err instanceof Error ? err.message : err);
     return {};
   }
 }
@@ -165,7 +176,8 @@ async function getTokenFees(tokenAddress: string): Promise<BankrTokenFeeResponse
     clearTimeout(timeout);
     if (!res.ok) return null;
     return (await res.json()) as BankrTokenFeeResponse;
-  } catch {
+  } catch (err) {
+    console.warn(`[bankr] getTokenFees failed for ${tokenAddress}:`, err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -226,7 +238,8 @@ async function fetchFeesForTokens(tokens: BankrTokenLaunch[]): Promise<TokenFee[
     try {
       const earned = BigInt(claimableWei) + BigInt(claimedWei);
       totalEarnedWei = earned.toString();
-    } catch {
+    } catch (err) {
+      console.warn('[bankr] BigInt conversion failed for earned calculation:', err instanceof Error ? err.message : err);
       totalEarnedWei = claimableWei;
     }
 

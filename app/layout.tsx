@@ -91,7 +91,7 @@ export default function RootLayout({
           <header className="animate-fade-in-down sticky top-0 z-50 border-b border-white/10 bg-background/20 backdrop-blur-xl shadow-sm dark:shadow-none">
             <nav aria-label="Main navigation" className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
               <Link href="/" className="group flex items-center gap-2.5" aria-label="ClaimScan home">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground" aria-hidden="true">
                   <svg className="h-4 w-4 text-background" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                   </svg>
@@ -102,7 +102,7 @@ export default function RootLayout({
               </Link>
               <div className="flex items-center gap-3">
                 <span className="hidden items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground sm:inline-flex">
-                  <span className="relative flex h-1.5 w-1.5">
+                  <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
                     <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-foreground/40 opacity-75" />
                     <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-foreground" />
                   </span>

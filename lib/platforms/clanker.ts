@@ -60,9 +60,13 @@ async function clankerFetch<T>(path: string): Promise<T | null> {
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[clanker] fetch ${path} returned HTTP ${res.status}`);
+      return null;
+    }
     return await res.json() as T;
-  } catch {
+  } catch (err) {
+    console.warn(`[clanker] fetch ${path} failed:`, err instanceof Error ? err.message : err);
     return null;
   }
 }

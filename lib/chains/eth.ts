@@ -55,7 +55,8 @@ export async function getZoraProtocolRewardsBalanceEth(
       functionName: 'balanceOf',
       args: [account],
     });
-  } catch {
+  } catch (err) {
+    console.warn('[eth] Zora ProtocolRewards balanceOf failed:', err instanceof Error ? err.message : err);
     return 0n;
   }
 }

@@ -31,18 +31,29 @@ interface HeavenPoolInfo {
 // Helpers
 // ═══════════════════════════════════════════════
 
+/**
+ * Short-circuit all Heaven API calls when the API is known to be down.
+ * Set HEAVEN_API_ENABLED=true to re-enable if Heaven restores their API.
+ */
+const HEAVEN_ENABLED = process.env.HEAVEN_API_ENABLED === 'true';
+
 async function heavenFetch<T>(
   baseUrl: string,
   path: string
 ): Promise<T | null> {
+  if (!HEAVEN_ENABLED) return null;
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     const res = await fetch(`${baseUrl}${path}`, { signal: controller.signal });
     clearTimeout(timeout);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[heaven] fetch ${path} returned HTTP ${res.status}`);
+      return null;
+    }
     return await res.json() as T;
-  } catch {
+  } catch (err) {
+    console.warn(`[heaven] fetch ${path} failed:`, err instanceof Error ? err.message : err);
     return null;
   }
 }

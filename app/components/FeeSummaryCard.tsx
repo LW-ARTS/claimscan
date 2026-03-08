@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
-import { safeBigInt, formatUsd } from '@/lib/utils';
-import { toUsdValue } from '@/lib/prices';
+import { safeBigInt, formatUsd, toUsdValue } from '@/lib/utils';
 
 interface LiveFee {
   totalUnclaimed: string;
@@ -55,8 +54,10 @@ export function FeeSummaryCard({
 
     async function pollLiveFees() {
       try {
-        const params = encodeURIComponent(walletsKey);
-        const res = await fetch(`/api/fees/live?wallets=${params}`, {
+        const res = await fetch('/api/fees/live', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wallets: JSON.parse(walletsKey) }),
           cache: 'no-store',
           signal: controller.signal,
         });

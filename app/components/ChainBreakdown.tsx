@@ -1,7 +1,6 @@
 import { CHAIN_CONFIG } from '@/lib/constants';
 import { ChainIcon } from './ChainIcon';
-import { formatUsd, safeBigInt } from '@/lib/utils';
-import { toUsdValue } from '@/lib/prices';
+import { formatUsd, safeBigInt, toUsdValue } from '@/lib/utils';
 import type { Database, Chain } from '@/lib/supabase/types';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
@@ -24,6 +23,10 @@ interface ChainBreakdownProps {
 /**
  * Compute USD for a single fee record.
  * Prefers DB-stored value; falls back to amount × native token price.
+ *
+ * TODO(#15): Fallback assumes native token decimals (SOL=9, ETH=18).
+ * Incorrect for RevShare and similar platforms where fees are in the
+ * meme token's own denomination. Needs server-side USD or token_decimals field.
  */
 function computeFeeUsd(fee: FeeRecord, solPrice: number, ethPrice: number): number {
   if (fee.total_earned_usd != null && fee.total_earned_usd > 0) {

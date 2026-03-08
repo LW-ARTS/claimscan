@@ -11,17 +11,30 @@ const PumpIcon = () => (
     </svg>
 );
 
-const SolanaIcon = () => (
-    <svg viewBox="0 0 397 311" className="size-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="currentColor" />
-        <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="currentColor" />
-        <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="currentColor" />
+const HeavenIcon = () => (
+    <svg viewBox="0 0 24 24" className="size-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="12" cy="5.5" rx="7" ry="2.5" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M12 9v7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M7 20c0-2.761 2.239-4 5-4s5 1.239 5 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
 );
 
-const BaseIcon = () => (
-    <svg viewBox="0 0 200 200" className="size-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path fillRule="evenodd" clipRule="evenodd" d="M100 200C155.228 200 200 155.228 200 100C200 44.7715 155.228 0 100 0C44.7715 0 0 44.7715 0 100C0 155.228 44.7715 200 100 200ZM100 146.5C125.681 146.5 146.5 125.681 146.5 100C146.5 74.3188 125.681 53.5 100 53.5C76.4716 53.5 56.6661 70.9238 52.6139 93.5H97C100.59 93.5 103.5 96.4101 103.5 100C103.5 103.59 100.59 106.5 97 106.5H52.6139C56.6661 129.076 76.4716 146.5 100 146.5Z" fill="currentColor" />
+const BankrIcon = () => (
+    <svg viewBox="0 0 24 24" className="size-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="5" width="16" height="13" rx="2" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="8.5" y="9" width="2" height="2" rx="0.5" fill="currentColor" />
+        <rect x="13.5" y="9" width="2" height="2" rx="0.5" fill="currentColor" />
+        <path d="M9.5 14.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M9 21h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+);
+
+const RevShareIcon = () => (
+    <svg viewBox="0 0 24 24" className="size-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="6" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="18" cy="6.5" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="18" cy="17.5" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M8.3 10.8l7.4-3.2M8.3 13.2l7.4 3.2" stroke="currentColor" strokeWidth="1.6" />
     </svg>
 );
 
@@ -53,6 +66,24 @@ const BelieveIcon = () => (
     </svg>
 );
 
+const CoinbarrelIcon = () => (
+    <svg viewBox="0 0 24 24" className="size-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="12" cy="6" rx="7" ry="3" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M5 6v5c0 1.657 3.134 3 7 3s7-1.343 7-3V6" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M5 11v5c0 1.657 3.134 3 7 3s7-1.343 7-3v-5" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="12" cy="13" r="1" fill="currentColor" />
+    </svg>
+);
+
+const RaydiumIcon = () => (
+    <svg viewBox="0 0 24 24" className="size-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L4 7v10l8 5 8-5V7l-8-5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M12 2v10l8-5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M12 12v10" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M12 12L4 7" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+);
+
 /* ─── Wrapper bubble ─── */
 const IconBubble = ({ children }: { children: React.ReactNode }) => (
     <div className="flex size-10 items-center justify-center rounded-full border border-border bg-background shadow-sm">
@@ -62,17 +93,20 @@ const IconBubble = ({ children }: { children: React.ReactNode }) => (
 
 export function OrbitingLogos() {
     return (
-        <div className="relative h-full w-full overflow-hidden pointer-events-none">
+        <div className="relative h-full w-full overflow-hidden pointer-events-none" aria-hidden="true">
             <OrbitingCircles iconSize={40}>
                 <IconBubble><PumpIcon /></IconBubble>
-                <IconBubble><BaseIcon /></IconBubble>
                 <IconBubble><BagsIcon /></IconBubble>
+                <IconBubble><RaydiumIcon /></IconBubble>
+                <IconBubble><HeavenIcon /></IconBubble>
+                <IconBubble><BankrIcon /></IconBubble>
             </OrbitingCircles>
             <OrbitingCircles radius={100} reverse iconSize={40}>
                 <IconBubble><ClankerIcon /></IconBubble>
-                <IconBubble><SolanaIcon /></IconBubble>
                 <IconBubble><ZoraIcon /></IconBubble>
                 <IconBubble><BelieveIcon /></IconBubble>
+                <IconBubble><CoinbarrelIcon /></IconBubble>
+                <IconBubble><RevShareIcon /></IconBubble>
             </OrbitingCircles>
         </div>
     );

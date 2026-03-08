@@ -68,6 +68,24 @@ const RevShareLogo = (props: SvgProps) => (
   </svg>
 );
 
+const CoinbarrelLogo = (props: SvgProps) => (
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <ellipse cx="12" cy="6" rx="7" ry="3" stroke="currentColor" strokeWidth="1.6" />
+    <path d="M5 6v5c0 1.657 3.134 3 7 3s7-1.343 7-3V6" stroke="currentColor" strokeWidth="1.6" />
+    <path d="M5 11v5c0 1.657 3.134 3 7 3s7-1.343 7-3v-5" stroke="currentColor" strokeWidth="1.6" />
+    <circle cx="12" cy="13" r="1" fill="currentColor" />
+  </svg>
+);
+
+const RaydiumLogo = (props: SvgProps) => (
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <path d="M12 2L4 7v10l8 5 8-5V7l-8-5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    <path d="M12 2v10l8-5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    <path d="M12 12v10" stroke="currentColor" strokeWidth="1.6" />
+    <path d="M12 12L4 7" stroke="currentColor" strokeWidth="1.6" />
+  </svg>
+);
+
 /* ─── Icon registry ─── */
 
 const iconMap: Record<string, React.FC<SvgProps>> = {
@@ -79,6 +97,8 @@ const iconMap: Record<string, React.FC<SvgProps>> = {
   bankr: BankrLogo,
   believe: BelieveLogo,
   revshare: RevShareLogo,
+  coinbarrel: CoinbarrelLogo,
+  raydium: RaydiumLogo,
 };
 
 interface PlatformIconProps extends SvgProps {

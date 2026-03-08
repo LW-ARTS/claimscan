@@ -5,6 +5,7 @@ import type { ResolvedWallet, TokenFee } from '@/lib/platforms/types';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
+import { safeBigInt } from '@/lib/utils';
 
 // ═══════════════════════════════════════════════
 // Identity Detection
@@ -150,7 +151,6 @@ export async function fetchAllFees(
 ): Promise<TokenFee[]> {
   const allAdapters = getAllAdapters();
   const liveAdapters = getLiveFeeAdapters();
-  const allFees: TokenFee[] = [];
 
   // Build tasks for historical fees (all adapters)
   const taskMeta: Array<{ platform: string; wallet: string; type: string }> = [];
@@ -167,9 +167,23 @@ export async function fetchAllFees(
   // Also fetch live unclaimed fees from adapters that support it.
   // Many adapters (pump, zora, etc.) have stub getHistoricalFees but working
   // getLiveUnclaimedFees — this ensures their fees appear in the platform tabs.
+  //
+  // Skip adapters where getHistoricalFees and getLiveUnclaimedFees return equivalent
+  // data (one delegates to the other, or both call the same underlying API).
+  // The historical pass above already covers them — calling both wastes RPC/API calls.
+  const HISTORICAL_COVERS_LIVE: ReadonlySet<string> = new Set([
+    'raydium',    // historical → getLiveUnclaimedFees
+    'coinbarrel', // historical → getLiveUnclaimedFees
+    'clanker',    // live → getHistoricalFees
+    'heaven',     // live → getHistoricalFees
+    'bankr',      // both call searchLaunchesPaginated independently
+    'bags',       // both call getClaimablePositionsCached (30s cache)
+  ]);
+
   for (const wallet of wallets) {
     for (const adapter of liveAdapters) {
       if (adapter.chain !== wallet.chain) continue;
+      if (HISTORICAL_COVERS_LIVE.has(adapter.platform)) continue;
       taskMeta.push({ platform: adapter.platform, wallet: wallet.address, type: 'live' });
       tasks.push(adapter.getLiveUnclaimedFees(wallet.address));
     }
@@ -177,8 +191,10 @@ export async function fetchAllFees(
 
   const results = await Promise.allSettled(tasks);
 
-  // Collect all fees, dedup by platform+chain+tokenAddress (historical takes priority)
-  const feeMap = new Map<string, TokenFee>();
+  // Collect all fees, dedup by platform+chain+tokenAddress.
+  // When the same token appears from multiple wallets, sum the amounts
+  // instead of discarding duplicates. Historical results take priority over live.
+  const feeMap = new Map<string, { fee: TokenFee; isHistorical: boolean }>();
 
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
@@ -187,8 +203,18 @@ export async function fetchAllFees(
       for (const fee of result.value) {
         const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
         const existing = feeMap.get(key);
-        if (!existing || meta.type === 'historical') {
-          feeMap.set(key, fee);
+        if (!existing) {
+          feeMap.set(key, { fee, isHistorical: meta.type === 'historical' });
+        } else if (meta.type === 'historical' && !existing.isHistorical) {
+          // Historical data replaces live data for the same key
+          feeMap.set(key, { fee, isHistorical: true });
+        } else if (meta.type === (existing.isHistorical ? 'historical' : 'live')) {
+          // Same type from different wallets — sum the amounts
+          const summed = { ...existing.fee };
+          summed.totalEarned = (safeBigInt(summed.totalEarned) + safeBigInt(fee.totalEarned)).toString();
+          summed.totalClaimed = (safeBigInt(summed.totalClaimed) + safeBigInt(fee.totalClaimed)).toString();
+          summed.totalUnclaimed = (safeBigInt(summed.totalUnclaimed) + safeBigInt(fee.totalUnclaimed)).toString();
+          feeMap.set(key, { fee: summed, isHistorical: existing.isHistorical });
         }
       }
     } else {
@@ -196,7 +222,7 @@ export async function fetchAllFees(
     }
   }
 
-  return Array.from(feeMap.values());
+  return Array.from(feeMap.values()).map((entry) => entry.fee);
 }
 
 /**

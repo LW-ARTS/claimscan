@@ -89,9 +89,13 @@ async function bagsFetch<T>(path: string): Promise<T | null> {
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[bags] fetch ${path} returned HTTP ${res.status}`);
+      return null;
+    }
     return await res.json() as T;
-  } catch {
+  } catch (err) {
+    console.warn(`[bags] fetch ${path} failed:`, err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -115,6 +119,35 @@ async function resolveHandleToWallet(
   const address = data?.response?.wallet;
   if (!address || !isValidSolanaAddress(address)) return null;
   return address;
+}
+
+// ═══════════════════════════════════════════════
+// Short-lived cache for claimable-positions (avoids duplicate API calls within a scan)
+// ═══════════════════════════════════════════════
+const positionsCache = new Map<string, { data: BagsClaimablePosition[]; ts: number }>();
+const POSITIONS_CACHE_TTL_MS = 30_000; // 30 seconds
+
+async function getClaimablePositionsCached(wallet: string): Promise<BagsClaimablePosition[]> {
+  const cached = positionsCache.get(wallet);
+  if (cached && Date.now() - cached.ts < POSITIONS_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const res = await bagsFetch<BagsApiResponse<BagsClaimablePosition[]>>(
+    `/token-launch/claimable-positions?wallet=${encodeURIComponent(wallet)}`
+  );
+  const data = Array.isArray(res?.response) ? res.response : [];
+
+  // Evict stale entries to prevent unbounded growth
+  if (positionsCache.size > 100) {
+    const now = Date.now();
+    for (const [key, entry] of positionsCache) {
+      if (now - entry.ts > POSITIONS_CACHE_TTL_MS) positionsCache.delete(key);
+    }
+  }
+
+  positionsCache.set(wallet, { data, ts: Date.now() });
+  return data;
 }
 
 // ═══════════════════════════════════════════════
@@ -154,14 +187,8 @@ export const bagsAdapter: PlatformAdapter = {
     const wallet = await resolveHandleToWallet(handle, provider);
     if (!wallet) return [];
 
-    // Step 2: Get claimable positions for that wallet.
-    // NOTE: claim-stats requires tokenMint (not wallet), so we can only use
-    // claimable-positions to discover fees by wallet address.
-    const claimableRes = await bagsFetch<BagsApiResponse<BagsClaimablePosition[]>>(
-      `/token-launch/claimable-positions?wallet=${encodeURIComponent(wallet)}`
-    );
-
-    const positions = Array.isArray(claimableRes?.response) ? claimableRes.response : [];
+    // Step 2: Get claimable positions for that wallet (cached to avoid duplicate calls).
+    const positions = await getClaimablePositionsCached(wallet);
 
     const fees: TokenFee[] = [];
     for (const p of positions) {
@@ -188,11 +215,8 @@ export const bagsAdapter: PlatformAdapter = {
 
   async getCreatorTokens(wallet: string): Promise<CreatorToken[]> {
     // Bags doesn't have a "list tokens by creator" endpoint.
-    // We discover tokens via claimable-positions.
-    const res = await bagsFetch<BagsApiResponse<BagsClaimablePosition[]>>(
-      `/token-launch/claimable-positions?wallet=${encodeURIComponent(wallet)}`
-    );
-    const data = Array.isArray(res?.response) ? res.response : [];
+    // We discover tokens via claimable-positions (cached).
+    const data = await getClaimablePositionsCached(wallet);
 
     return data
       .filter((p) => p.baseMint)
@@ -215,10 +239,7 @@ export const bagsAdapter: PlatformAdapter = {
   },
 
   async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
-    const res = await bagsFetch<BagsApiResponse<BagsClaimablePosition[]>>(
-      `/token-launch/claimable-positions?wallet=${encodeURIComponent(wallet)}`
-    );
-    const data = Array.isArray(res?.response) ? res.response : [];
+    const data = await getClaimablePositionsCached(wallet);
 
     const fees = data
       .filter((p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0)

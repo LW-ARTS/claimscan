@@ -20,7 +20,7 @@ export default function Loading() {
       </div>
 
       {/* Summary cards skeleton */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
         {[1, 2, 3].map((i) => (
           <div
             key={i}
@@ -41,7 +41,7 @@ export default function Loading() {
       {/* Chain breakdown skeleton */}
       <div className="space-y-3">
         <div className="h-5 w-24 animate-pulse rounded bg-muted" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
           {[1, 2].map((i) => (
             <div
               key={i}

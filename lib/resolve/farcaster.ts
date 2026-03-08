@@ -114,10 +114,14 @@ async function warpcastSearch(query: string, limit = 5): Promise<WarpcastUser[]>
       { signal: controller.signal }
     );
     clearTimeout(timeout);
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn(`[farcaster] Warpcast search returned HTTP ${res.status}`);
+      return [];
+    }
     const data = (await res.json()) as WarpcastSearchResponse;
     return data?.result?.users ?? [];
-  } catch {
+  } catch (err) {
+    console.warn('[farcaster] Warpcast search failed:', err instanceof Error ? err.message : err);
     return [];
   }
 }
@@ -144,7 +148,8 @@ function decodeHubAddress(raw: string, protocol: string): string | null {
       if (bytes.length === 20) {
         return '0x' + bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
       }
-    } catch {
+    } catch (err) {
+      console.warn('[farcaster] decodeHubAddress failed:', err instanceof Error ? err.message : err);
       // Fall through
     }
   }
@@ -168,7 +173,10 @@ async function getVerifiedAddresses(fid: number): Promise<VerifiedAddress[]> {
       { signal: controller.signal }
     );
     clearTimeout(timeout);
-    if (!res.ok) return addresses;
+    if (!res.ok) {
+      console.warn(`[farcaster] Hub verifications returned HTTP ${res.status}`);
+      return addresses;
+    }
 
     const data = (await res.json()) as HubVerificationsResponse;
     const messages = data?.messages ?? [];

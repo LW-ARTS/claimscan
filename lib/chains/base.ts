@@ -154,7 +154,8 @@ export async function getZoraProtocolRewardsBalance(
       functionName: 'balanceOf',
       args: [account],
     });
-  } catch {
+  } catch (err) {
+    console.warn('[base] Zora ProtocolRewards balanceOf failed:', err instanceof Error ? err.message : err);
     return 0n;
   }
 }
@@ -177,7 +178,8 @@ export async function getErc20Balance(
       functionName: 'balanceOf',
       args: [account],
     });
-  } catch {
+  } catch (err) {
+    console.warn(`[base] ERC20 balanceOf failed for token=${token}:`, err instanceof Error ? err.message : err);
     return 0n;
   }
 }
@@ -212,7 +214,8 @@ export async function getErc20Info(token: Address): Promise<{
       name: results[1].status === 'success' ? (results[1].result as string) : 'Unknown Token',
       decimals,
     };
-  } catch {
+  } catch (err) {
+    console.warn(`[base] ERC20 info multicall failed for token=${token}:`, err instanceof Error ? err.message : err);
     return null;
   }
 }

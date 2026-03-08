@@ -1,7 +1,7 @@
 import 'server-only';
 import { PublicKey } from '@solana/web3.js';
 import { RAYDIUM_LAUNCHLAB_API, RAYDIUM_LAUNCHLAB_PROGRAM_ID } from '@/lib/constants';
-import { getConnection, isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
+import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
 import { sanitizeTokenSymbol } from '@/lib/utils';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -77,10 +77,14 @@ async function fetchCreatorTokens(
       { signal: controller.signal }
     );
     clearTimeout(timeout);
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn(`[raydium] fetchCreatorTokens returned HTTP ${res.status}`);
+      return [];
+    }
     const data = (await res.json()) as LaunchLabResponse;
     return data.data?.rows ?? [];
-  } catch {
+  } catch (err) {
+    console.warn('[raydium] fetchCreatorTokens failed:', err instanceof Error ? err.message : err);
     return [];
   }
 }

@@ -5,7 +5,7 @@ import {
   getMint,
   getTransferFeeConfig,
 } from '@solana/spl-token';
-import { getConnection, isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
+import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
 import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -109,7 +109,6 @@ export const revshareAdapter: PlatformAdapter = {
       const mintAddresses = await findMintsByWithdrawAuthority(wallet);
       if (mintAddresses.length === 0) return [];
 
-      const connection = getConnection();
       const fees: TokenFee[] = [];
 
       // Process mints in parallel (limited batch to avoid overwhelming RPC)
@@ -149,6 +148,8 @@ export const revshareAdapter: PlatformAdapter = {
         for (const result of results) {
           if (result.status === 'fulfilled' && result.value) {
             fees.push(result.value);
+          } else if (result.status === 'rejected') {
+            console.warn('[revshare] mint read failed:', result.reason instanceof Error ? result.reason.message : result.reason);
           }
         }
       }
@@ -190,6 +191,15 @@ async function findMintsByWithdrawAuthority(wallet: string): Promise<string[]> {
         connection.getProgramAccounts(TOKEN_2022_PROGRAM_ID, {
           commitment: 'confirmed',
           filters: [
+            // Filter: AccountType = Mint (1) at offset 83.
+            // Without this filter, Token accounts (AccountType=2) that happen
+            // to have matching bytes at offset 120 would be returned as false positives.
+            {
+              memcmp: {
+                offset: ACCOUNT_TYPE_OFFSET,
+                bytes: '2', // base58 encoding of byte [1] (Mint)
+              },
+            },
             // Filter: withdrawWithheldAuthority = wallet
             // At offset 120 when TransferFeeConfig is the first extension.
             {

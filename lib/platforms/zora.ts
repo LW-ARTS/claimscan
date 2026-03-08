@@ -1,6 +1,5 @@
 import 'server-only';
-import { ZORA_API_BASE } from '@/lib/constants';
-import { getZoraProtocolRewardsBalance, isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
+import { getZoraProtocolRewardsBalance, isValidEvmAddress } from '@/lib/chains/base';
 import { getZoraProtocolRewardsBalanceEth } from '@/lib/chains/eth';
 import { getAddress } from 'viem';
 import type { IdentityProvider } from '@/lib/supabase/types';
@@ -59,8 +58,19 @@ export const zoraAdapter: PlatformAdapter = {
       getZoraProtocolRewardsBalanceEth(checksummed),
     ]);
 
-    const baseBal = baseBalance.status === 'fulfilled' ? baseBalance.value : 0n;
-    const ethBal = ethBalance.status === 'fulfilled' ? ethBalance.value : 0n;
+    let baseBal = 0n;
+    if (baseBalance.status === 'fulfilled') {
+      baseBal = baseBalance.value;
+    } else {
+      console.warn('[zora] Base ProtocolRewards query failed:', baseBalance.reason instanceof Error ? baseBalance.reason.message : baseBalance.reason);
+    }
+
+    let ethBal = 0n;
+    if (ethBalance.status === 'fulfilled') {
+      ethBal = ethBalance.value;
+    } else {
+      console.warn('[zora] ETH ProtocolRewards query failed:', ethBalance.reason instanceof Error ? ethBalance.reason.message : ethBalance.reason);
+    }
 
     if (baseBal > 0n) {
       fees.push({

@@ -247,7 +247,8 @@
     opacity: 1 !important;
     transform: none !important;
   }
-  .shimmer::after {
+  .shimmer::after,
+  .scan-line::after {
     animation: none !important;
   }
 }

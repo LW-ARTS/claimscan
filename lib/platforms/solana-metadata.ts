@@ -41,10 +41,13 @@ async function fetchHeliusMetadata(
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), HELIUS_TIMEOUT_MS);
       const res = await fetch(
-        `https://mainnet.helius-rpc.com/?api-key=${apiKey}`,
+        'https://mainnet.helius-rpc.com',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
           body: JSON.stringify({
             jsonrpc: '2.0',
             id: 'claimscan-metadata',
@@ -58,7 +61,10 @@ async function fetchHeliusMetadata(
         }
       );
       clearTimeout(timeout);
-      if (!res.ok) break;
+      if (!res.ok) {
+        console.warn(`[solana-metadata] Helius DAS returned HTTP ${res.status}`);
+        continue;
+      }
 
       const data = (await res.json()) as HeliusDasResponse;
       for (const asset of data.result ?? []) {
@@ -76,7 +82,7 @@ async function fetchHeliusMetadata(
         '[solana-metadata] Helius DAS batch failed:',
         err instanceof Error ? err.message : err
       );
-      break;
+      continue;
     }
   }
 
@@ -139,7 +145,8 @@ export async function enrichSolanaTokenSymbols(
         tokenSymbol: sanitizeTokenSymbol(meta.symbol || meta.name) || null,
       };
     });
-  } catch {
+  } catch (err) {
+    console.warn('[solana-metadata] enrichSolanaTokenSymbols failed:', err instanceof Error ? err.message : err);
     return fees;
   }
 }

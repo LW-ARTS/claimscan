@@ -42,8 +42,8 @@ export const NEYNAR_API_BASE = 'https://api.neynar.com/v2';
 
 // Price APIs
 export const COINGECKO_API = 'https://api.coingecko.com/api/v3';
-export const DEXSCREENER_API = 'https://api.dexscreener.com/latest/dex';
-export const JUPITER_PRICE_API = 'https://api.jup.ag/price/v2';
+export const DEXSCREENER_API = 'https://api.dexscreener.com';
+export const JUPITER_PRICE_API = 'https://api.jup.ag/price/v3';
 
 // ═══════════════════════════════════════════════
 // Chain Config

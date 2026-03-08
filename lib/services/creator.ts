@@ -82,10 +82,8 @@ async function doResolve(
 ): Promise<ResolveResult> {
   const supabase = createServiceClient();
 
-  // Log search (fire-and-forget) — hash the query to avoid storing raw wallet addresses
-  const logQuery = parsed.provider === 'wallet'
-    ? hashQueryForLog(parsed.value)
-    : parsed.value;
+  // Log search (fire-and-forget) — hash all queries to avoid storing PII
+  const logQuery = hashQueryForLog(parsed.value);
 
   Promise.resolve(
     supabase.from('search_log').insert({
@@ -268,10 +266,8 @@ async function freshResolve(
       }
     }
 
-    // Update search_log with creator_id — use hashed query for wallet provider
-    const logQuery = parsed.provider === 'wallet'
-      ? hashQueryForLog(parsed.value)
-      : parsed.value;
+    // Update search_log with creator_id — all queries are hashed
+    const logQuery = hashQueryForLog(parsed.value);
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     await supabase
       .from('search_log')
@@ -313,8 +309,8 @@ async function freshResolve(
             cached: true,
           };
         }
-      } catch {
-        // Stale data fetch also failed — fall through to return null
+      } catch (staleErr) {
+        console.error('[creator] stale data fallback also failed:', staleErr instanceof Error ? staleErr.message : staleErr);
       }
     }
     return { creator: null, wallets: [], fees: [], cached: false };

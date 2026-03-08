@@ -80,10 +80,13 @@ async function fetchDexScreenerPrice(
     const chainSlug = CHAIN_SLUG_MAP[chain];
     if (!chainSlug) return null;
     const res = await fetchWithTimeout(
-      `${DEXSCREENER_API}/tokens/${chainSlug}/${encodeURIComponent(tokenAddress)}`,
+      `${DEXSCREENER_API}/tokens/v1/${chainSlug}/${encodeURIComponent(tokenAddress)}`,
       { next: { revalidate: 300 } }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[prices] DexScreener returned HTTP ${res.status} for ${tokenAddress}`);
+      return null;
+    }
     const data = await res.json();
 
     // Pick the most liquid pair instead of blindly using pairs[0]
@@ -99,7 +102,8 @@ async function fetchDexScreenerPrice(
       )[0];
 
     return validPair ? sanitizePrice(validPair.priceUsd) : null;
-  } catch {
+  } catch (err) {
+    console.warn('[prices] DexScreener fetch failed:', err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -116,11 +120,15 @@ async function fetchJupiterPrice(
       `${JUPITER_PRICE_API}?ids=${encodeURIComponent(tokenAddress)}`,
       { headers, next: { revalidate: 300 } }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[prices] Jupiter returned HTTP ${res.status} for ${tokenAddress}`);
+      return null;
+    }
     const data = await res.json();
-    const price = data.data?.[tokenAddress]?.price;
+    const price = data.data?.[tokenAddress]?.usdPrice ?? data.data?.[tokenAddress]?.price;
     return sanitizePrice(price);
-  } catch {
+  } catch (err) {
+    console.warn('[prices] Jupiter fetch failed:', err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -171,39 +179,18 @@ export async function batchGetTokenPrices(
     })
   );
 
-  return results
-    .filter((r) => r.status === 'fulfilled')
-    .map((r) => (r as PromiseFulfilledResult<TokenPrice>).value);
-}
-
-/**
- * Convert a raw token amount (bigint) to USD value.
- * Uses Number() split for whole/remainder to avoid parseFloat precision loss.
- */
-export function toUsdValue(
-  amount: bigint,
-  decimals: number,
-  priceUsd: number
-): number {
-  if (amount === 0n || priceUsd === 0) return 0;
-
-  // Guard against invalid decimals
-  if (!Number.isInteger(decimals) || decimals < 0) return 0;
-
-  // For amounts that fit safely in Number (< 2^53), use direct division
-  if (amount < BigInt(Number.MAX_SAFE_INTEGER)) {
-    return (Number(amount) / Math.pow(10, decimals)) * priceUsd;
+  const fulfilled: TokenPrice[] = [];
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      fulfilled.push(result.value);
+    } else {
+      console.warn('[prices] batchGetTokenPrices item failed:', result.reason instanceof Error ? result.reason.message : result.reason);
+    }
   }
-
-  // For larger amounts, split into whole + remainder using BigInt arithmetic
-  // then convert each part to Number separately to minimize precision loss.
-  const divisor = 10n ** BigInt(decimals);
-  const whole = amount / divisor;
-  const remainder = amount % divisor;
-
-  // Number(whole) may lose precision for very large whole parts (> 2^53),
-  // but this is the best we can do without arbitrary-precision float libraries.
-  // Number(remainder) / Number(divisor) preserves the fractional part.
-  const tokenValue = Number(whole) + Number(remainder) / Number(divisor);
-  return tokenValue * priceUsd;
+  return fulfilled;
 }
+
+// Re-export toUsdValue from utils for backward compatibility.
+// The canonical definition lives in lib/utils to avoid bundling server-side
+// fetch code into client components that only need the conversion helper.
+export { toUsdValue } from '@/lib/utils';

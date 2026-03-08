@@ -106,6 +106,40 @@ export function sanitizeTokenSymbol(val: unknown): string | null {
   return val.replace(/[^\w\-\.]/g, '').slice(0, 20) || null;
 }
 
+/**
+ * Convert a raw token amount (bigint) to USD value.
+ * Uses Number() split for whole/remainder to avoid parseFloat precision loss.
+ * Defined here (not in lib/prices) to avoid pulling server-side fetch code
+ * into client bundles when client components need USD conversion.
+ */
+export function toUsdValue(
+  amount: bigint,
+  decimals: number,
+  priceUsd: number
+): number {
+  if (amount === 0n || priceUsd === 0) return 0;
+
+  // Guard against invalid decimals
+  if (!Number.isInteger(decimals) || decimals < 0) return 0;
+
+  // For amounts that fit safely in Number (< 2^53), use direct division
+  if (amount < BigInt(Number.MAX_SAFE_INTEGER)) {
+    return (Number(amount) / Math.pow(10, decimals)) * priceUsd;
+  }
+
+  // For larger amounts, split into whole + remainder using BigInt arithmetic
+  // then convert each part to Number separately to minimize precision loss.
+  const divisor = 10n ** BigInt(decimals);
+  const whole = amount / divisor;
+  const remainder = amount % divisor;
+
+  // Number(whole) may lose precision for very large whole parts (> 2^53),
+  // but this is the best we can do without arbitrary-precision float libraries.
+  // Number(remainder) / Number(divisor) preserves the fractional part.
+  const tokenValue = Number(whole) + Number(remainder) / Number(divisor);
+  return tokenValue * priceUsd;
+}
+
 export function isValidWalletInput(w: unknown): w is { address: string; chain: string; sourcePlatform: string } {
   if (!w || typeof w !== 'object') return false;
   const obj = w as Record<string, unknown>;

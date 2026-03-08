@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { ClaimStatusBadge } from './ClaimStatusBadge';
 import { PlatformIcon } from './PlatformIcon';
 import { PLATFORM_CONFIG } from '@/lib/constants';
-import { formatTokenAmount, formatUsd, safeBigInt } from '@/lib/utils';
-import { toUsdValue } from '@/lib/prices';
+import { formatTokenAmount, formatUsd, safeBigInt, toUsdValue } from '@/lib/utils';
 import type { Database } from '@/lib/supabase/types';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
@@ -22,6 +21,11 @@ interface TokenFeeTableProps {
  * Compute the USD value for a fee record.
  * Prefers the DB-stored total_earned_usd if available.
  * Falls back to computing from the largest non-zero amount × native token price.
+ *
+ * TODO(#15): This fallback assumes all fee amounts are denominated in native tokens
+ * (SOL with 9 decimals, ETH with 18 decimals). This is incorrect for platforms like
+ * RevShare where fees are in the SPL/ERC20 token's own denomination. Fix requires
+ * either server-side USD computation or a `token_decimals` field in fee records.
  */
 function computeFeeUsd(fee: FeeRecord, solPrice: number, ethPrice: number): number {
   if (fee.total_earned_usd != null && fee.total_earned_usd > 0) {

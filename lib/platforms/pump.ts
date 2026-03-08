@@ -62,8 +62,12 @@ export const pumpAdapter: PlatformAdapter = {
 
       const fees: TokenFee[] = [];
 
-      const pumpBalance =
-        pumpFees.status === 'fulfilled' ? pumpFees.value : 0n;
+      let pumpBalance = 0n;
+      if (pumpFees.status === 'fulfilled') {
+        pumpBalance = pumpFees.value;
+      } else {
+        console.warn('[pump] getUnclaimedPumpFees failed:', pumpFees.reason instanceof Error ? pumpFees.reason.message : pumpFees.reason);
+      }
       if (pumpBalance > 0n) {
         fees.push({
           // Use 'SOL:pump' to distinguish from PumpSwap vault in DB upsert.
@@ -81,8 +85,12 @@ export const pumpAdapter: PlatformAdapter = {
         });
       }
 
-      const swapBalance =
-        pumpSwapFees.status === 'fulfilled' ? pumpSwapFees.value : 0n;
+      let swapBalance = 0n;
+      if (pumpSwapFees.status === 'fulfilled') {
+        swapBalance = pumpSwapFees.value;
+      } else {
+        console.warn('[pump] getUnclaimedPumpSwapFees failed:', pumpSwapFees.reason instanceof Error ? pumpSwapFees.reason.message : pumpSwapFees.reason);
+      }
       if (swapBalance > 0n) {
         fees.push({
           tokenAddress: 'SOL:pumpswap',

@@ -205,6 +205,7 @@ export async function getUnclaimedPumpSwapFees(
  * Get SOL balance for any account.
  */
 export async function getSolBalance(address: string): Promise<bigint> {
+  if (!isValidSolanaAddress(address)) return 0n;
   const pubkey = new PublicKey(address);
   const balance = await withRpcFallback((c) => c.getBalance(pubkey), 'sol-balance');
   return BigInt(balance);
@@ -308,15 +309,19 @@ export async function fetchTokenMetadataBatch(
   const result = new Map<string, TokenMetadata>();
   if (mints.length === 0) return result;
 
+  // Filter out invalid addresses to prevent PublicKey constructor from throwing
+  const validMints = mints.filter(isValidSolanaAddress);
+  if (validMints.length === 0) return result;
+
   // Derive metadata PDAs
-  const mintKeys = mints.map((m) => new PublicKey(m));
+  const mintKeys = validMints.map((m) => new PublicKey(m));
   const pdas = mintKeys.map(deriveMetadataPda);
 
   // Batch in groups of 100 (RPC limit for getMultipleAccountsInfo)
   const BATCH_SIZE = 100;
   for (let i = 0; i < pdas.length; i += BATCH_SIZE) {
     const batchPdas = pdas.slice(i, i + BATCH_SIZE);
-    const batchMints = mints.slice(i, i + BATCH_SIZE);
+    const batchMints = validMints.slice(i, i + BATCH_SIZE);
 
     try {
       const accounts = await withRpcFallback(

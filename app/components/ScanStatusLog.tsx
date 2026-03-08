@@ -58,10 +58,11 @@ export function ScanStatusLog({ fees, resolvedChains }: ScanStatusLogProps) {
     <div className="rounded-xl border border-border/40 bg-white/[0.02]">
       <button
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/[0.02]"
       >
         {/* Status dots summary */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" aria-hidden="true">
           {statuses.map((s) => (
             <span
               key={s.platform}
@@ -87,6 +88,7 @@ export function ScanStatusLog({ fees, resolvedChains }: ScanStatusLogProps) {
           viewBox="0 0 24 24"
           strokeWidth={2}
           stroke="currentColor"
+          aria-hidden="true"
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
         </svg>
@@ -113,6 +115,7 @@ export function ScanStatusLog({ fees, resolvedChains }: ScanStatusLogProps) {
                           ? 'bg-white/15'
                           : 'bg-white/[0.06]'
                     }`}
+                    aria-hidden="true"
                   />
                   <PlatformIcon
                     platform={s.platform}
