@@ -9,7 +9,9 @@ import type { Database } from '@/lib/supabase/types';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 
-const PAGE_SIZE = 15;
+/** How many tokens to show initially and per "Show More" click */
+const INITIAL_COUNT = 15;
+const LOAD_MORE_COUNT = 15;
 
 interface TokenFeeTableProps {
   fees: FeeRecord[];
@@ -42,8 +44,19 @@ function computeFeeUsd(fee: FeeRecord, solPrice: number, ethPrice: number): numb
   return toUsdValue(amount, decimals, price);
 }
 
+/** Format token display: $SYMBOL when available, shortened address as fallback */
+function tokenDisplay(fee: FeeRecord): { label: string; badge: string } {
+  const raw = (fee.token_symbol || '').replace(/[^\w\s\-\.]/g, '').trim().slice(0, 20);
+  if (raw) {
+    return { label: `$${raw}`, badge: raw[0] };
+  }
+  const addr = fee.token_address || '';
+  const short = addr.length > 8 ? addr.slice(0, 6) + '...' : addr;
+  return { label: short, badge: '?' };
+}
+
 export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTableProps) {
-  const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_COUNT);
 
   // Sort by computed USD value descending (largest fees first)
   const sortedFees = [...fees].sort((a, b) => {
@@ -53,9 +66,8 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
     return Number(safeBigInt(b.total_unclaimed) - safeBigInt(a.total_unclaimed));
   });
 
-  const totalPages = Math.max(1, Math.ceil(sortedFees.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pagedFees = sortedFees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const displayedFees = sortedFees.slice(0, visibleCount);
+  const hasMore = visibleCount < sortedFees.length;
 
   /** Currency label based on chain — shown after formatted amounts */
   const currencyLabel = (chain: string) => (
@@ -77,19 +89,19 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
     <>
     {/* Mobile: stacked card layout */}
     <div className="space-y-3 md:hidden">
-      {pagedFees.map((fee) => {
+      {displayedFees.map((fee) => {
         const platformConfig = PLATFORM_CONFIG[fee.platform];
         const decimals = fee.chain === 'sol' ? 9 : 18;
-        const safeSymbol = (fee.token_symbol || '').replace(/[^\w\s\-\.]/g, '').slice(0, 20) || null;
+        const { label, badge } = tokenDisplay(fee);
         return (
           <div key={fee.id} className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-bold uppercase text-muted-foreground">
-                  {(safeSymbol || '?')[0]}
+                  {badge}
                 </span>
                 <span className="font-mono text-sm font-medium">
-                  {safeSymbol || fee.token_address.slice(0, 8) + '...'}
+                  {label}
                 </span>
               </div>
               <ClaimStatusBadge status={fee.claim_status} />
@@ -152,28 +164,24 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {pagedFees.map((fee) => {
+            {displayedFees.map((fee) => {
               const platformConfig = PLATFORM_CONFIG[fee.platform];
               const decimals = fee.chain === 'sol' ? 9 : 18;
+              const { label, badge } = tokenDisplay(fee);
               return (
                 <tr
                   key={fee.id}
                   className="transition-colors hover:bg-muted/50"
                 >
                   <td className="whitespace-nowrap px-4 py-3">
-                    {(() => {
-                      const safeSymbol = (fee.token_symbol || '').replace(/[^\w\s\-\.]/g, '').slice(0, 20) || null;
-                      return (
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-bold uppercase text-muted-foreground" aria-hidden="true">
-                            {(safeSymbol || '?')[0]}
-                          </span>
-                          <span className="font-mono text-sm font-medium">
-                            {safeSymbol || fee.token_address.slice(0, 8) + '...'}
-                          </span>
-                        </div>
-                      );
-                    })()}
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-bold uppercase text-muted-foreground" aria-hidden="true">
+                        {badge}
+                      </span>
+                      <span className="font-mono text-sm font-medium">
+                        {label}
+                      </span>
+                    </div>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -204,88 +212,21 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
       </div>
     </div>
 
-    {/* Pagination */}
-    {totalPages > 1 && (
-      <div className="mt-4 flex items-center justify-between">
-        <p className="text-xs text-muted-foreground tabular-nums">
-          {(currentPage - 1) * PAGE_SIZE + 1}&ndash;{Math.min(currentPage * PAGE_SIZE, sortedFees.length)} of {sortedFees.length} tokens
+    {/* Show More */}
+    {hasMore && (
+      <div className="mt-4 flex flex-col items-center gap-1">
+        <button
+          onClick={() => setVisibleCount((c) => c + LOAD_MORE_COUNT)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+        >
+          Show More
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+        <p className="text-[10px] text-muted-foreground/60 tabular-nums">
+          Showing {displayedFees.length} of {sortedFees.length}
         </p>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setPage(1)}
-            disabled={currentPage <= 1}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-xs text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
-            aria-label="First page"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" />
-            </svg>
-          </button>
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage <= 1}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-xs text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
-            aria-label="Previous page"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-            </svg>
-          </button>
-
-          {/* Page number buttons */}
-          {Array.from({ length: totalPages }, (_, i) => i + 1)
-            .filter((p) => {
-              // Show first, last, current, and neighbors
-              if (p === 1 || p === totalPages) return true;
-              if (Math.abs(p - currentPage) <= 1) return true;
-              return false;
-            })
-            .reduce<(number | 'ellipsis')[]>((acc, p, i, arr) => {
-              if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('ellipsis');
-              acc.push(p);
-              return acc;
-            }, [])
-            .map((item, i) =>
-              item === 'ellipsis' ? (
-                <span key={`ellipsis-${i}`} className="px-1 text-xs text-muted-foreground">
-                  &hellip;
-                </span>
-              ) : (
-                <button
-                  key={item}
-                  onClick={() => setPage(item)}
-                  className={`inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg border text-xs font-medium transition-colors ${
-                    currentPage === item
-                      ? 'border-foreground/20 bg-foreground text-background'
-                      : 'border-border bg-card text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {item}
-                </button>
-              )
-            )}
-
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage >= totalPages}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-xs text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
-            aria-label="Next page"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-            </svg>
-          </button>
-          <button
-            onClick={() => setPage(totalPages)}
-            disabled={currentPage >= totalPages}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-xs text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
-            aria-label="Last page"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 4.5l7.5 7.5-7.5 7.5m6-15l7.5 7.5-7.5 7.5" />
-            </svg>
-          </button>
-        </div>
       </div>
     )}
     </>
