@@ -401,7 +401,8 @@ async function searchLaunchesPaginated(
       }
       if (!data.nextCursor) break;
       cursor = data.nextCursor;
-    } catch {
+    } catch (err) {
+      console.warn('[bankr] searchLaunchesPaginated failed:', err instanceof Error ? err.message : err);
       break;
     }
   }
@@ -420,7 +421,8 @@ async function searchLaunches(query: string): Promise<BankrSearchResponse> {
     clearTimeout(timeout);
     if (!res.ok) return {};
     return (await res.json()) as BankrSearchResponse;
-  } catch {
+  } catch (err) {
+    console.warn('[bankr] searchLaunches failed:', err instanceof Error ? err.message : err);
     return {};
   }
 }
@@ -435,7 +437,8 @@ async function getTokenFees(tokenAddress: string): Promise<BankrTokenFeeResponse
     clearTimeout(timeout);
     if (!res.ok) return null;
     return (await res.json()) as BankrTokenFeeResponse;
-  } catch {
+  } catch (err) {
+    console.warn('[bankr] getTokenFees failed:', err instanceof Error ? err.message : err);
     return null;
   }
 }

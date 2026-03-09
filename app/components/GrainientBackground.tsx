@@ -19,8 +19,8 @@ export function GrainientBackground() {
         blendSoftness={0.32}
         rotationAmount={500}
         noiseScale={0.35}
-        grainAmount={0.06}
-        grainScale={1.2}
+        grainAmount={0.03}
+        grainScale={0.8}
         grainAnimated
         contrast={1.5}
         gamma={1}

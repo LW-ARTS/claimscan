@@ -111,12 +111,14 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
       let creatorId: string | null = null;
 
       if (isWallet) {
-        const { data } = await supabase
-          .from('wallets')
-          .select('creator_id')
-          .eq('address', decoded)
-          .limit(1)
-          .maybeSingle();
+        // EVM addresses are stored checksummed (mixed-case) but users may paste lowercase.
+        // Use case-insensitive match for EVM (0x...) addresses, exact match for Solana (base58).
+        const isEvm = decoded.startsWith('0x');
+        const query = supabase.from('wallets').select('creator_id').limit(1);
+        const { data } = await (isEvm
+          ? query.ilike('address', decoded)
+          : query.eq('address', decoded)
+        ).maybeSingle();
         creatorId = data?.creator_id ?? null;
       } else {
         const lc = decoded.toLowerCase();

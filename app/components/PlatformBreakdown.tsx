@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useId } from 'react';
+import { useState, useId, useMemo } from 'react';
 import { TokenFeeTable } from './TokenFeeTable';
 import { PlatformIcon } from './PlatformIcon';
-import { PLATFORM_CONFIG } from '@/lib/constants';
-import type { Database, Platform } from '@/lib/supabase/types';
+import { ChainIcon } from './ChainIcon';
+import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
+import { computeFeeUsd, formatUsd } from '@/lib/utils';
+import type { Database, Platform, Chain } from '@/lib/supabase/types';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 
@@ -15,6 +17,13 @@ interface PlatformBreakdownProps {
   fees: FeeRecord[];
   solPrice?: number;
   ethPrice?: number;
+}
+
+interface ChainSummary {
+  chain: Chain;
+  name: string;
+  totalUsd: number;
+  unclaimedCount: number;
 }
 
 export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: PlatformBreakdownProps) {
@@ -44,6 +53,23 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
     }
   }
 
+  // Compute chain summaries (absorbed from ChainBreakdown)
+  const chainSummaries = useMemo(() => {
+    const byChain = new Map<Chain, ChainSummary>();
+    for (const fee of fees) {
+      const existing = byChain.get(fee.chain) ?? {
+        chain: fee.chain,
+        name: CHAIN_CONFIG[fee.chain]?.name ?? fee.chain,
+        totalUsd: 0,
+        unclaimedCount: 0,
+      };
+      existing.totalUsd += computeFeeUsd(fee, solPrice, ethPrice);
+      if (fee.claim_status === 'unclaimed') existing.unclaimedCount += 1;
+      byChain.set(fee.chain, existing);
+    }
+    return Array.from(byChain.values());
+  }, [fees, solPrice, ethPrice]);
+
   // Group fees by platform
   const byPlatform = new Map<Platform, FeeRecord[]>();
   for (const fee of fees) {
@@ -52,30 +78,40 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
     byPlatform.set(fee.platform, existing);
   }
 
-  // Always show all platforms, sorted: platforms with data first, then empty ones
   const platformsWithData = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) > 0);
   const platformsEmpty = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) === 0);
-  const orderedPlatforms = [...platformsWithData, ...platformsEmpty];
 
   const filteredFees = activeTab === 'all' ? fees : (byPlatform.get(activeTab as Platform) ?? []);
-  // Only cycle through visible tabs (All + platforms with data) for keyboard nav
   const tabKeys = ['all', ...platformsWithData];
 
+  const totalUnclaimed = chainSummaries.reduce((sum, c) => sum + c.unclaimedCount, 0);
+
   return (
-    <div className="space-y-3">
-      {/* Section label + summary */}
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/50">
-          By Platform
-        </p>
-        <p className="text-xs tabular-nums text-muted-foreground/60">
-          <span className="font-semibold text-foreground/80">{platformsWithData.length}</span>
-          <span>/{ALL_PLATFORMS.length} platforms</span>
-          <span className="mx-1.5 text-border">·</span>
-          <span className="font-semibold text-foreground/80">{fees.length}</span>
-          <span> tokens</span>
-        </p>
-      </div>
+    <div className="space-y-4">
+      {/* Chain summary pills (absorbed from ChainBreakdown) */}
+      {chainSummaries.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {chainSummaries.map((chain, i) => (
+            <div key={chain.chain} className="flex items-center gap-1.5">
+              <ChainIcon chain={chain.chain} className="h-4 w-4" />
+              <span className="text-sm font-medium">{chain.name}</span>
+              <span className="text-sm font-semibold tabular-nums">{formatUsd(chain.totalUsd)}</span>
+            </div>
+          ))}
+          {totalUnclaimed > 0 && (
+            <>
+              <span className="h-3.5 w-px bg-border/50" aria-hidden="true" />
+              <span className="flex items-center gap-1.5 text-xs text-foreground/70">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-foreground/40 opacity-75" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-foreground" />
+                </span>
+                {totalUnclaimed} unclaimed
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div
@@ -160,7 +196,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
         {filteredFees.length > 0 ? (
           <TokenFeeTable fees={filteredFees} solPrice={solPrice} ethPrice={ethPrice} />
         ) : (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-border/50 bg-card/30 py-12 text-center">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-border/30 py-12 text-center">
             <PlatformIcon platform={activeTab} className="mb-2 h-6 w-6 text-muted-foreground/30" aria-hidden />
             <p className="text-sm text-muted-foreground/60">
               {activeTab === 'all'

@@ -55,7 +55,7 @@ export function ScanStatusLog({ fees, resolvedChains }: ScanStatusLogProps) {
   const totalChecked = statuses.filter((s) => s.result !== 'no_wallet').length;
 
   return (
-    <div className="rounded-xl border border-border/40 bg-white/[0.02]">
+    <div className="rounded-xl border border-border/20 bg-transparent">
       <button
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}

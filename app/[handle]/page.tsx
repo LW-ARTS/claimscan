@@ -5,10 +5,7 @@ import { getNativeTokenPrices } from '@/lib/prices';
 import { safeBigInt, toUsdValue } from '@/lib/utils';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 import { SearchBar } from '../components/SearchBar';
-import { ProfileHeader } from '../components/ProfileHeader';
-import { FeeSummaryCard } from '../components/FeeSummaryCard';
-import { ShareReceiptCard } from '../components/ShareReceiptCard';
-import { ChainBreakdown } from '../components/ChainBreakdown';
+import { ProfileHero } from '../components/ProfileHero';
 import { LazySection } from '../components/LazySection';
 import type { Chain } from '@/lib/supabase/types';
 
@@ -124,80 +121,39 @@ export default async function ProfilePage({ params }: PageProps) {
     return toUsdValue(amount, decimals, price);
   };
 
-  // Compute aggregate stats for the share receipt card (server-side)
+  // Compute aggregate stats
   const totalEarnedUsd = feeRecords.reduce((sum, fee) => sum + feeToUsd(fee), 0);
-
   const platformCount = new Set(feeRecords.map((f) => f.platform)).size;
 
-  // Build per-platform USD totals for the top platforms breakdown
-  const platformUsdMap = new Map<string, number>();
-  for (const fee of feeRecords) {
-    const usd = feeToUsd(fee);
-    if (usd > 0) {
-      platformUsdMap.set(fee.platform, (platformUsdMap.get(fee.platform) ?? 0) + usd);
-    }
-  }
-
-  const topPlatforms = [...platformUsdMap.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([key, usdValue]) => {
-      const config = PLATFORM_CONFIG[key as keyof typeof PLATFORM_CONFIG];
-      return {
-        key,
-        name: config?.name ?? key,
-        color: config?.color ?? '#888888',
-        usdValue,
-        percentage: totalEarnedUsd > 0 ? (usdValue / totalEarnedUsd) * 100 : 0,
-      };
-    });
-
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-8 sm:space-y-10">
       <SearchBar />
 
+      {/* ZONE 1: Profile Hero */}
       <div className="animate-fade-in-up">
-        <ProfileHeader creator={creator} wallets={wallets} />
-      </div>
-
-      <div className="animate-fade-in-up delay-75">
-        <FeeSummaryCard
+        <ProfileHero
+          creator={creator}
+          wallets={wallets}
           initialFees={feeRecords}
-          wallets={walletsForLive}
+          walletsForLive={walletsForLive}
           solPrice={prices.sol}
           ethPrice={prices.eth}
+          handle={decoded}
+          totalEarnedUsd={totalEarnedUsd}
+          platformCount={platformCount}
         />
       </div>
 
-      {/* Share receipt card */}
-      {totalEarnedUsd > 0 && (
-        <div className="animate-fade-in-up delay-150">
-          <ShareReceiptCard
-            handle={decoded}
-            totalEarnedUsd={totalEarnedUsd}
-            platformCount={platformCount}
-            topPlatforms={topPlatforms}
-          />
-        </div>
-      )}
-
-      {/* Chain breakdown */}
-      <LazySection minHeight={160}>
-        <div className="animate-fade-in-up delay-200">
-          <ChainBreakdown fees={feeRecords} solPrice={prices.sol} ethPrice={prices.eth} />
-        </div>
-      </LazySection>
-
-      {/* Platform breakdown */}
+      {/* ZONE 2: Breakdown (chain pills + platform tabs + table) */}
       <LazySection minHeight={200}>
-        <div className="animate-fade-in-up delay-300">
+        <div className="animate-fade-in-up delay-150">
           <PlatformBreakdown fees={feeRecords} solPrice={prices.sol} ethPrice={prices.eth} key={creator.id} />
         </div>
       </LazySection>
 
-      {/* Scan status log */}
+      {/* ZONE 3: Scan Status (minimal footnote) */}
       <LazySection minHeight={80}>
-        <div className="animate-fade-in-up delay-400">
+        <div className="animate-fade-in-up delay-300">
           <ScanStatusLog fees={feeRecords} resolvedChains={resolvedChains} />
         </div>
       </LazySection>

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Exo_2, JetBrains_Mono } from 'next/font/google';
+import { Exo_2, JetBrains_Mono, Montserrat } from 'next/font/google';
 import dynamic from 'next/dynamic';
 import './globals.css';
 import { JsonLd } from './components/JsonLd';
@@ -22,6 +22,12 @@ const exo2 = Exo_2({
 
 const jetbrainsMono = JetBrains_Mono({
   variable: '--font-mono',
+  subsets: ['latin'],
+  display: 'swap',
+});
+
+const montserrat = Montserrat({
+  variable: '--font-subtitle',
   subsets: ['latin'],
   display: 'swap',
 });
@@ -121,7 +127,7 @@ export default function RootLayout({
         <JsonLd />
       </head>
       <body
-        className={`${exo2.variable} ${jetbrainsMono.variable} font-sans antialiased min-h-screen bg-background text-foreground select-none`}
+        className={`${exo2.variable} ${jetbrainsMono.variable} ${montserrat.variable} font-sans antialiased min-h-screen bg-background text-foreground select-none`}
       >
         <AntiCopy />
         <div className="relative min-h-screen flex flex-col">

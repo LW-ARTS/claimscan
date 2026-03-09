@@ -13,6 +13,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -72,8 +73,11 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
       setSaved(true);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setSaved(false), 2000);
-    } catch {
-      // Silently fail
+    } catch (err) {
+      console.warn('[ShareButton] Image save failed:', err instanceof Error ? err.message : err);
+      setSaveFailed(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setSaveFailed(false), 2500);
     } finally {
       setSaving(false);
     }
@@ -86,7 +90,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
         href={tweetIntentUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-all cursor-pointer hover:opacity-90"
       >
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
@@ -100,14 +104,23 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
           onClick={handleSaveImage}
           disabled={saving}
           className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all active:scale-[0.97] ${
-            saved
-              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-              : saving
-                ? 'border-border bg-muted/60 text-muted-foreground/50 cursor-wait'
-                : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:border-foreground/20 hover:text-foreground'
+            saveFailed
+              ? 'border-red-500/30 bg-red-500/10 text-red-400'
+              : saved
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                : saving
+                  ? 'border-border bg-muted/60 text-muted-foreground/50 cursor-wait'
+                  : 'border-border bg-muted/40 text-muted-foreground cursor-pointer hover:bg-muted hover:border-foreground/20 hover:text-foreground'
           }`}
         >
-          {saved ? (
+          {saveFailed ? (
+            <>
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+              Failed
+            </>
+          ) : saved ? (
             <>
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -128,7 +141,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
           className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all active:scale-[0.97] ${
             copied
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-              : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:border-foreground/20 hover:text-foreground'
+              : 'border-border bg-muted/40 text-muted-foreground cursor-pointer hover:bg-muted hover:border-foreground/20 hover:text-foreground'
           }`}
         >
           {copied ? (

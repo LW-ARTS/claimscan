@@ -143,8 +143,8 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Prevent caching of API responses
-  if (pathname.startsWith('/api/')) {
+  // Prevent caching of API responses (except /api/prices which uses revalidate)
+  if (pathname.startsWith('/api/') && pathname !== '/api/prices') {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   }
 
