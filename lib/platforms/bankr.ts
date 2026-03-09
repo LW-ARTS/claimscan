@@ -154,8 +154,8 @@ function parseAgentFeeResponse(response: string): ParsedAgentFee[] {
         }
         if (fees.length > 0) return fees;
       }
-    } catch {
-      // JSON parse failed — fall through to regex
+    } catch (err) {
+      console.warn('[bankr] JSON parse failed in agent response, falling back to regex:', err instanceof Error ? err.message : err);
     }
   }
 
@@ -264,7 +264,8 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
       if (earned === '0' && (claimed !== '0' || unclaimed !== '0')) {
         try {
           totalEarned = (BigInt(claimed) + BigInt(unclaimed)).toString();
-        } catch {
+        } catch (err) {
+          console.warn('[bankr] BigInt add failed in fetchFeesByAgent:', err instanceof Error ? err.message : err);
           totalEarned = unclaimed;
         }
       }
@@ -391,7 +392,7 @@ async function searchLaunchesPaginated(
         { headers: bankrAuthHeaders(), signal: controller.signal }
       );
       clearTimeout(timeout);
-      if (!res.ok) break;
+      if (!res.ok) { console.warn(`[bankr] searchLaunchesPaginated returned HTTP ${res.status}`); break; }
 
       const data = (await res.json()) as BankrPaginatedResponse;
       for (const token of data.results ?? []) {
@@ -419,7 +420,7 @@ async function searchLaunches(query: string): Promise<BankrSearchResponse> {
       { headers: bankrAuthHeaders(), signal: controller.signal }
     );
     clearTimeout(timeout);
-    if (!res.ok) return {};
+    if (!res.ok) { console.warn(`[bankr] searchLaunches returned HTTP ${res.status}`); return {}; }
     return (await res.json()) as BankrSearchResponse;
   } catch (err) {
     console.warn('[bankr] searchLaunches failed:', err instanceof Error ? err.message : err);
@@ -435,7 +436,7 @@ async function getTokenFees(tokenAddress: string): Promise<BankrTokenFeeResponse
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    if (!res.ok) return null;
+    if (!res.ok) { console.warn(`[bankr] getTokenFees returned HTTP ${res.status} for ${tokenAddress}`); return null; }
     return (await res.json()) as BankrTokenFeeResponse;
   } catch (err) {
     console.warn('[bankr] getTokenFees failed:', err instanceof Error ? err.message : err);
@@ -481,7 +482,8 @@ async function fetchFeesForTokens(tokens: BankrTokenLaunch[]): Promise<TokenFee[
     let totalEarnedWei: string;
     try {
       totalEarnedWei = (BigInt(claimableWei) + BigInt(claimedWei)).toString();
-    } catch {
+    } catch (err) {
+      console.warn('[bankr] BigInt add failed in fetchFeesForTokens:', err instanceof Error ? err.message : err);
       totalEarnedWei = claimableWei;
     }
 
@@ -600,7 +602,7 @@ export const bankrAdapter: PlatformAdapter = {
             const unclaimed = wethToWei(p.unclaimedWeth);
             let totalEarned = earned;
             if (earned === '0' && (claimed !== '0' || unclaimed !== '0')) {
-              try { totalEarned = (BigInt(claimed) + BigInt(unclaimed)).toString(); } catch { totalEarned = unclaimed; }
+              try { totalEarned = (BigInt(claimed) + BigInt(unclaimed)).toString(); } catch (err) { console.warn('[bankr] BigInt add failed in getHistoricalFees:', err instanceof Error ? err.message : err); totalEarned = unclaimed; }
             }
             return {
               tokenAddress: normalizeEvmAddress(p.tokenAddress),
@@ -629,7 +631,8 @@ export const bankrAdapter: PlatformAdapter = {
     return allFees.filter((f) => {
       try {
         return BigInt(f.totalUnclaimed) > 0n;
-      } catch {
+      } catch (err) {
+        console.warn('[bankr] BigInt parse failed in getLiveUnclaimedFees:', err instanceof Error ? err.message : err);
         return parseFloat(f.totalUnclaimed) > 0;
       }
     });

@@ -6,6 +6,27 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Copy text to clipboard with fallback for older browsers.
+ * Returns true if copy succeeded, false otherwise.
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  }
+}
+
+/**
  * Safely convert a string to BigInt.
  * Returns 0n for null, undefined, empty strings, decimals, negative, or invalid values.
  * Negative values are clamped to 0n since token amounts cannot be negative.

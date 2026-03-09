@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 import { PlatformIcon } from './PlatformIcon';
 import { ShareButton } from './ShareButton';
 import { PLATFORM_CONFIG, LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
-import { safeBigInt, formatUsd, toUsdValue } from '@/lib/utils';
-import type { Database } from '@/lib/supabase/types';
+import { safeBigInt, formatUsd, toUsdValue, copyToClipboard } from '@/lib/utils';
+import type { Database, Chain, Platform } from '@/lib/supabase/types';
 
 type Creator = Database['public']['Tables']['creators']['Row'];
 type Wallet = Database['public']['Tables']['wallets']['Row'];
@@ -14,8 +15,8 @@ interface FeeInput {
   total_earned_usd: number | null;
   total_earned: string | null;
   total_unclaimed: string | null;
-  chain: string;
-  platform: string;
+  chain: Chain;
+  platform: Platform;
 }
 
 interface WalletInput {
@@ -27,14 +28,6 @@ interface WalletInput {
 interface LiveFee {
   totalUnclaimed: string;
   chain: string;
-}
-
-export interface TopPlatform {
-  key: string;
-  name: string;
-  color: string;
-  usdValue: number;
-  percentage: number;
 }
 
 interface ProfileHeroProps {
@@ -63,6 +56,23 @@ function CopyIcon({ className }: { className?: string }) {
   );
 }
 
+function PulsingDot({ className = 'h-1.5 w-1.5' }: { className?: string }) {
+  return (
+    <span className={`relative flex ${className}`} aria-hidden="true">
+      <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-current opacity-75" />
+      <span className={`relative inline-flex ${className} rounded-full bg-current`} />
+    </span>
+  );
+}
+
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
 function CheckIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -83,23 +93,10 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
 
   const handleCopy = useCallback(async () => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    try {
-      await navigator.clipboard.writeText(wallet.address);
+    const ok = await copyToClipboard(wallet.address);
+    if (ok) {
       setCopied(true);
       timerRef.current = setTimeout(() => setCopied(false), 2000);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = wallet.address;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(ta);
-      if (ok) {
-        setCopied(true);
-        timerRef.current = setTimeout(() => setCopied(false), 2000);
-      }
     }
   }, [wallet.address]);
 
@@ -153,11 +150,10 @@ export function ProfileHero({
   const [loading, setLoading] = useState(true);
 
   const walletsKey = useMemo(() => JSON.stringify(walletsForLive), [walletsForLive]);
-  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    abortRef.current = controller;
+    let timeoutId: ReturnType<typeof setTimeout>;
 
     async function pollLiveFees() {
       try {
@@ -168,61 +164,77 @@ export function ProfileHero({
           cache: 'no-store',
           signal: controller.signal,
         });
-        if (res.ok) {
-          const data = await res.json();
-          setLiveFees(data.fees ?? []);
+        if (!res.ok) {
+          console.warn(`[ProfileHero] live fees returned HTTP ${res.status}`);
+          return;
         }
+        const data = await res.json();
+        setLiveFees(data.fees ?? []);
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
+        console.warn('[ProfileHero] live fee poll failed:', err instanceof Error ? err.message : err);
       } finally {
         setLoading(false);
       }
     }
 
-    pollLiveFees();
-    let interval = setInterval(pollLiveFees, LIVE_POLL_INTERVAL_MS);
+    async function pollAndSchedule() {
+      await pollLiveFees();
+      if (!controller.signal.aborted) {
+        timeoutId = setTimeout(pollAndSchedule, LIVE_POLL_INTERVAL_MS);
+      }
+    }
+
+    pollLiveFees().then(() => {
+      if (!controller.signal.aborted) {
+        timeoutId = setTimeout(pollAndSchedule, LIVE_POLL_INTERVAL_MS);
+      }
+    });
 
     function handleVisibility() {
       if (document.hidden) {
-        clearInterval(interval);
+        clearTimeout(timeoutId);
       } else {
-        pollLiveFees();
-        interval = setInterval(pollLiveFees, LIVE_POLL_INTERVAL_MS);
+        pollLiveFees().then(() => {
+          if (!controller.signal.aborted) {
+            timeoutId = setTimeout(pollAndSchedule, LIVE_POLL_INTERVAL_MS);
+          }
+        });
       }
     }
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      clearInterval(interval);
+      clearTimeout(timeoutId);
       controller.abort();
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [walletsKey]);
 
   // ── Computed values ──
-  const cachedUnclaimedUsd = useMemo(() => {
+  function computeUnclaimedTotal(items: Array<{ chain: string; amount: string | null }>) {
     let total = 0;
-    for (const fee of initialFees) {
-      const amount = safeBigInt(fee.total_unclaimed);
+    for (const item of items) {
+      const amount = safeBigInt(item.amount);
       if (amount === 0n) continue;
-      const price = fee.chain === 'sol' ? solPrice : ethPrice;
-      const decimals = fee.chain === 'sol' ? 9 : 18;
+      const price = item.chain === 'sol' ? solPrice : ethPrice;
+      const decimals = item.chain === 'sol' ? 9 : 18;
       total += toUsdValue(amount, decimals, price);
     }
     return total;
-  }, [initialFees, solPrice, ethPrice]);
+  }
 
-  const liveUnclaimedUsd = useMemo(() => {
-    let total = 0;
-    for (const fee of liveFees) {
-      const amount = safeBigInt(fee.totalUnclaimed);
-      if (amount === 0n) continue;
-      const price = fee.chain === 'sol' ? solPrice : ethPrice;
-      const decimals = fee.chain === 'sol' ? 9 : 18;
-      total += toUsdValue(amount, decimals, price);
-    }
-    return total;
-  }, [liveFees, solPrice, ethPrice]);
+  const cachedUnclaimedUsd = useMemo(
+    () => computeUnclaimedTotal(initialFees.map((f) => ({ chain: f.chain, amount: f.total_unclaimed }))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [initialFees, solPrice, ethPrice],
+  );
+
+  const liveUnclaimedUsd = useMemo(
+    () => computeUnclaimedTotal(liveFees.map((f) => ({ chain: f.chain, amount: f.totalUnclaimed }))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [liveFees, solPrice, ethPrice],
+  );
 
   const displayUnclaimedUsd = liveFees.length > 0 ? liveUnclaimedUsd : cachedUnclaimedUsd;
 
@@ -242,15 +254,14 @@ export function ProfileHero({
             {/* Avatar */}
             <div className="relative shrink-0">
               {avatarUrl && !avatarError ? (
-                <img
+                <Image
                   src={avatarUrl}
                   alt={displayName}
-                  width={80}
-                  height={80}
+                  width={72}
+                  height={72}
                   className="h-14 w-14 rounded-full border-2 border-border object-cover sm:h-[72px] sm:w-[72px]"
                   onError={() => setAvatarError(true)}
-                  loading="eager"
-                  fetchPriority="high"
+                  priority
                   referrerPolicy="no-referrer"
                 />
               ) : (
@@ -268,9 +279,7 @@ export function ProfileHero({
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {creator.twitter_handle && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-xs text-muted-foreground">
-                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                    </svg>
+                    <XIcon className="h-3 w-3" />
                     @{creator.twitter_handle}
                   </span>
                 )}
@@ -286,10 +295,7 @@ export function ProfileHero({
                       key={chain}
                       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${meta.bg} ${meta.color}`}
                     >
-                      <span className="relative flex h-1 w-1" aria-hidden="true">
-                        <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-current opacity-75" />
-                        <span className="relative inline-flex h-1 w-1 rounded-full bg-current" />
-                      </span>
+                      <PulsingDot className="h-1 w-1" />
                       {meta.label}
                     </span>
                   );
@@ -316,12 +322,7 @@ export function ProfileHero({
             <span className="font-semibold tabular-nums" aria-live="polite" aria-atomic>
               {formatUsd(displayUnclaimedUsd)}
             </span>
-            {loading && (
-              <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
-                <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-foreground/40 opacity-75" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-foreground" />
-              </span>
-            )}
+            {loading && <PulsingDot className="h-1.5 w-1.5 text-foreground" />}
           </div>
           <span className="h-3.5 w-px bg-border/60" aria-hidden="true" />
           <div className="flex items-center gap-1.5">

@@ -1,5 +1,12 @@
 import type { Metadata } from 'next';
+import { Montserrat } from 'next/font/google';
 import { ScrollReveal } from '../components/ScrollReveal';
+
+const montserrat = Montserrat({
+  variable: '--font-subtitle',
+  subsets: ['latin'],
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'ClaimScan Docs: Architecture & Roadmap',
@@ -114,7 +121,7 @@ function StatBox({
 
 export default function DocsPage() {
   return (
-    <div className="flex flex-col items-center gap-10 pb-16">
+    <div className={`${montserrat.variable} flex flex-col items-center gap-10 pb-16`}>
       {/* Header */}
       <div className="animate-fade-in w-full max-w-4xl text-center">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">

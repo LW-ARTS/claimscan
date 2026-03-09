@@ -6,6 +6,7 @@ import { safeBigInt, toUsdValue } from '@/lib/utils';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 import { SearchBar } from '../components/SearchBar';
 import { ProfileHero } from '../components/ProfileHero';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LazySection } from '../components/LazySection';
 import type { Chain } from '@/lib/supabase/types';
 
@@ -131,17 +132,19 @@ export default async function ProfilePage({ params }: PageProps) {
 
       {/* ZONE 1: Profile Hero */}
       <div className="animate-fade-in-up">
-        <ProfileHero
-          creator={creator}
-          wallets={wallets}
-          initialFees={feeRecords}
-          walletsForLive={walletsForLive}
-          solPrice={prices.sol}
-          ethPrice={prices.eth}
-          handle={decoded}
-          totalEarnedUsd={totalEarnedUsd}
-          platformCount={platformCount}
-        />
+        <ErrorBoundary>
+          <ProfileHero
+            creator={creator}
+            wallets={wallets}
+            initialFees={feeRecords}
+            walletsForLive={walletsForLive}
+            solPrice={prices.sol}
+            ethPrice={prices.eth}
+            handle={decoded}
+            totalEarnedUsd={totalEarnedUsd}
+            platformCount={platformCount}
+          />
+        </ErrorBoundary>
       </div>
 
       {/* ZONE 2: Breakdown (chain pills + platform tabs + table) */}

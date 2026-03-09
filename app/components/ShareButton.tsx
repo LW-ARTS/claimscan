@@ -1,12 +1,19 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { formatUsd } from '@/lib/utils';
+import { formatUsd, copyToClipboard } from '@/lib/utils';
 
 interface ShareButtonProps {
   handle: string;
   totalEarnedUsd: number;
   platformCount: number;
+}
+
+function saveButtonStyle({ saveFailed, saved, saving }: { saveFailed: boolean; saved: boolean; saving: boolean }) {
+  if (saveFailed) return 'border-red-500/30 bg-red-500/10 text-red-400';
+  if (saved) return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
+  if (saving) return 'border-border bg-muted/60 text-muted-foreground/50 cursor-wait';
+  return 'border-border bg-muted/40 text-muted-foreground cursor-pointer hover:bg-muted hover:border-foreground/20 hover:text-foreground';
 }
 
 export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButtonProps) {
@@ -35,23 +42,10 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
 
   const handleCopyLink = useCallback(async () => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    try {
-      await navigator.clipboard.writeText(profileUrl);
+    const ok = await copyToClipboard(profileUrl);
+    if (ok) {
       setCopied(true);
       timerRef.current = setTimeout(() => setCopied(false), 2000);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = profileUrl;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(ta);
-      if (ok) {
-        setCopied(true);
-        timerRef.current = setTimeout(() => setCopied(false), 2000);
-      }
     }
   }, [profileUrl]);
 
@@ -103,15 +97,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
         <button
           onClick={handleSaveImage}
           disabled={saving}
-          className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all active:scale-[0.97] ${
-            saveFailed
-              ? 'border-red-500/30 bg-red-500/10 text-red-400'
-              : saved
-                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                : saving
-                  ? 'border-border bg-muted/60 text-muted-foreground/50 cursor-wait'
-                  : 'border-border bg-muted/40 text-muted-foreground cursor-pointer hover:bg-muted hover:border-foreground/20 hover:text-foreground'
-          }`}
+          className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-all active:scale-[0.97] ${saveButtonStyle({ saveFailed, saved, saving })}`}
         >
           {saveFailed ? (
             <>

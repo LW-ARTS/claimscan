@@ -70,16 +70,18 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
     return Array.from(byChain.values());
   }, [fees, solPrice, ethPrice]);
 
-  // Group fees by platform
-  const byPlatform = new Map<Platform, FeeRecord[]>();
-  for (const fee of fees) {
-    const existing = byPlatform.get(fee.platform) ?? [];
-    existing.push(fee);
-    byPlatform.set(fee.platform, existing);
-  }
-
-  const platformsWithData = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) > 0);
-  const platformsEmpty = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) === 0);
+  // Group fees by platform (memoized — fees can contain hundreds of records)
+  const { byPlatform, platformsWithData, platformsEmpty } = useMemo(() => {
+    const byPlatform = new Map<Platform, FeeRecord[]>();
+    for (const fee of fees) {
+      const existing = byPlatform.get(fee.platform) ?? [];
+      existing.push(fee);
+      byPlatform.set(fee.platform, existing);
+    }
+    const platformsWithData = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) > 0);
+    const platformsEmpty = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) === 0);
+    return { byPlatform, platformsWithData, platformsEmpty };
+  }, [fees]);
 
   const filteredFees = activeTab === 'all' ? fees : (byPlatform.get(activeTab as Platform) ?? []);
   const tabKeys = ['all', ...platformsWithData];
@@ -102,9 +104,9 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
             <>
               <span className="h-3.5 w-px bg-border/50" aria-hidden="true" />
               <span className="flex items-center gap-1.5 text-xs text-foreground/70">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-foreground/40 opacity-75" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-foreground" />
+                <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
+                  <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-current opacity-75" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
                 </span>
                 {totalUnclaimed} unclaimed
               </span>
