@@ -1,13 +1,24 @@
 import { notFound } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { resolveAndPersistCreator } from '@/lib/services/creator';
 import { getNativeTokenPrices } from '@/lib/prices';
+import { safeBigInt, toUsdValue } from '@/lib/utils';
+import { PLATFORM_CONFIG } from '@/lib/constants';
 import { SearchBar } from '../components/SearchBar';
 import { ProfileHeader } from '../components/ProfileHeader';
 import { FeeSummaryCard } from '../components/FeeSummaryCard';
-import { PlatformBreakdown } from '../components/PlatformBreakdown';
+import { ShareReceiptCard } from '../components/ShareReceiptCard';
 import { ChainBreakdown } from '../components/ChainBreakdown';
-import { ScanStatusLog } from '../components/ScanStatusLog';
+import { LazySection } from '../components/LazySection';
 import type { Chain } from '@/lib/supabase/types';
+
+// Lazy-load below-fold heavy client components
+const PlatformBreakdown = dynamic(
+  () => import('../components/PlatformBreakdown').then((m) => ({ default: m.PlatformBreakdown })),
+);
+const ScanStatusLog = dynamic(
+  () => import('../components/ScanStatusLog').then((m) => ({ default: m.ScanStatusLog })),
+);
 
 interface PageProps {
   params: Promise<{ handle: string }>;
@@ -21,17 +32,19 @@ export async function generateMetadata({ params }: PageProps) {
   const isWallet = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(safeName);
   const displayName = isWallet ? safeName : `@${safeName}`;
   return {
-    title: `${displayName} — ClaimScan | DeFi Fee Tracker`,
-    description: `View creator fee earnings, claims, and unclaimed balances for ${displayName} across Pump.fun, Bags.fm, Clanker, Zora, and more DeFi launchpads.`,
+    title: `${displayName} Creator Fees`,
+    description: `See earned, claimed, and unclaimed fees for ${displayName} across Pump.fun, Bags.fm, Clanker, Zora and more. Real-time data on Solana and Base.`,
     openGraph: {
-      title: `${displayName} — ClaimScan`,
-      description: `Creator fee summary for ${displayName} across DeFi launchpads.`,
+      title: `${displayName} Creator Fees | ClaimScan`,
+      description: `Earnings breakdown for ${displayName} across 10+ DeFi launchpads on Solana and Base.`,
     },
     twitter: {
       card: 'summary_large_image' as const,
+      title: `${displayName} Creator Fees | ClaimScan`,
+      description: `Earnings breakdown for ${displayName} across 10+ DeFi launchpads.`,
     },
     alternates: {
-      canonical: `https://claimscan.com/${encodeURIComponent(safeName)}`,
+      canonical: `https://claimscan.tech/${encodeURIComponent(safeName)}`,
     },
   };
 }
@@ -84,45 +97,97 @@ export default async function ProfilePage({ params }: PageProps) {
   // Determine which chains have resolved wallets (for scan status)
   const resolvedChains = [...new Set(wallets.map((w) => w.chain))] as Chain[];
 
+  // Compute USD value for a single fee record (uses DB cache, falls back to live price)
+  const feeToUsd = (fee: typeof feeRecords[number]): number => {
+    const dbUsd = fee.total_earned_usd;
+    if (typeof dbUsd === 'number' && Number.isFinite(dbUsd) && dbUsd > 0) return dbUsd;
+    const unclaimed = safeBigInt(fee.total_unclaimed);
+    const earned = safeBigInt(fee.total_earned);
+    const amount = unclaimed > 0n ? unclaimed : earned;
+    if (amount === 0n) return 0;
+    const price = fee.chain === 'sol' ? prices.sol : prices.eth;
+    const decimals = fee.chain === 'sol' ? 9 : 18;
+    return toUsdValue(amount, decimals, price);
+  };
+
+  // Compute aggregate stats for the share receipt card (server-side)
+  const totalEarnedUsd = feeRecords.reduce((sum, fee) => sum + feeToUsd(fee), 0);
+
+  const platformCount = new Set(feeRecords.map((f) => f.platform)).size;
+
+  // Build per-platform USD totals for the top platforms breakdown
+  const platformUsdMap = new Map<string, number>();
+  for (const fee of feeRecords) {
+    const usd = feeToUsd(fee);
+    if (usd > 0) {
+      platformUsdMap.set(fee.platform, (platformUsdMap.get(fee.platform) ?? 0) + usd);
+    }
+  }
+
+  const topPlatforms = [...platformUsdMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([key, usdValue]) => {
+      const config = PLATFORM_CONFIG[key as keyof typeof PLATFORM_CONFIG];
+      return {
+        key,
+        name: config?.name ?? key,
+        color: config?.color ?? '#888888',
+        usdValue,
+        percentage: totalEarnedUsd > 0 ? (usdValue / totalEarnedUsd) * 100 : 0,
+      };
+    });
+
   return (
-    <div className="space-y-5 sm:space-y-8">
+    <div className="space-y-3 sm:space-y-4">
       <SearchBar />
 
-      <ProfileHeader creator={creator} wallets={wallets} />
+      <div className="animate-fade-in-up">
+        <ProfileHeader creator={creator} wallets={wallets} />
+      </div>
 
-      <FeeSummaryCard
-        initialFees={feeRecords}
-        wallets={walletsForLive}
-        solPrice={prices.sol}
-        ethPrice={prices.eth}
-      />
+      <div className="animate-fade-in-up delay-75">
+        <FeeSummaryCard
+          initialFees={feeRecords}
+          wallets={walletsForLive}
+          solPrice={prices.sol}
+          ethPrice={prices.eth}
+        />
+      </div>
 
-      {/* Chain breakdown section */}
-      <section>
-        <div className="mb-3 sm:mb-4 flex items-center gap-3">
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
-          <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground/60">
-            By Chain
-          </h2>
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+      {/* Share receipt card */}
+      {totalEarnedUsd > 0 && (
+        <div className="animate-fade-in-up delay-150">
+          <ShareReceiptCard
+            handle={decoded}
+            totalEarnedUsd={totalEarnedUsd}
+            platformCount={platformCount}
+            topPlatforms={topPlatforms}
+            twitterHandle={creator.twitter_handle}
+          />
         </div>
-        <ChainBreakdown fees={feeRecords} solPrice={prices.sol} ethPrice={prices.eth} />
-      </section>
+      )}
 
-      {/* Platform breakdown section */}
-      <section>
-        <div className="mb-3 sm:mb-4 flex items-center gap-3">
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
-          <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground/60">
-            By Platform
-          </h2>
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+      {/* Chain breakdown */}
+      <LazySection minHeight={160}>
+        <div className="animate-fade-in-up delay-200">
+          <ChainBreakdown fees={feeRecords} solPrice={prices.sol} ethPrice={prices.eth} />
         </div>
-        <PlatformBreakdown fees={feeRecords} solPrice={prices.sol} ethPrice={prices.eth} key={creator.id} />
-      </section>
+      </LazySection>
+
+      {/* Platform breakdown */}
+      <LazySection minHeight={200}>
+        <div className="animate-fade-in-up delay-300">
+          <PlatformBreakdown fees={feeRecords} solPrice={prices.sol} ethPrice={prices.eth} key={creator.id} />
+        </div>
+      </LazySection>
 
       {/* Scan status log */}
-      <ScanStatusLog fees={feeRecords} resolvedChains={resolvedChains} />
+      <LazySection minHeight={80}>
+        <div className="animate-fade-in-up delay-400">
+          <ScanStatusLog fees={feeRecords} resolvedChains={resolvedChains} />
+        </div>
+      </LazySection>
     </div>
   );
 }

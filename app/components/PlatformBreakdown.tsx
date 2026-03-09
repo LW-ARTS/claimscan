@@ -62,69 +62,22 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
   const tabKeys = ['all', ...platformsWithData];
 
   return (
-    <div className="space-y-4">
-      {/* Summary */}
+    <div className="space-y-3">
+      {/* Section label + summary */}
       <div className="flex items-center justify-between">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/50">
+          By Platform
+        </p>
         <p className="text-xs tabular-nums text-muted-foreground/60">
           <span className="font-semibold text-foreground/80">{platformsWithData.length}</span>
-          <span>/{ALL_PLATFORMS.length} platforms with fees</span>
-        </p>
-        <p className="text-xs tabular-nums text-muted-foreground/60">
+          <span>/{ALL_PLATFORMS.length} platforms</span>
+          <span className="mx-1.5 text-border">·</span>
           <span className="font-semibold text-foreground/80">{fees.length}</span>
-          <span> tokens total</span>
+          <span> tokens</span>
         </p>
       </div>
 
-      {/* Platform grid — compact visual overview */}
-      <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-10 sm:gap-2">
-        {orderedPlatforms.map((platform) => {
-          const config = PLATFORM_CONFIG[platform];
-          const count = byPlatform.get(platform)?.length ?? 0;
-          const hasData = count > 0;
-          const isActive = activeTab === platform;
-          return (
-            <button
-              key={platform}
-              onClick={() => setActiveTab(isActive ? 'all' : platform)}
-              aria-pressed={isActive}
-              aria-label={`${config?.name ?? platform}: ${count} tokens`}
-              className={`group relative flex flex-col items-center gap-1 rounded-xl border px-1 py-2.5 transition-all duration-200 ${
-                isActive
-                  ? 'border-foreground/30 bg-foreground/10 shadow-sm'
-                  : hasData
-                    ? 'border-border bg-card hover:border-foreground/20 hover:bg-muted/50'
-                    : 'border-border/30 bg-card/30 opacity-40 hover:opacity-60'
-              }`}
-            >
-              <PlatformIcon
-                platform={platform}
-                className={`h-4 w-4 transition-colors ${
-                  isActive ? 'text-foreground' : hasData ? 'text-muted-foreground group-hover:text-foreground' : 'text-muted-foreground/40'
-                }`}
-                aria-hidden
-              />
-              <span className={`text-[9px] font-medium leading-tight ${
-                isActive ? 'text-foreground' : hasData ? 'text-muted-foreground' : 'text-muted-foreground/40'
-              }`}>
-                {config?.name ?? platform}
-              </span>
-              {hasData && (
-                <span
-                  className={`absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums ${
-                    isActive
-                      ? 'bg-foreground text-background'
-                      : 'bg-foreground/80 text-background'
-                  }`}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Filter tabs for keyboard/screen-reader accessibility */}
+      {/* Filter tabs */}
       <div
         role="tablist"
         aria-label="Filter by platform"

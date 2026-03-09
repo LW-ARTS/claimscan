@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 export function SiteFooter() {
   const pathname = usePathname();
@@ -28,12 +29,19 @@ export function SiteFooter() {
               <span className="text-sm font-semibold text-foreground">ClaimScan</span>
             </div>
             <p className="text-[11px] text-muted-foreground/40">
-              Real-time creator fee tracking across Solana and Base
+              Track and claim creator fees across Solana and Base
             </p>
           </div>
 
           {/* Right side — links + social */}
           <div className="flex items-center gap-4">
+            <Link
+              href="/docs"
+              className="text-[11px] text-muted-foreground/50 transition-colors hover:text-foreground"
+            >
+              Docs
+            </Link>
+            <span className="h-3 w-px bg-border/50" aria-hidden="true" />
             <a
               href="https://x.com/lwartss"
               target="_blank"

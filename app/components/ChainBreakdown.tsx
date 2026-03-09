@@ -66,13 +66,17 @@ export function ChainBreakdown({ fees, solPrice = 0, ethPrice = 0 }: ChainBreakd
   if (chains.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
-      {chains.map((chain) => {
-        return (
-          <div
-            key={chain.chain}
-            className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 sm:p-5 transition-all duration-300 hover:border-foreground/20"
-          >
+    <div className="space-y-3">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/50">
+        By Chain
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {chains.map((chain) => {
+          return (
+            <div
+              key={chain.chain}
+              className="group relative overflow-hidden rounded-xl border border-border bg-card p-3 sm:p-4 transition-all duration-300 hover:border-foreground/20"
+            >
 
             <div className="relative">
               <div className="flex items-center gap-3">
@@ -107,8 +111,9 @@ export function ChainBreakdown({ fees, solPrice = 0, ethPrice = 0 }: ChainBreakd
               </div>
             </div>
           </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

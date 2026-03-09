@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import Image from 'next/image';
 import { PlatformIcon } from './PlatformIcon';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 import type { Database } from '@/lib/supabase/types';
@@ -20,8 +19,8 @@ const chainMeta: Record<string, { label: string; color: string; bg: string }> = 
   eth: { label: 'Ethereum', color: 'text-blue-300', bg: 'bg-blue-400/10 border-blue-400/20' },
 };
 
-/** Max wallets shown before expand toggle */
-const WALLETS_COLLAPSED = 4;
+/** Max wallets shown before expand toggle — 0 = start fully collapsed */
+const WALLETS_COLLAPSED = 0;
 
 /** Clipboard copy icon */
 function CopyIcon({ className }: { className?: string }) {
@@ -120,6 +119,7 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
 
 export function ProfileHeader({ creator, wallets }: ProfileHeaderProps) {
   const [showAllWallets, setShowAllWallets] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   const displayName =
     creator.display_name ||
@@ -128,24 +128,25 @@ export function ProfileHeader({ creator, wallets }: ProfileHeaderProps) {
     'Unknown';
 
   const chains = [...new Set(wallets.map((w) => w.chain))];
-  const visibleWallets = showAllWallets ? wallets : wallets.slice(0, WALLETS_COLLAPSED);
-  const hiddenCount = wallets.length - WALLETS_COLLAPSED;
+
+  // Resolve avatar: unavatar.io via Twitter handle (fresh, no Next.js cache) → letter fallback
+  const avatarUrl = creator.twitter_handle ? `/api/avatar?handle=${encodeURIComponent(creator.twitter_handle)}` : null;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4 sm:p-6">
       <div className="flex items-start gap-3 sm:gap-5">
-        {/* Avatar */}
+        {/* Avatar — uses <img> directly to avoid next/image cache serving stale PFPs */}
         <div className="relative shrink-0">
-          {creator.avatar_url?.startsWith('https://') &&
-           /^https:\/\/(pbs\.twimg\.com|abs\.twimg\.com|avatars\.githubusercontent\.com|imagedelivery\.net|ipfs\.io)\//.test(creator.avatar_url) ? (
-            <Image
-              src={creator.avatar_url}
+          {avatarUrl && !avatarError ? (
+            <img
+              src={avatarUrl}
               alt={displayName}
               width={80}
               height={80}
-              sizes="(max-width: 640px) 64px, 80px"
               className="relative h-16 w-16 rounded-full border-2 border-border object-cover sm:h-20 sm:w-20"
-              priority
+              onError={() => setAvatarError(true)}
+              loading="eager"
+              referrerPolicy="no-referrer"
             />
           ) : (
             <div className="relative flex h-16 w-16 items-center justify-center rounded-full border-2 border-border bg-muted text-2xl font-black text-foreground sm:h-20 sm:w-20 sm:text-3xl">
@@ -196,29 +197,48 @@ export function ProfileHeader({ creator, wallets }: ProfileHeaderProps) {
 
       {/* Resolved Wallets */}
       {wallets.length > 0 && (
-        <div className="mt-4 border-t border-border/50 pt-4">
-          <div className="mb-2.5 flex items-center justify-between">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/50">
-              Resolved Wallets
-            </p>
-            <p className="text-[11px] tabular-nums text-muted-foreground/40">
-              {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            {visibleWallets.map((w) => (
-              <WalletRow key={w.id} wallet={w} />
-            ))}
-          </div>
-
-          {/* Show more/less toggle */}
-          {hiddenCount > 0 && (
+        <div className="mt-4 border-t border-border/50 pt-3">
+          {/* Collapsed: clickable summary row */}
+          {!showAllWallets && (
             <button
-              onClick={() => setShowAllWallets((v) => !v)}
-              className="mt-2 w-full rounded-lg py-1.5 text-center text-[11px] font-medium text-muted-foreground/60 transition-colors hover:bg-muted/40 hover:text-muted-foreground"
+              onClick={() => setShowAllWallets(true)}
+              className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-[11px] transition-colors hover:bg-muted/40 group"
             >
-              {showAllWallets ? 'Show less' : `Show ${hiddenCount} more wallet${hiddenCount > 1 ? 's' : ''}`}
+              <span className="font-medium uppercase tracking-wider text-muted-foreground/50 group-hover:text-muted-foreground">
+                Resolved Wallets
+              </span>
+              <span className="flex items-center gap-1.5 tabular-nums text-muted-foreground/40 group-hover:text-muted-foreground">
+                {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                </svg>
+              </span>
             </button>
+          )}
+
+          {/* Expanded: full wallet list */}
+          {showAllWallets && (
+            <>
+              <div className="mb-2.5 flex items-center justify-between px-1">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/50">
+                  Resolved Wallets
+                </p>
+                <p className="text-[11px] tabular-nums text-muted-foreground/40">
+                  {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                {wallets.map((w) => (
+                  <WalletRow key={w.id} wallet={w} />
+                ))}
+              </div>
+              <button
+                onClick={() => setShowAllWallets(false)}
+                className="mt-2 w-full rounded-lg py-1.5 text-center text-[11px] font-medium text-muted-foreground/60 transition-colors hover:bg-muted/40 hover:text-muted-foreground"
+              >
+                Hide wallets
+              </button>
+            </>
           )}
         </div>
       )}

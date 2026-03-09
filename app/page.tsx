@@ -1,13 +1,23 @@
+import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { SearchBar } from './components/SearchBar';
 import { PlatformIcon } from './components/PlatformIcon';
-import { OrbitingLogos } from './components/OrbitingLogos';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 import TrueFocus from './components/TrueFocus';
-import MoneyFaceEmoji from './components/MoneyFaceEmoji';
+import { HeroReveal } from './components/HeroReveal';
+
+// Lazy-load decorative / animation-heavy components (auto code-split)
+const OrbitingLogos = dynamic(
+  () => import('./components/OrbitingLogos').then((m) => ({ default: m.OrbitingLogos })),
+);
+const MoneyFaceEmoji = dynamic(() => import('./components/MoneyFaceEmoji'), {
+  loading: () => <div className="size-7 sm:size-10 md:size-14 lg:size-[72px]" />,
+});
 export default function Home() {
   const platformEntries = Object.entries(PLATFORM_CONFIG);
 
   return (
+    <HeroReveal>
     <div className="flex min-h-[calc(75vh-4rem)] flex-col items-center justify-center pt-8 sm:pt-0">
       {/* Orbiting logos — homepage only, hidden on mobile */}
       <div className="fixed pointer-events-none -z-10 opacity-50 hidden md:block md:bottom-0 md:left-0 md:-translate-x-1/3 md:translate-y-1/3 md:w-[500px] md:h-[500px]">
@@ -121,6 +131,13 @@ export default function Home() {
               LW ARTS
             </a>
             {' '}&middot;{' '}
+            <Link
+              href="/docs"
+              className="text-muted-foreground/80 underline decoration-foreground/10 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground/30"
+            >
+              Docs
+            </Link>
+            {' '}&middot;{' '}
             <a
               href="https://x.com/lwartss"
               target="_blank"
@@ -144,5 +161,6 @@ export default function Home() {
         </div>
       </div>
     </div>
+    </HeroReveal>
   );
 }

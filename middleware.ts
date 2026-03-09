@@ -88,7 +88,7 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-DNS-Prefetch-Control', 'on');
-  response.headers.set('X-Robots-Tag', 'noarchive, noimageindex');
+  response.headers.set('X-Robots-Tag', 'noarchive');
   response.headers.set(
     'Permissions-Policy',
     'camera=(), microphone=(), geolocation=(), payment=()'
@@ -99,9 +99,10 @@ export function middleware(request: NextRequest) {
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://pbs.twimg.com https://abs.twimg.com https://avatars.githubusercontent.com https://imagedelivery.net https://ipfs.io",
+      "img-src 'self' data: blob: https://pbs.twimg.com https://abs.twimg.com https://avatars.githubusercontent.com https://imagedelivery.net https://ipfs.io https://unavatar.io",
       "font-src 'self' https://fonts.gstatic.com",
       "connect-src 'self' https://*.supabase.co https://api.coingecko.com https://api.dexscreener.com https://api.jup.ag https://*.ingest.sentry.io",
+      "frame-src 'self'",
       "frame-ancestors 'none'",
       "object-src 'none'",
       "base-uri 'self'",
@@ -119,7 +120,7 @@ export function middleware(request: NextRequest) {
 
   // CORS — fail closed to production URL; never reflect attacker-controlled origin
   const rawOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  const allowedOrigin = rawOrigin && rawOrigin.startsWith('https://') ? rawOrigin : 'https://claimscan.com';
+  const allowedOrigin = rawOrigin && rawOrigin.startsWith('https://') ? rawOrigin : 'https://claimscan.tech';
   response.headers.set('Access-Control-Allow-Origin', allowedOrigin);
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -193,6 +194,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|pdf)$).*)',
   ],
 };

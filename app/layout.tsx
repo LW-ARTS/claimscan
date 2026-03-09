@@ -1,11 +1,18 @@
 import type { Metadata, Viewport } from 'next';
 import { Exo_2, JetBrains_Mono } from 'next/font/google';
+import dynamic from 'next/dynamic';
 import './globals.css';
 import { JsonLd } from './components/JsonLd';
-import { GrainientBackground } from './components/GrainientBackground';
 import { SiteFooter } from './components/SiteFooter';
-import { AntiCopy } from './components/AntiCopy';
 import Link from 'next/link';
+
+// Lazy-load heavy client components (auto code-split, hydrate on client)
+const GrainientBackground = dynamic(
+  () => import('./components/GrainientBackground').then((m) => ({ default: m.GrainientBackground })),
+);
+const AntiCopy = dynamic(
+  () => import('./components/AntiCopy').then((m) => ({ default: m.AntiCopy })),
+);
 
 const exo2 = Exo_2({
   variable: '--font-sans',
@@ -22,17 +29,20 @@ const jetbrainsMono = JetBrains_Mono({
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#FAFAFA',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FAFAFA' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+  ],
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://claimscan.io'),
+  metadataBase: new URL('https://claimscan.tech'),
   title: {
-    default: 'ClaimScan — Cross-Chain DeFi Fee Tracker',
+    default: 'ClaimScan | Track Unclaimed Creator Fees Across DeFi',
     template: '%s | ClaimScan',
   },
   description:
-    'Track creator fees across Pump.fun, Bags.fm, Clanker, Zora, and more. Discover earned, claimed, and unclaimed DeFi revenue by Twitter handle, GitHub, or wallet address. Real-time cross-chain data on Solana & Base.',
+    'Find unclaimed creator fees on Pump.fun, Bags.fm, Clanker, Zora and 10+ launchpads. Paste any @handle or wallet to see earnings across Solana and Base in seconds.',
   keywords: [
     'DeFi fees', 'creator fees', 'Pump.fun fees', 'Bags.fm', 'Clanker',
     'Zora', 'Solana', 'Base', 'cross-chain', 'fee tracker', 'unclaimed fees',
@@ -40,20 +50,23 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'ClaimScan' }],
   creator: 'ClaimScan',
+  publisher: 'LW ARTS',
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://claimscan.io',
+    url: 'https://claimscan.tech',
     siteName: 'ClaimScan',
-    title: 'ClaimScan — Cross-Chain DeFi Fee Tracker',
+    title: 'ClaimScan | Track Unclaimed Creator Fees Across DeFi',
     description:
-      'Track creator fees across DeFi launchpads. Real-time data for Pump.fun, Bags.fm, Clanker, Zora on Solana & Base.',
+      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 10+ launchpads on Solana and Base.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'ClaimScan — Cross-Chain DeFi Fee Tracker',
+    site: '@lwartss',
+    creator: '@lwartss',
+    title: 'ClaimScan | Track Unclaimed Creator Fees Across DeFi',
     description:
-      'Track creator fees across DeFi launchpads. Search by @twitter, GitHub, or wallet.',
+      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 10+ launchpads.',
   },
   robots: {
     index: true,
@@ -66,8 +79,20 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '48x48' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-icon', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  manifest: '/site.webmanifest',
   alternates: {
-    canonical: 'https://claimscan.io',
+    canonical: 'https://claimscan.tech',
   },
 };
 
@@ -105,7 +130,14 @@ export default function RootLayout({
                   ClaimScan
                 </span>
               </Link>
-              <div className="flex items-center gap-2" />
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/docs"
+                  className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Docs
+                </Link>
+              </div>
             </nav>
           </header>
 
