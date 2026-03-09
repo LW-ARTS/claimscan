@@ -1,7 +1,7 @@
 import 'server-only';
 import { CLANKER_API_BASE } from '@/lib/constants';
 import { batchClankerFees, isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
-import { safeBigInt, sanitizeTokenSymbol } from '@/lib/utils';
+import { safeBigInt, sanitizeTokenSymbol, sanitizeTokenName } from '@/lib/utils';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import { getAddress, type Address } from 'viem';
 import type {
@@ -160,7 +160,7 @@ export const clankerAdapter: PlatformAdapter = {
       chain: 'base' as const,
       platform: 'clanker' as const,
       symbol: sanitizeTokenSymbol(t.symbol),
-      name: t.name ? sanitizeTokenSymbol(t.name) : null,
+      name: sanitizeTokenName(t.name),
       imageUrl: t.img_url,
     }));
   },

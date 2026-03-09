@@ -19,9 +19,6 @@ const chainMeta: Record<string, { label: string; color: string; bg: string }> = 
   eth: { label: 'Ethereum', color: 'text-blue-300', bg: 'bg-blue-400/10 border-blue-400/20' },
 };
 
-/** Max wallets shown before expand toggle — 0 = start fully collapsed */
-const WALLETS_COLLAPSED = 0;
-
 /** Clipboard copy icon */
 function CopyIcon({ className }: { className?: string }) {
   return (

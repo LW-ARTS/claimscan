@@ -14,7 +14,6 @@ interface ShareReceiptCardProps {
   totalEarnedUsd: number;
   platformCount: number;
   topPlatforms: TopPlatform[];
-  twitterHandle?: string | null;
 }
 
 export function ShareReceiptCard({

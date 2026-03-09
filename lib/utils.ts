@@ -83,7 +83,7 @@ export function sanitizeAmountString(val: unknown): string {
   // Accept pure integer strings
   if (/^\d+$/.test(trimmed)) return trimmed;
   // Handle scientific notation (e.g. "1e18", "1.5e6") by converting to integer string
-  if (/^\d+(\.\d+)?e\+?\d+$/i.test(trimmed)) {
+  if (/^\d+(\.\d+)?e[+\-]?\d+$/i.test(trimmed)) {
     try {
       const num = Number(trimmed);
       if (Number.isFinite(num) && num >= 0 && num <= Number.MAX_SAFE_INTEGER) {
@@ -93,6 +93,7 @@ export function sanitizeAmountString(val: unknown): string {
     return '0';
   }
   // Accept decimal strings by truncating to integer part (some APIs return formatted values)
+  // Note: this must come AFTER the scientific notation check to avoid "1.5e20" → "1"
   const intPart = trimmed.split('.')[0];
   if (intPart && /^\d+$/.test(intPart)) return intPart;
   return '0';
@@ -104,6 +105,40 @@ export function sanitizeAmountString(val: unknown): string {
 export function sanitizeTokenSymbol(val: unknown): string | null {
   if (typeof val !== 'string') return null;
   return val.replace(/[^\w\-\.]/g, '').slice(0, 20) || null;
+}
+
+/**
+ * Sanitize a token name from external APIs — allows spaces but strips control chars.
+ */
+export function sanitizeTokenName(val: unknown): string | null {
+  if (typeof val !== 'string') return null;
+  // eslint-disable-next-line no-control-regex
+  return val.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 100) || null;
+}
+
+/**
+ * Compute USD value for a fee record.
+ * Prefers DB-stored total_earned_usd; falls back to amount × native token price.
+ *
+ * TODO(#15): Fallback assumes native token decimals (SOL=9, ETH=18).
+ * Incorrect for RevShare and similar platforms where fees are in the
+ * meme token's own denomination. Needs server-side USD or token_decimals field.
+ */
+export function computeFeeUsd(
+  fee: { total_earned_usd?: number | null; total_unclaimed: string | null; total_earned: string | null; chain: string },
+  solPrice: number,
+  ethPrice: number,
+): number {
+  if (fee.total_earned_usd != null && fee.total_earned_usd > 0) {
+    return fee.total_earned_usd;
+  }
+  const unclaimed = safeBigInt(fee.total_unclaimed);
+  const earned = safeBigInt(fee.total_earned);
+  const amount = unclaimed > 0n ? unclaimed : earned;
+  if (amount === 0n) return 0;
+  const price = fee.chain === 'sol' ? solPrice : ethPrice;
+  const decimals = fee.chain === 'sol' ? 9 : 18;
+  return toUsdValue(amount, decimals, price);
 }
 
 /**

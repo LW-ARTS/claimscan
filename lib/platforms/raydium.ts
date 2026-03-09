@@ -2,7 +2,7 @@ import 'server-only';
 import { PublicKey } from '@solana/web3.js';
 import { RAYDIUM_LAUNCHLAB_API, RAYDIUM_LAUNCHLAB_PROGRAM_ID } from '@/lib/constants';
 import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
-import { sanitizeTokenSymbol } from '@/lib/utils';
+import { sanitizeTokenName, sanitizeTokenSymbol } from '@/lib/utils';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
   PlatformAdapter,
@@ -121,7 +121,7 @@ export const raydiumAdapter: PlatformAdapter = {
         chain: 'sol' as const,
         platform: 'raydium' as const,
         symbol: sanitizeTokenSymbol(t.symbol),
-        name: t.name ? sanitizeTokenSymbol(t.name) : null,
+        name: sanitizeTokenName(t.name),
         imageUrl: t.imageUri ?? t.image ?? null,
       })).filter((t) => t.tokenAddress.length > 0);
     } catch (err) {

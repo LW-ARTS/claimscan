@@ -137,12 +137,7 @@ export function FeeSummaryCard({
       if (amount === 0n) continue;
       const price = fee.chain === 'sol' ? solPrice : ethPrice;
       const decimals = fee.chain === 'sol' ? 9 : 18;
-      const divisor = 10n ** BigInt(decimals);
-      const whole = amount / divisor;
-      const remainder = amount % divisor;
-      const fracStr = remainder.toString().padStart(decimals, '0');
-      const tokenValue = parseFloat(`${whole}.${fracStr}`);
-      total += tokenValue * price;
+      total += toUsdValue(amount, decimals, price);
     }
     return total;
   }, [liveFees, solPrice, ethPrice]);

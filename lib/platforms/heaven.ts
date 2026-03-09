@@ -1,7 +1,7 @@
 import 'server-only';
 import { HEAVEN_DATA_API } from '@/lib/constants';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
-import { safeBigInt, sanitizeAmountString, sanitizeTokenSymbol } from '@/lib/utils';
+import { safeBigInt, sanitizeAmountString, sanitizeTokenName, sanitizeTokenSymbol } from '@/lib/utils';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
   PlatformAdapter,
@@ -97,7 +97,7 @@ export const heavenAdapter: PlatformAdapter = {
       chain: 'sol' as const,
       platform: 'heaven' as const,
       symbol: sanitizeTokenSymbol(p.tokenSymbol),
-      name: p.tokenName ? sanitizeTokenSymbol(p.tokenName) : null,
+      name: sanitizeTokenName(p.tokenName),
       imageUrl: null,
     }));
   },

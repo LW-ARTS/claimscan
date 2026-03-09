@@ -177,7 +177,6 @@ export default async function ProfilePage({ params }: PageProps) {
             totalEarnedUsd={totalEarnedUsd}
             platformCount={platformCount}
             topPlatforms={topPlatforms}
-            twitterHandle={creator.twitter_handle}
           />
         </div>
       )}
