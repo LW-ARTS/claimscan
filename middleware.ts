@@ -88,7 +88,6 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-DNS-Prefetch-Control', 'on');
-  response.headers.set('X-Robots-Tag', 'noarchive');
   response.headers.set(
     'Permissions-Policy',
     'camera=(), microphone=(), geolocation=(), payment=()'
@@ -149,8 +148,12 @@ export function middleware(request: NextRequest) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   }
 
-  // Rate limit public API endpoints
-  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/cron')) {
+  // Rate limit public API endpoints and expensive dynamic routes (OG images)
+  const isRateLimitedPath =
+    (pathname.startsWith('/api/') && !pathname.startsWith('/api/cron')) ||
+    pathname.endsWith('/opengraph-image');
+
+  if (isRateLimitedPath) {
     // Use Vercel's runtime-injected IP (not spoofable), falling back to headers
     // set by trusted reverse proxy. On Vercel, request.ip is injected by the platform.
     const ip = (request as unknown as { ip?: string }).ip

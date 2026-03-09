@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'edge';
 export const alt = 'ClaimScan Creator Fee Receipt';
-export const size = { width: 1200, height: 630 };
+export const size = { width: 2400, height: 1260 };
 export const contentType = 'image/png';
 
 // ═══════════════════════════════════════════════
@@ -62,7 +62,7 @@ async function fetchPrices(): Promise<{ sol: number; eth: number }> {
   try {
     const res = await fetch(
       'https://api.coingecko.com/api/v3/simple/price?ids=solana,ethereum&vs_currencies=usd',
-      { signal: AbortSignal.timeout(4000) },
+      { signal: AbortSignal.timeout(4000), next: { revalidate: 300 } },
     );
     if (!res.ok) return { sol: 0, eth: 0 };
     const data = await res.json();
@@ -83,6 +83,15 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
   try {
   const { handle } = await params;
   const decoded = decodeURIComponent(handle);
+
+  // Input validation — reject excessively long or empty handles early
+  if (!decoded || decoded.length < 2 || decoded.length > 256) {
+    return new ImageResponse(
+      (<div style={{ display: 'flex', width: '100%', height: '100%', backgroundColor: '#0A0A0A', color: '#FAFAFA', fontSize: '64px', fontWeight: 800, alignItems: 'center', justifyContent: 'center' }}>ClaimScan</div>),
+      { width: 2400, height: 1260 },
+    );
+  }
+
   const isWallet = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(decoded);
   const displayName = isWallet ? `${decoded.slice(0, 8)}...${decoded.slice(-6)}` : `@${decoded}`;
 
@@ -92,7 +101,7 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
 
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (url && key) {
       const supabase = createClient(url, key, {
@@ -168,7 +177,8 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
 
   // ── Avatar ──
   let avatarSrc: string | null = null;
-  if (!isWallet) {
+  // Validate handle format before external fetch (prevent path traversal / param injection)
+  if (!isWallet && /^[a-zA-Z0-9_]{1,50}$/.test(decoded)) {
     try {
       const res = await fetch(`https://unavatar.io/x/${decoded}`, {
         signal: AbortSignal.timeout(2500),
@@ -196,19 +206,12 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
   let soraMedium: ArrayBuffer | null = null;
   let spaceMono: ArrayBuffer | null = null;
   try {
+    const fontOpts = { signal: AbortSignal.timeout(3000), next: { revalidate: 86400 } } as RequestInit;
     const [r800, r600, r500, rMono] = await Promise.all([
-      fetch('https://fonts.gstatic.com/s/sora/v17/xMQOuFFYT72X5wkB_18qmnndmSfSmX-K.ttf', {
-        signal: AbortSignal.timeout(3000),
-      }),
-      fetch('https://fonts.gstatic.com/s/sora/v17/xMQOuFFYT72X5wkB_18qmnndmSeMmX-K.ttf', {
-        signal: AbortSignal.timeout(3000),
-      }),
-      fetch('https://fonts.gstatic.com/s/sora/v17/xMQOuFFYT72X5wkB_18qmnndmSdgnn-K.ttf', {
-        signal: AbortSignal.timeout(3000),
-      }),
-      fetch('https://fonts.gstatic.com/s/spacemono/v17/i7dPIFZifjKcF5UAWdDRUEY.ttf', {
-        signal: AbortSignal.timeout(3000),
-      }),
+      fetch('https://fonts.gstatic.com/s/sora/v17/xMQOuFFYT72X5wkB_18qmnndmSfSmX-K.ttf', fontOpts),
+      fetch('https://fonts.gstatic.com/s/sora/v17/xMQOuFFYT72X5wkB_18qmnndmSeMmX-K.ttf', fontOpts),
+      fetch('https://fonts.gstatic.com/s/sora/v17/xMQOuFFYT72X5wkB_18qmnndmSdgnn-K.ttf', fontOpts),
+      fetch('https://fonts.gstatic.com/s/spacemono/v17/i7dPIFZifjKcF5UAWdDRUEY.ttf', fontOpts),
     ]);
     if (r800.ok) soraExtraBold = await r800.arrayBuffer();
     if (r600.ok) soraSemiBold = await r600.arrayBuffer();
@@ -675,12 +678,12 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
     },
   );
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[OG] Error:', msg);
+    console.error('[OG] Error:', err instanceof Error ? err.message : String(err));
+    // Return opaque fallback — never expose error details in publicly-served images
     return new ImageResponse(
       (
-        <div style={{ display: 'flex', width: '100%', height: '100%', backgroundColor: '#0A0A0A', color: '#FF4444', fontSize: '48px', alignItems: 'center', justifyContent: 'center', padding: '96px' }}>
-          {`OG Error: ${msg.slice(0, 200)}`}
+        <div style={{ display: 'flex', width: '100%', height: '100%', backgroundColor: '#0A0A0A', color: '#FAFAFA', fontSize: '64px', fontWeight: 800, alignItems: 'center', justifyContent: 'center' }}>
+          ClaimScan
         </div>
       ),
       { width: 2400, height: 1260 },

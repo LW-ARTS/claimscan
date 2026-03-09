@@ -158,6 +158,7 @@ const Grainient: React.FC<GrainientProps> = ({
     let raf = 0;
     let ro: ResizeObserver | null = null;
     let canvasEl: HTMLCanvasElement | null = null;
+    let visHandler: (() => void) | null = null;
     const container = containerRef.current;
 
     import('ogl').then(({ Renderer, Program, Mesh, Triangle }) => {
@@ -228,12 +229,26 @@ const Grainient: React.FC<GrainientProps> = ({
       setSize();
 
       const t0 = performance.now();
+      let paused = false;
       const loop = (t: number) => {
+        if (paused) return;
         (program.uniforms.iTime as { value: number }).value = (t - t0) * 0.001;
         renderer.render({ scene: mesh });
         raf = requestAnimationFrame(loop);
       };
       raf = requestAnimationFrame(loop);
+
+      // Pause animation when tab is hidden to save GPU/battery
+      visHandler = () => {
+        if (document.hidden) {
+          paused = true;
+          cancelAnimationFrame(raf);
+        } else {
+          paused = false;
+          raf = requestAnimationFrame(loop);
+        }
+      };
+      document.addEventListener('visibilitychange', visHandler);
     }).catch((err) => {
       console.error('[Grainient] Failed to load OGL:', err);
     });
@@ -241,6 +256,7 @@ const Grainient: React.FC<GrainientProps> = ({
     return () => {
       cancelAnimationFrame(raf);
       ro?.disconnect();
+      if (visHandler) document.removeEventListener('visibilitychange', visHandler);
       if (canvasEl) {
         try {
           container.removeChild(canvasEl);

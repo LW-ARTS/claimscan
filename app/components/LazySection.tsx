@@ -12,33 +12,33 @@ interface LazySectionProps {
 }
 
 /**
- * Renders children only when the section scrolls into (or near) the viewport.
- * Uses IntersectionObserver for zero-cost idle detection.
- * Once visible, the observer disconnects — content stays mounted permanently.
+ * SSR-safe lazy section.
+ * Content is always rendered in the initial HTML (important for SEO/Googlebot),
+ * but gets a fade-in entrance animation when it scrolls into view on the client.
  */
 export function LazySection({
   children,
   rootMargin = '200px 0px',
-  minHeight = 120,
+  minHeight: _minHeight,
   className,
 }: LazySectionProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [animated, setAnimated] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
-    // Skip IntersectionObserver when prefers-reduced-motion is on
+    // Skip animation when prefers-reduced-motion is on
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setVisible(true);
+      setAnimated(true);
       return;
     }
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setVisible(true);
+          setAnimated(true);
           observer.disconnect();
         }
       },
@@ -50,16 +50,16 @@ export function LazySection({
   }, [rootMargin]);
 
   return (
-    <div ref={ref} className={className}>
-      {visible ? (
-        children
-      ) : (
-        <div
-          style={{ minHeight }}
-          className="animate-pulse rounded-xl bg-foreground/[0.03]"
-          aria-hidden
-        />
-      )}
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: animated ? 1 : 0,
+        transform: animated ? 'translateY(0)' : 'translateY(12px)',
+        transition: 'opacity 0.4s ease-out, transform 0.4s ease-out',
+      }}
+    >
+      {children}
     </div>
   );
 }

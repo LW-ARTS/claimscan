@@ -146,6 +146,7 @@ export function ProfileHeader({ creator, wallets }: ProfileHeaderProps) {
               className="relative h-16 w-16 rounded-full border-2 border-border object-cover sm:h-20 sm:w-20"
               onError={() => setAvatarError(true)}
               loading="eager"
+              fetchPriority="high"
               referrerPolicy="no-referrer"
             />
           ) : (

@@ -222,9 +222,11 @@ function parseAgentFeeResponse(response: string): ParsedAgentFee[] {
  * Asks for structured JSON output for reliable parsing.
  */
 async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_MS): Promise<TokenFee[]> {
+  // Sanitize handle before interpolation into prompt (prevent prompt injection)
+  const safeHandle = handle.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 50);
   // Ask for structured JSON output — the Bankr agent understands JSON requests well
   const prompt = [
-    `List all Bankr tokens where @${handle} is the fee recipient.`,
+    `List all Bankr tokens where @${safeHandle} is the fee recipient.`,
     'For each token, return ONLY a JSON array with this exact format, no explanation text:',
     '[{"a":"TOKEN_ADDRESS","s":"SYMBOL","e":"EARNED_WETH","c":"CLAIMED_WETH","u":"UNCLAIMED_WETH"}]',
     'Use numeric strings for WETH values (e.g. "0.005417"). Return [] if no tokens found.',

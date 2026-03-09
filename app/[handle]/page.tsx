@@ -37,11 +37,25 @@ export async function generateMetadata({ params }: PageProps) {
     openGraph: {
       title: `${displayName} Creator Fees | ClaimScan`,
       description: `Earnings breakdown for ${displayName} across 10+ DeFi launchpads on Solana and Base.`,
+      images: [
+        {
+          url: `/${encodeURIComponent(safeName)}/opengraph-image`,
+          width: 2400,
+          height: 1260,
+          alt: `${displayName} creator fee receipt on ClaimScan`,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image' as const,
       title: `${displayName} Creator Fees | ClaimScan`,
       description: `Earnings breakdown for ${displayName} across 10+ DeFi launchpads.`,
+      images: [
+        {
+          url: `/${encodeURIComponent(safeName)}/opengraph-image`,
+          alt: `${displayName} creator fee receipt on ClaimScan`,
+        },
+      ],
     },
     alternates: {
       canonical: `https://claimscan.tech/${encodeURIComponent(safeName)}`,

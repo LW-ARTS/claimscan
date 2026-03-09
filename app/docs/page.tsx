@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Whitepaper',
+  title: 'ClaimScan Whitepaper — Architecture & Roadmap',
   description:
     'Read the ClaimScan V1 whitepaper. Architecture, cross-chain fee tracking, security model, and roadmap for Solana and Base launchpads.',
   openGraph: {

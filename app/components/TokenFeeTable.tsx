@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ClaimStatusBadge } from './ClaimStatusBadge';
 import { PlatformIcon } from './PlatformIcon';
 import { PLATFORM_CONFIG } from '@/lib/constants';
@@ -58,13 +58,19 @@ function tokenDisplay(fee: FeeRecord): { label: string; badge: string } {
 export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTableProps) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_COUNT);
 
-  // Sort by computed USD value descending (largest fees first)
-  const sortedFees = [...fees].sort((a, b) => {
-    const aUsd = computeFeeUsd(a, solPrice, ethPrice);
-    const bUsd = computeFeeUsd(b, solPrice, ethPrice);
-    if (bUsd !== aUsd) return bUsd - aUsd;
-    return Number(safeBigInt(b.total_unclaimed) - safeBigInt(a.total_unclaimed));
-  });
+  // Memoize sort + display value computation so it only re-runs when inputs change
+  const sortedFees = useMemo(() => {
+    const withUsd = fees.map((fee) => ({
+      fee,
+      usd: computeFeeUsd(fee, solPrice, ethPrice),
+      display: tokenDisplay(fee),
+    }));
+    withUsd.sort((a, b) => {
+      if (b.usd !== a.usd) return b.usd - a.usd;
+      return Number(safeBigInt(b.fee.total_unclaimed) - safeBigInt(a.fee.total_unclaimed));
+    });
+    return withUsd;
+  }, [fees, solPrice, ethPrice]);
 
   const displayedFees = sortedFees.slice(0, visibleCount);
   const hasMore = visibleCount < sortedFees.length;
@@ -89,10 +95,9 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
     <>
     {/* Mobile: stacked card layout */}
     <div className="space-y-3 md:hidden">
-      {displayedFees.map((fee) => {
+      {displayedFees.map(({ fee, usd, display: { label, badge } }) => {
         const platformConfig = PLATFORM_CONFIG[fee.platform];
         const decimals = fee.chain === 'sol' ? 9 : 18;
-        const { label, badge } = tokenDisplay(fee);
         return (
           <div key={fee.id} className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center justify-between">
@@ -117,7 +122,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
               </div>
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">USD</p>
-                <p className="font-medium tabular-nums">{formatUsd(computeFeeUsd(fee, solPrice, ethPrice))}</p>
+                <p className="font-medium tabular-nums">{formatUsd(usd)}</p>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Unclaimed</p>
@@ -164,10 +169,9 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {displayedFees.map((fee) => {
+            {displayedFees.map(({ fee, usd, display: { label, badge } }) => {
               const platformConfig = PLATFORM_CONFIG[fee.platform];
               const decimals = fee.chain === 'sol' ? 9 : 18;
-              const { label, badge } = tokenDisplay(fee);
               return (
                 <tr
                   key={fee.id}
@@ -199,7 +203,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
                     {formatTokenAmount(fee.total_unclaimed, decimals)}{currencyLabel(fee.chain)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium tabular-nums">
-                    {formatUsd(computeFeeUsd(fee, solPrice, ethPrice))}
+                    {formatUsd(usd)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     <ClaimStatusBadge status={fee.claim_status} />

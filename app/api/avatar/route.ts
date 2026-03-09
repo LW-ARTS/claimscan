@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': ct,
-        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=600',
+        'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=43200, stale-if-error=604800',
       },
     });
   } catch {

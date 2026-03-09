@@ -75,46 +75,45 @@ export async function GET(request: Request) {
       }
     }
 
-    // Fetch prices in batches of 10
+    // Fetch prices in parallel batches of 10, then batch-upsert all results
     const entries = Array.from(unique.values());
-    let updated = 0;
+    const priceRows: { chain: 'sol' | 'base' | 'eth'; token_address: string; token_symbol: string; price_usd: number; updated_at: string }[] = [];
 
     for (let i = 0; i < entries.length; i += 10) {
       const batch = entries.slice(i, i + 10);
       const results = await Promise.allSettled(
         batch.map(async (t) => {
-          // Validate token address format before calling external price APIs
           if (!isValidTokenForChain(t.chain, t.address)) {
             console.warn(`[refresh-prices] skipping invalid address: ${t.chain}:${t.address}`);
-            return;
+            return null;
           }
-
           const price = await getTokenPrice(t.chain, t.address);
           if (price > 0) {
-            const { error: upsertErr } = await supabase.from('token_prices').upsert(
-              {
-                chain: t.chain,
-                token_address: t.address,
-                token_symbol: t.symbol,
-                price_usd: price,
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: 'chain,token_address' }
-            );
-            // Only count as updated if upsert actually succeeded
-            if (upsertErr) {
-              console.warn(`[refresh-prices] upsert failed for ${t.address}:`, upsertErr.message);
-            } else {
-              updated++;
-            }
+            return { chain: t.chain, token_address: t.address, token_symbol: t.symbol, price_usd: price, updated_at: new Date().toISOString() };
           }
+          return null;
         })
       );
 
       for (const result of results) {
-        if (result.status === 'rejected') {
-          console.warn('[refresh-prices] batch update failed:', result.reason);
+        if (result.status === 'fulfilled' && result.value) {
+          priceRows.push(result.value);
+        } else if (result.status === 'rejected') {
+          console.warn('[refresh-prices] price fetch failed:', result.reason);
         }
+      }
+    }
+
+    // Single batch upsert instead of N individual writes
+    let updated = 0;
+    if (priceRows.length > 0) {
+      const { error: batchErr } = await supabase
+        .from('token_prices')
+        .upsert(priceRows, { onConflict: 'chain,token_address' });
+      if (batchErr) {
+        console.warn('[refresh-prices] batch upsert failed:', batchErr.message);
+      } else {
+        updated = priceRows.length;
       }
     }
 

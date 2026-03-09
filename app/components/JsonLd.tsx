@@ -24,10 +24,7 @@ export function JsonLd() {
         url: 'https://claimscan.tech',
         potentialAction: {
           '@type': 'SearchAction',
-          target: {
-            '@type': 'EntryPoint',
-            urlTemplate: 'https://claimscan.tech/{search_term_string}',
-          },
+          target: 'https://claimscan.tech/{search_term_string}',
           'query-input': 'required name=search_term_string',
         },
       },

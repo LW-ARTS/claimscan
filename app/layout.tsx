@@ -59,6 +59,14 @@ export const metadata: Metadata = {
     title: 'ClaimScan | Track Unclaimed Creator Fees Across DeFi',
     description:
       'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 10+ launchpads on Solana and Base.',
+    images: [
+      {
+        url: '/opengraph-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'ClaimScan — Cross-chain DeFi fee tracker for Solana and Base',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
@@ -67,6 +75,12 @@ export const metadata: Metadata = {
     title: 'ClaimScan | Track Unclaimed Creator Fees Across DeFi',
     description:
       'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 10+ launchpads.',
+    images: [
+      {
+        url: '/opengraph-image.png',
+        alt: 'ClaimScan — Cross-chain DeFi fee tracker for Solana and Base',
+      },
+    ],
   },
   robots: {
     index: true,
