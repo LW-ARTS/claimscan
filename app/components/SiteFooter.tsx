@@ -56,7 +56,7 @@ export function SiteFooter() {
             </a>
             <span className="h-3 w-px bg-border/50" aria-hidden="true" />
             <p className="text-[10px] tabular-nums text-muted-foreground/30">
-              Solana · Base · 10 platforms
+              Solana · Base · 9 platforms
             </p>
           </div>
         </div>

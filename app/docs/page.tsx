@@ -11,11 +11,11 @@ const montserrat = Montserrat({
 export const metadata: Metadata = {
   title: 'ClaimScan Docs: Architecture & Roadmap',
   description:
-    'ClaimScan documentation. V1 creator fee tracking across 10+ launchpads. V2 roadmap: token contract lookup, fee recipient discovery, and claim status on Solana and Base.',
+    'ClaimScan documentation. V1 creator fee tracking across 9 launchpads. V2 roadmap: token contract lookup, fee recipient discovery, and claim status on Solana and Base.',
   openGraph: {
     title: 'ClaimScan Docs',
     description:
-      'Architecture, security, and roadmap for the cross-chain DeFi fee tracker powering 10+ launchpads.',
+      'Architecture, security, and roadmap for the cross-chain DeFi fee tracker powering 9 launchpads.',
   },
   twitter: {
     card: 'summary_large_image' as const,
@@ -33,7 +33,6 @@ export const metadata: Metadata = {
 const solanaPlatforms = [
   { name: 'Pump.fun', desc: 'Largest Solana memecoin launchpad', color: '#00D4AA' },
   { name: 'Bags.fm', desc: 'Social token trading with creator fees', color: '#FF6B35' },
-  { name: 'Heaven', desc: 'Bonding curve token launches', color: '#FFD700' },
   { name: 'Believe', desc: 'Community token launches with fee splits', color: '#E91E63' },
   { name: 'RevShare', desc: 'On-chain revenue sharing for token creators', color: '#4CAF50' },
   { name: 'Coinbarrel', desc: 'Fast token launches with built-in fees', color: '#FF8C00' },
@@ -245,13 +244,13 @@ export default function DocsPage() {
             <SectionTitle lines={['What is', 'ClaimScan?']} />
             <Divider />
             <p className="font-subtitle text-sm leading-relaxed text-muted-foreground">
-              You launched tokens. Platforms collected fees for you. But nobody told you where the money went. ClaimScan scans 10 launchpads across Solana and Base in real time, showing you exactly how much you&apos;ve earned, what you&apos;ve claimed, and what&apos;s still sitting uncollected on-chain.
+              You launched tokens. Platforms collected fees for you. But nobody told you where the money went. ClaimScan scans 9 launchpads across Solana and Base in real time, showing you exactly how much you&apos;ve earned, what you&apos;ve claimed, and what&apos;s still sitting uncollected on-chain.
             </p>
             <Quote>
               &ldquo;Your money is already on-chain. ClaimScan tells you where.&rdquo;
             </Quote>
             <div className="grid grid-cols-3 gap-3">
-              <StatBox value="10" label="Platforms, One Search" dark />
+              <StatBox value="9" label="Platforms, One Search" dark />
               <StatBox value="2" label="Chains Unified" dark />
               <StatBox value="~40%" label="Fees Go Unclaimed*" dark />
               <StatBox value="<30s" label="Full Results" />
@@ -278,7 +277,7 @@ export default function DocsPage() {
               {[
                 {
                   title: 'Fragmented Dashboards',
-                  desc: '10 platforms. 10 different dashboards. 10 different login flows. No creator checks all of them. Most check none. That\'s how fees expire unclaimed.',
+                  desc: '9 platforms. 9 different dashboards. 9 different login flows. No creator checks all of them. Most check none. That\'s how fees expire unclaimed.',
                 },
                 {
                   title: 'Cross-Chain Complexity',
@@ -337,7 +336,7 @@ export default function DocsPage() {
               {[
                 {
                   title: 'One Search, All Platforms',
-                  desc: 'Type your @handle. ClaimScan queries all 10 platforms simultaneously and shows you every fee across every chain in under 30 seconds.',
+                  desc: 'Type your @handle. ClaimScan queries all 9 platforms simultaneously and shows you every fee across every chain in seconds.',
                   dark: true,
                 },
                 {
@@ -435,7 +434,7 @@ export default function DocsPage() {
             <SectionTitle lines={['Supported', 'Platforms']} />
             <Divider />
             <p className="font-subtitle text-sm text-muted-foreground">
-              10 platforms across 2 blockchains. More coming in V2.
+              9 platforms across 2 blockchains. More coming in V2.
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -606,7 +605,7 @@ resolution   addresses     & USD values`}
                 </div>
                 <ul className="mt-3 space-y-1.5">
                   {[
-                    '10 platform support (Solana + Base)',
+                    '9 platform support (Solana + Base)',
                     'Multi-identity search (Twitter, GitHub, Farcaster, Wallet)',
                     'Real-time fee polling with 30s intervals',
                     'USD conversion with live price feeds',

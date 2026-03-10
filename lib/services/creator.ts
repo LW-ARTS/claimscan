@@ -28,10 +28,14 @@ type Creator = Database['public']['Tables']['creators']['Row'];
 type Wallet = Database['public']['Tables']['wallets']['Row'];
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 
+type ClaimEventRow = Database['public']['Tables']['claim_events']['Row'];
+
 interface ResolveResult {
   creator: (Creator & { wallets?: Wallet[]; fee_records?: FeeRecord[] }) | null;
   wallets: Wallet[];
   fees: FeeRecord[];
+  claimEvents: ClaimEventRow[];
+  resolveMs: number;
   cached: boolean;
 }
 
@@ -60,7 +64,7 @@ export async function resolveAndPersistCreator(query: string): Promise<ResolveRe
   }).catch((err) => {
     clearTimeout(timeoutId!);
     console.error(`[creator] resolve timed out or failed for ${dedupeKey}:`, err instanceof Error ? err.message : err);
-    return { creator: null, wallets: [], fees: [], cached: false } as ResolveResult;
+    return { creator: null, wallets: [], fees: [], claimEvents: [], resolveMs: 0, cached: false } as ResolveResult;
   });
 
   inFlight.set(dedupeKey, promise);
@@ -82,6 +86,7 @@ function hashQueryForLog(value: string): string {
 async function doResolve(
   parsed: { value: string; provider: IdentityProvider }
 ): Promise<ResolveResult> {
+  const start = Date.now();
   const supabase = createServiceClient();
 
   // Log search (fire-and-forget) — hash all queries to avoid storing PII
@@ -118,27 +123,38 @@ async function doResolve(
       const isFresh = maxSyncedAt > 0 && Date.now() - maxSyncedAt < CACHE_TTL_MS;
 
       if (isFresh) {
+        // Query claim_events for this creator (cached path)
+        const { data: claimEvents } = await supabase
+          .from('claim_events')
+          .select('*')
+          .eq('creator_id', data.id)
+          .order('claimed_at', { ascending: false })
+          .limit(50);
+
         return {
           creator: data,
           wallets: data.wallets ?? [],
           fees: feeRecords,
+          claimEvents: (claimEvents ?? []) as ClaimEventRow[],
+          resolveMs: Date.now() - start,
           cached: true,
         };
       }
 
       // Cache is stale — fully re-resolve before returning
-      return await freshResolve(parsed, supabase, data.id);
+      return await freshResolve(parsed, supabase, data.id, start);
     }
   }
 
   // Resolve fresh
-  return await freshResolve(parsed, supabase, null);
+  return await freshResolve(parsed, supabase, null, start);
 }
 
 async function freshResolve(
   parsed: { value: string; provider: IdentityProvider },
   supabase: ReturnType<typeof createServiceClient>,
-  existingCreatorId: string | null
+  existingCreatorId: string | null,
+  start: number
 ): Promise<ResolveResult> {
   // Wrap in try/catch to prevent crashing the server component
   try {
@@ -152,7 +168,7 @@ async function freshResolve(
 
     // If no wallets AND no handle-based fees AND no existing creator → nothing found
     if (wallets.length === 0 && handleFees.length === 0 && !existingCreatorId) {
-      return { creator: null, wallets: [], fees: [], cached: false };
+      return { creator: null, wallets: [], fees: [], claimEvents: [], resolveMs: Date.now() - start, cached: false };
     }
 
     // Upsert creator
@@ -202,7 +218,7 @@ async function freshResolve(
     }
 
     if (!creatorId) {
-      return { creator: null, wallets: [], fees: [], cached: false };
+      return { creator: null, wallets: [], fees: [], claimEvents: [], resolveMs: Date.now() - start, cached: false };
     }
 
     // Batch upsert wallets — use onConflict to update source_platform on re-association.
@@ -325,17 +341,27 @@ async function freshResolve(
       .is('creator_id', null)
       .gte('searched_at', fiveMinutesAgo);
 
-    // Return fresh data
-    const { data: freshCreator } = await supabase
-      .from('creators')
-      .select('*, wallets(*), fee_records(*)')
-      .eq('id', creatorId)
-      .single();
+    // Return fresh data + claim events
+    const [{ data: freshCreator }, { data: claimEvents }] = await Promise.all([
+      supabase
+        .from('creators')
+        .select('*, wallets(*), fee_records(*)')
+        .eq('id', creatorId)
+        .single(),
+      supabase
+        .from('claim_events')
+        .select('*')
+        .eq('creator_id', creatorId)
+        .order('claimed_at', { ascending: false })
+        .limit(50),
+    ]);
 
     return {
       creator: freshCreator,
       wallets: (freshCreator?.wallets ?? []) as Wallet[],
       fees: (freshCreator?.fee_records ?? []) as FeeRecord[],
+      claimEvents: (claimEvents ?? []) as ClaimEventRow[],
+      resolveMs: Date.now() - start,
       cached: false,
     };
   } catch (err) {
@@ -354,6 +380,8 @@ async function freshResolve(
             creator: staleCreator,
             wallets: staleCreator.wallets ?? [],
             fees: staleCreator.fee_records ?? [],
+            claimEvents: [],
+            resolveMs: Date.now() - start,
             cached: true,
           };
         }
@@ -361,7 +389,7 @@ async function freshResolve(
         console.error('[creator] stale data fallback also failed:', staleErr instanceof Error ? staleErr.message : staleErr);
       }
     }
-    return { creator: null, wallets: [], fees: [], cached: false };
+    return { creator: null, wallets: [], fees: [], claimEvents: [], resolveMs: Date.now() - start, cached: false };
   }
 }
 

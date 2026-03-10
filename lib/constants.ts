@@ -15,9 +15,6 @@ export const PUMPSWAP_PROGRAM_ID = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'
 export const METEORA_DBC_PROGRAM = 'dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN';
 export const COINBARREL_PROGRAM_ID = '7HxbxHnTUBaUfWjVPbPLs8gqqScmjmBWjRnETBjS9DMj';
 export const RAYDIUM_LAUNCHLAB_PROGRAM_ID = 'LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj';
-// NOTE: HEAVEN_AMM_PROGRAM is not currently used — Heaven fees are read via API.
-// Kept as reference for potential future onchain integration.
-
 // Base (EVM) Contract Addresses — getAddress() enforces EIP-55 checksum at import time
 // and types them as Address, eliminating all downstream `as Address` casts.
 export const CLANKER_FACTORY: Address = getAddress('0xE85A59c628F7d27878ACeB4bf3b35733630083a9');
@@ -32,8 +29,6 @@ export const ZORA_PROTOCOL_REWARDS: Address = getAddress('0x7777777F279eba3d3Ad8
 export const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
 export const CLANKER_API_BASE = 'https://clanker.world/api';
 export const ZORA_API_BASE = 'https://api-sdk.zora.engineering/api';
-export const HEAVEN_DATA_API = 'https://api.heaven.xyz';
-export const HEAVEN_TX_API = 'https://tx.api.heaven.xyz';
 export const BANKR_API_BASE = 'https://api.bankr.bot/agent';
 export const RAYDIUM_LAUNCHLAB_API = 'https://launch-mint-v1.raydium.io';
 
@@ -85,7 +80,6 @@ export const PLATFORM_CONFIG = {
   clanker: { name: 'Clanker', chain: 'base' as const, color: '#0052FF' },
   pump: { name: 'Pump.fun', chain: 'sol' as const, color: '#00D4AA' },
   zora: { name: 'Zora', chain: 'base' as const, color: '#5B5BD6' },
-  heaven: { name: 'Heaven', chain: 'sol' as const, color: '#FFD700' },
   bankr: { name: 'Bankr', chain: 'base' as const, color: '#1DA1F2' },
   believe: { name: 'Believe', chain: 'sol' as const, color: '#E91E63' },
   revshare: { name: 'RevShare', chain: 'sol' as const, color: '#4CAF50' },

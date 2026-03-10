@@ -5,7 +5,6 @@ import { bagsAdapter } from './bags';
 import { clankerAdapter } from './clanker';
 import { pumpAdapter } from './pump';
 import { zoraAdapter } from './zora';
-import { heavenAdapter } from './heaven';
 import { bankrAdapter } from './bankr';
 import { believeAdapter } from './believe';
 import { revshareAdapter } from './revshare';
@@ -21,7 +20,6 @@ const adapters: Record<Platform, PlatformAdapter> = {
   clanker: clankerAdapter,
   pump: pumpAdapter,
   zora: zoraAdapter,
-  heaven: heavenAdapter,
   bankr: bankrAdapter,
   believe: believeAdapter,
   revshare: revshareAdapter,

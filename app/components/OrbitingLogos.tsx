@@ -11,14 +11,6 @@ const PumpIcon = () => (
     </svg>
 );
 
-const HeavenIcon = () => (
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="12" cy="5.5" rx="7" ry="2.5" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M12 9v7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        <path d="M7 20c0-2.761 2.239-4 5-4s5 1.239 5 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-);
-
 const BankrIcon = () => (
     <svg viewBox="0 0 24 24" className="size-5" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect x="4" y="5" width="16" height="13" rx="2" stroke="currentColor" strokeWidth="1.6" />
@@ -98,7 +90,6 @@ export function OrbitingLogos() {
                 <IconBubble><PumpIcon /></IconBubble>
                 <IconBubble><BagsIcon /></IconBubble>
                 <IconBubble><RaydiumIcon /></IconBubble>
-                <IconBubble><HeavenIcon /></IconBubble>
                 <IconBubble><BankrIcon /></IconBubble>
             </OrbitingCircles>
             <OrbitingCircles radius={100} reverse iconSize={40}>

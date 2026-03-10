@@ -18,8 +18,8 @@ test.describe('Homepage', () => {
   test('displays platform pills with correct count', async ({ page }) => {
     await page.goto('/');
 
-    // All 8 platform pills should be present
-    const platforms = ['Bags.fm', 'Clanker', 'Pump.fun', 'Zora', 'Heaven', 'Bankr', 'Believe', 'RevShare'];
+    // All platform pills should be present
+    const platforms = ['Bags.fm', 'Clanker', 'Pump.fun', 'Zora', 'Bankr', 'Believe', 'RevShare'];
     for (const name of platforms) {
       await expect(page.getByText(name, { exact: true })).toBeVisible();
     }

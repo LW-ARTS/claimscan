@@ -66,7 +66,7 @@ export default function Home() {
         </div>
 
         <p className="animate-fade-in-up delay-200 mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
-          Paste any @handle or wallet. See what you&apos;ve earned, claimed, and left on the table across 10 launchpads.
+          Paste any @handle or wallet. See what you&apos;ve earned, claimed, and left on the table across {platformEntries.length} launchpads.
         </p>
 
         {/* Search bar */}

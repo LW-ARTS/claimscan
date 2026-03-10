@@ -17,6 +17,9 @@ const PlatformBreakdown = dynamic(
 const ScanStatusLog = dynamic(
   () => import('../components/ScanStatusLog').then((m) => ({ default: m.ScanStatusLog })),
 );
+const ClaimHistory = dynamic(
+  () => import('../components/ClaimHistory').then((m) => ({ default: m.ClaimHistory })),
+);
 
 interface PageProps {
   params: Promise<{ handle: string }>;
@@ -143,6 +146,7 @@ export default async function ProfilePage({ params }: PageProps) {
             handle={decoded}
             totalEarnedUsd={totalEarnedUsd}
             platformCount={platformCount}
+            resolveMs={result.resolveMs}
           />
         </ErrorBoundary>
       </div>
@@ -154,7 +158,16 @@ export default async function ProfilePage({ params }: PageProps) {
         </div>
       </LazySection>
 
-      {/* ZONE 3: Scan Status (minimal footnote) */}
+      {/* ZONE 3: Claim History */}
+      {result.claimEvents.length > 0 && (
+        <LazySection minHeight={100}>
+          <div className="animate-fade-in-up delay-200">
+            <ClaimHistory events={result.claimEvents} />
+          </div>
+        </LazySection>
+      )}
+
+      {/* ZONE 4: Scan Status (minimal footnote) */}
       <LazySection minHeight={80}>
         <div className="animate-fade-in-up delay-300">
           <ScanStatusLog fees={feeRecords} resolvedChains={resolvedChains} />

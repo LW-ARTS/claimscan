@@ -39,6 +39,7 @@ interface ProfileHeroProps {
   handle: string;
   totalEarnedUsd: number;
   platformCount: number;
+  resolveMs: number;
 }
 
 const chainMeta: Record<string, { label: string; color: string; bg: string }> = {
@@ -140,6 +141,7 @@ export function ProfileHero({
   handle,
   totalEarnedUsd,
   platformCount,
+  resolveMs,
 }: ProfileHeroProps) {
   const [showAllWallets, setShowAllWallets] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
@@ -369,6 +371,17 @@ export function ProfileHero({
               {platformCount > 0 ? platformCount : '—'}
             </span>
           </div>
+          {resolveMs > 0 && (
+            <>
+              <span className="h-3.5 w-px bg-border/60" aria-hidden="true" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground/50 text-xs">Scanned in</span>
+                <span className="font-semibold tabular-nums">
+                  {(resolveMs / 1000).toFixed(1)}s
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Share buttons */}

@@ -177,7 +177,6 @@ export async function fetchAllFees(
     'raydium',    // historical → getLiveUnclaimedFees
     'coinbarrel', // historical → getLiveUnclaimedFees
     'clanker',    // live → getHistoricalFees
-    'heaven',     // live → getHistoricalFees
     'bankr',      // Agent API handles both historical + live in one call
     'bags',       // both call getClaimablePositionsCached (30s cache)
   ]);

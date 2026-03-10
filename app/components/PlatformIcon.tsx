@@ -41,14 +41,6 @@ const BelieveLogo = (props: SvgProps) => (
 
 /* ─── Stylized icons for platforms without official public SVGs ─── */
 
-const HeavenLogo = (props: SvgProps) => (
-  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
-    <ellipse cx="12" cy="5.5" rx="7" ry="2.5" stroke="currentColor" strokeWidth="1.6" />
-    <path d="M12 9v7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    <path d="M7 20c0-2.761 2.239-4 5-4s5 1.239 5 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-  </svg>
-);
-
 const BankrLogo = (props: SvgProps) => (
   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
     <rect x="4" y="5" width="16" height="13" rx="2" stroke="currentColor" strokeWidth="1.6" />
@@ -93,7 +85,6 @@ const iconMap: Record<string, React.FC<SvgProps>> = {
   clanker: ClankerLogo,
   pump: PumpLogo,
   zora: ZoraLogo,
-  heaven: HeavenLogo,
   bankr: BankrLogo,
   believe: BelieveLogo,
   revshare: RevShareLogo,

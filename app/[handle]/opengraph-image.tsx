@@ -15,7 +15,6 @@ const PLATFORMS: Record<string, { name: string }> = {
   clanker: { name: 'Clanker' },
   pump: { name: 'Pump.fun' },
   zora: { name: 'Zora' },
-  heaven: { name: 'Heaven' },
   bankr: { name: 'Bankr' },
   believe: { name: 'Believe' },
   revshare: { name: 'RevShare' },
