@@ -74,7 +74,17 @@ function mapIdentityProvider(
   return map[provider] || 'twitter';
 }
 
+/** Track rate limit state to avoid wasting API calls after a 429. */
+let rateLimitedUntil = 0;
+
+function isRateLimited(): boolean {
+  return Date.now() < rateLimitedUntil;
+}
+
 async function bagsFetch<T>(path: string): Promise<T | null> {
+  // Short-circuit if we know we're rate limited
+  if (isRateLimited()) return null;
+
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -89,6 +99,19 @@ async function bagsFetch<T>(path: string): Promise<T | null> {
       signal: controller.signal,
     });
     clearTimeout(timeout);
+    if (res.status === 429) {
+      // Parse reset time from response if available, otherwise default to 5 minutes
+      try {
+        const body = await res.json() as { resetTime?: string };
+        rateLimitedUntil = body.resetTime
+          ? new Date(body.resetTime).getTime()
+          : Date.now() + 5 * 60_000;
+      } catch {
+        rateLimitedUntil = Date.now() + 5 * 60_000;
+      }
+      console.warn(`[bags] rate limited until ${new Date(rateLimitedUntil).toISOString()}`);
+      return null;
+    }
     if (!res.ok) {
       console.warn(`[bags] fetch ${path} returned HTTP ${res.status}`);
       return null;
@@ -288,6 +311,12 @@ async function computeClaimedAmounts(
 
   console.log(`[bags] computeClaimedAmounts for ${handle ?? wallet.slice(0, 8)}: ${eligible.length} positions (withBps=${withBps.length}, withoutBps=${withoutBps.length})`);
 
+  // Bail early if we already know we're rate limited (saves hundreds of wasted calls)
+  if (isRateLimited()) {
+    console.warn(`[bags] skipping computeClaimedAmounts — rate limited until ${new Date(rateLimitedUntil).toISOString()}`);
+    return claimMap;
+  }
+
   // --- Primary: lifetime-fees for positions with known BPS ---
   if (withBps.length > 0) {
     const sorted = [...withBps].sort(
@@ -323,7 +352,8 @@ async function computeClaimedAmounts(
   }
 
   // --- Fallback: claim-stats for positions without BPS ---
-  if (withoutBps.length > 0) {
+  // Skip if we got rate limited during primary phase
+  if (withoutBps.length > 0 && !isRateLimited()) {
     const sorted = [...withoutBps].sort(
       (a, b) => (b.totalClaimableLamportsUserShare || 0) - (a.totalClaimableLamportsUserShare || 0)
     );
@@ -401,13 +431,13 @@ export const bagsAdapter: PlatformAdapter = {
     const positions = await getClaimablePositionsCached(wallet);
     if (positions.length === 0) return [];
 
-    // Step 3: Compute claimed amounts (lifetime-fees primary, claim-stats fallback)
+    // Step 3: Compute claimed amounts (lifetime-fees primary, claim-stats fallback).
+    // When rate limited, claimTotals will be empty — earned = unclaimed only.
     const claimTotals = await computeClaimedAmounts(positions, wallet, handle);
 
     const fees: TokenFee[] = [];
     for (const p of positions) {
       if (!p.baseMint) continue;
-      // totalClaimableLamportsUserShare is in lamports (1 SOL = 1e9 lamports)
       const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
       const claimed = claimTotals.get(p.baseMint) ?? 0n;
       if (unclaimed <= 0n && claimed <= 0n) continue;
