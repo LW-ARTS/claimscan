@@ -91,6 +91,6 @@ export const PLATFORM_CONFIG = {
 // Timing Constants
 // ═══════════════════════════════════════════════
 
-export const CACHE_TTL_MS = 25 * 60 * 1000; // 25 minutes
+export const CACHE_TTL_MS = 40 * 60 * 1000; // 40 minutes
 export const LIVE_POLL_INTERVAL_MS = 30 * 1000; // 30 seconds
 export const PRICE_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
