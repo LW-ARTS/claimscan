@@ -198,7 +198,12 @@ async function getClaimTotalsForWallet(
       // Find this wallet's entry (match by wallet address)
       const entry = stats.find((s) => s.wallet === wallet);
       if (entry?.totalClaimed) {
-        const claimed = BigInt(entry.totalClaimed);
+        // claim-stats may return lamports (integer string) or SOL (decimal string).
+        // Handle both: if it contains a decimal point, parse as float and convert to lamports.
+        const raw = entry.totalClaimed;
+        const claimed = raw.includes('.')
+          ? BigInt(Math.floor(parseFloat(raw) * 1_000_000_000))
+          : BigInt(raw);
         if (claimed > 0n) claimMap.set(mint, claimed);
       }
     })

@@ -176,6 +176,7 @@ export async function fetchAllFees(
   const HISTORICAL_COVERS_LIVE: ReadonlySet<string> = new Set([
     'raydium',    // historical → getLiveUnclaimedFees
     'coinbarrel', // historical → getLiveUnclaimedFees
+    'believe',    // historical → getLiveUnclaimedFees
     'clanker',    // live → getHistoricalFees
     'bankr',      // Agent API handles both historical + live in one call
     'bags',       // both call getClaimablePositionsCached (30s cache)
@@ -209,13 +210,14 @@ export async function fetchAllFees(
         } else if (meta.type === 'historical' && !existing.isHistorical) {
           // Historical data replaces live data for the same key
           feeMap.set(key, { fee, isHistorical: true });
-        } else if (meta.type === (existing.isHistorical ? 'historical' : 'live')) {
-          // Same type from different wallets — sum the amounts
+        } else {
+          // Same token from a different wallet or source type — sum the amounts.
+          // Keeps the historical flag if either source is historical.
           const summed = { ...existing.fee };
           summed.totalEarned = (safeBigInt(summed.totalEarned) + safeBigInt(fee.totalEarned)).toString();
           summed.totalClaimed = (safeBigInt(summed.totalClaimed) + safeBigInt(fee.totalClaimed)).toString();
           summed.totalUnclaimed = (safeBigInt(summed.totalUnclaimed) + safeBigInt(fee.totalUnclaimed)).toString();
-          feeMap.set(key, { fee: summed, isHistorical: existing.isHistorical });
+          feeMap.set(key, { fee: summed, isHistorical: existing.isHistorical || meta.type === 'historical' });
         }
       }
     } else {

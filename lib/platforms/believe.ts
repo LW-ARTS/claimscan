@@ -2,7 +2,7 @@ import 'server-only';
 import { PublicKey } from '@solana/web3.js';
 import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { getConnection, isValidSolanaAddress } from '@/lib/chains/solana';
-import { fetchVaultClaimTotal } from '@/lib/helius/transactions';
+import { fetchVaultClaimTotal, fetchTokenClaimTotal } from '@/lib/helius/transactions';
 import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -130,57 +130,10 @@ export const believeAdapter: PlatformAdapter = {
   },
 
   async getHistoricalFees(wallet: string): Promise<TokenFee[]> {
-    if (!isValidSolanaAddress(wallet)) return [];
-
-    try {
-      const pools = await getPoolsByCreatorCached(wallet);
-      if (pools.length === 0) return [];
-
-      // Sort by unclaimed fee descending, cap at 10 pools for Helius queries
-      const poolsWithFees = pools
-        .map((p) => ({
-          pool: p,
-          quoteFee: bnToBigInt(p.account.creatorQuoteFee),
-          poolAddress: p.publicKey.toBase58(),
-        }))
-        .filter((p) => p.quoteFee > 0n)
-        .sort((a, b) => (b.quoteFee > a.quoteFee ? 1 : -1))
-        .slice(0, 10);
-
-      if (poolsWithFees.length === 0) return [];
-
-      // Fetch claimed totals from Helius vault history in parallel
-      const claimResults = await Promise.allSettled(
-        poolsWithFees.map((p) => fetchVaultClaimTotal(p.poolAddress))
-      );
-
-      const fees: TokenFee[] = [];
-      for (let i = 0; i < poolsWithFees.length; i++) {
-        const { quoteFee, poolAddress } = poolsWithFees[i];
-        const cr = claimResults[i];
-        const claimed = cr.status === 'fulfilled' ? cr.value : 0n;
-
-        fees.push({
-          tokenAddress: `SOL:believe:${poolAddress}`,
-          tokenSymbol: 'SOL',
-          chain: 'sol',
-          platform: 'believe',
-          totalEarned: (quoteFee + claimed).toString(),
-          totalClaimed: claimed.toString(),
-          totalUnclaimed: quoteFee.toString(),
-          totalEarnedUsd: null,
-          royaltyBps: null,
-        });
-      }
-
-      return fees;
-    } catch (err) {
-      console.warn(
-        '[believe] getHistoricalFees failed:',
-        err instanceof Error ? err.message : err
-      );
-      return [];
-    }
+    // Delegate to getLiveUnclaimedFees — it covers both SOL (quote) and
+    // base-token fees with Helius claim history. Listed in HISTORICAL_COVERS_LIVE
+    // to avoid double Helius calls.
+    return this.getLiveUnclaimedFees(wallet);
   },
 
   async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
@@ -204,50 +157,73 @@ export const believeAdapter: PlatformAdapter = {
 
       if (activePools.length === 0) return [];
 
-      // Fetch claimed totals for top 10 pools (by SOL fees) in parallel
-      const poolsForClaim = activePools
+      // Fetch SOL claimed totals for top 10 pools (by SOL fees) in parallel
+      const poolsForSolClaim = activePools
         .filter((p) => p.quoteFee > 0n)
         .sort((a, b) => (b.quoteFee > a.quoteFee ? 1 : -1))
         .slice(0, 10);
 
-      const claimResults = await Promise.allSettled(
-        poolsForClaim.map((p) => fetchVaultClaimTotal(p.poolAddress))
-      );
+      // Fetch base-token claimed totals for top 10 pools (by base fee) in parallel
+      const poolsForBaseClaim = activePools
+        .filter((p) => p.baseFee > 0n)
+        .sort((a, b) => (b.baseFee > a.baseFee ? 1 : -1))
+        .slice(0, 10);
 
-      const claimMap = new Map<string, bigint>();
-      for (let i = 0; i < poolsForClaim.length; i++) {
-        const cr = claimResults[i];
+      const [solClaimResults, baseClaimResults] = await Promise.all([
+        Promise.allSettled(
+          poolsForSolClaim.map((p) => fetchVaultClaimTotal(p.poolAddress))
+        ),
+        Promise.allSettled(
+          poolsForBaseClaim.map((p) =>
+            fetchTokenClaimTotal(p.poolAddress, wallet, p.baseMint)
+          )
+        ),
+      ]);
+
+      const solClaimMap = new Map<string, bigint>();
+      for (let i = 0; i < poolsForSolClaim.length; i++) {
+        const cr = solClaimResults[i];
         if (cr.status === 'fulfilled' && cr.value > 0n) {
-          claimMap.set(poolsForClaim[i].poolAddress, cr.value);
+          solClaimMap.set(poolsForSolClaim[i].poolAddress, cr.value);
+        }
+      }
+
+      const baseClaimMap = new Map<string, bigint>();
+      for (let i = 0; i < poolsForBaseClaim.length; i++) {
+        const cr = baseClaimResults[i];
+        if (cr.status === 'fulfilled' && cr.value > 0n) {
+          baseClaimMap.set(poolsForBaseClaim[i].poolAddress, cr.value);
         }
       }
 
       const fees: TokenFee[] = [];
       for (const p of activePools) {
-        const claimed = claimMap.get(p.poolAddress) ?? 0n;
+        const solClaimed = solClaimMap.get(p.poolAddress) ?? 0n;
 
-        if (p.quoteFee > 0n) {
+        if (p.quoteFee > 0n || solClaimed > 0n) {
           fees.push({
             tokenAddress: `SOL:believe:${p.poolAddress}`,
             tokenSymbol: 'SOL',
             chain: 'sol',
             platform: 'believe',
-            totalEarned: (p.quoteFee + claimed).toString(),
-            totalClaimed: claimed.toString(),
+            totalEarned: (p.quoteFee + solClaimed).toString(),
+            totalClaimed: solClaimed.toString(),
             totalUnclaimed: p.quoteFee.toString(),
             totalEarnedUsd: null,
             royaltyBps: null,
           });
         }
 
-        if (p.baseFee > 0n) {
+        const baseClaimed = baseClaimMap.get(p.poolAddress) ?? 0n;
+
+        if (p.baseFee > 0n || baseClaimed > 0n) {
           fees.push({
             tokenAddress: p.baseMint,
             tokenSymbol: null,
             chain: 'sol',
             platform: 'believe',
-            totalEarned: p.baseFee.toString(),
-            totalClaimed: '0',
+            totalEarned: (p.baseFee + baseClaimed).toString(),
+            totalClaimed: baseClaimed.toString(),
             totalUnclaimed: p.baseFee.toString(),
             totalEarnedUsd: null,
             royaltyBps: null,
