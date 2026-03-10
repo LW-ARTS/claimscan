@@ -74,24 +74,54 @@ function mapIdentityProvider(
   return map[provider] || 'twitter';
 }
 
-/** Track rate limit state to avoid wasting API calls after a 429. */
-let rateLimitedUntil = 0;
+// ═══════════════════════════════════════════════
+// Multi-key rotation with per-key rate limit tracking
+// ═══════════════════════════════════════════════
+
+/** Parse API keys from BAGS_API_KEYS (comma-separated) or legacy BAGS_API_KEY. */
+function getApiKeys(): string[] {
+  const multi = process.env.BAGS_API_KEYS;
+  if (multi) return multi.split(',').map((k) => k.trim()).filter(Boolean);
+  const single = process.env.BAGS_API_KEY;
+  if (single) return [single.replace(/\\n$/, '').trim()];
+  return [];
+}
+
+/** Per-key rate limit expiry timestamps. */
+const keyRateLimits = new Map<string, number>();
+let keyIndex = 0;
+
+/** Get the next available (non-rate-limited) API key, or null if all exhausted. */
+function getAvailableKey(): string | null {
+  const keys = getApiKeys();
+  if (keys.length === 0) return null;
+  const now = Date.now();
+  // Try each key starting from current index (round-robin)
+  for (let i = 0; i < keys.length; i++) {
+    const idx = (keyIndex + i) % keys.length;
+    const key = keys[idx];
+    const limitedUntil = keyRateLimits.get(key) ?? 0;
+    if (now >= limitedUntil) {
+      keyIndex = (idx + 1) % keys.length; // advance for next call
+      return key;
+    }
+  }
+  return null; // all keys rate limited
+}
 
 function isRateLimited(): boolean {
-  return Date.now() < rateLimitedUntil;
+  return getAvailableKey() === null;
 }
 
 async function bagsFetch<T>(path: string): Promise<T | null> {
-  // Short-circuit if we know we're rate limited
-  if (isRateLimited()) return null;
+  const apiKey = getAvailableKey();
+  if (!apiKey) return null; // all keys rate limited
 
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'x-api-key': apiKey,
     };
-    if (process.env.BAGS_API_KEY) {
-      headers['x-api-key'] = process.env.BAGS_API_KEY;
-    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     const res = await fetch(`${BAGS_API_BASE}${path}`, {
@@ -100,16 +130,17 @@ async function bagsFetch<T>(path: string): Promise<T | null> {
     });
     clearTimeout(timeout);
     if (res.status === 429) {
-      // Parse reset time from response if available, otherwise default to 5 minutes
+      // Mark THIS key as rate limited, other keys may still work
+      let resetAt = Date.now() + 5 * 60_000;
       try {
         const body = await res.json() as { resetTime?: string };
-        rateLimitedUntil = body.resetTime
-          ? new Date(body.resetTime).getTime()
-          : Date.now() + 5 * 60_000;
-      } catch {
-        rateLimitedUntil = Date.now() + 5 * 60_000;
-      }
-      console.warn(`[bags] rate limited until ${new Date(rateLimitedUntil).toISOString()}`);
+        if (body.resetTime) resetAt = new Date(body.resetTime).getTime();
+      } catch { /* use default */ }
+      keyRateLimits.set(apiKey, resetAt);
+      const keysLeft = getApiKeys().filter((k) => (keyRateLimits.get(k) ?? 0) <= Date.now()).length;
+      console.warn(`[bags] key ${apiKey.slice(-6)} rate limited until ${new Date(resetAt).toISOString()} (${keysLeft} keys remaining)`);
+      // Retry with next available key
+      if (keysLeft > 0) return bagsFetch<T>(path);
       return null;
     }
     if (!res.ok) {
@@ -264,10 +295,10 @@ function solDecimalToLamports(raw: string): bigint {
 
 /** Max mints for lifetime-fees primary method (positions with known BPS).
  *  This is the PRIMARY method — avoids wallet-matching issues of claim-stats. */
-const MAX_LIFETIME_FEE_MINTS = 400;
+const MAX_LIFETIME_FEE_MINTS = 800;
 
 /** Max mints for claim-stats fallback (positions with unknown BPS). */
-const MAX_CLAIM_STATS_FALLBACK_MINTS = 100;
+const MAX_CLAIM_STATS_FALLBACK_MINTS = 200;
 
 /**
  * Fetch lifetime-fees for a token (total fees collected, all claimers combined).
@@ -295,7 +326,7 @@ async function fetchLifetimeFees(tokenMint: string): Promise<bigint> {
  * 2. FALLBACK (positions with unknown userBps):
  *    Use claim-stats with findClaimerEntry matching.
  *
- * Total API calls: ≤ MAX_LIFETIME_FEE_MINTS + MAX_CLAIM_STATS_FALLBACK_MINTS (≤500).
+ * Total API calls: ≤ MAX_LIFETIME_FEE_MINTS + MAX_CLAIM_STATS_FALLBACK_MINTS (≤1000).
  */
 async function computeClaimedAmounts(
   positions: BagsClaimablePosition[],
@@ -311,9 +342,9 @@ async function computeClaimedAmounts(
 
   console.log(`[bags] computeClaimedAmounts for ${handle ?? wallet.slice(0, 8)}: ${eligible.length} positions (withBps=${withBps.length}, withoutBps=${withoutBps.length})`);
 
-  // Bail early if we already know we're rate limited (saves hundreds of wasted calls)
+  // Bail early if all API keys are rate limited
   if (isRateLimited()) {
-    console.warn(`[bags] skipping computeClaimedAmounts — rate limited until ${new Date(rateLimitedUntil).toISOString()}`);
+    console.warn('[bags] skipping computeClaimedAmounts — all API keys rate limited');
     return claimMap;
   }
 
