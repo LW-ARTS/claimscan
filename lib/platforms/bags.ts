@@ -544,25 +544,24 @@ export const bagsAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
+      // Historical fees: only fetch unclaimed positions (1 API call via cache).
+      // Claimed amounts are computed only in getFeesByHandle (the initial scan).
       const positions = await getClaimablePositionsCached(wallet);
       if (positions.length === 0) return [];
-
-      const claimTotals = await computeClaimedAmounts(positions, wallet);
 
       const fees: TokenFee[] = [];
       for (const p of positions) {
         if (!p.baseMint) continue;
         const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
-        const claimed = claimTotals.get(p.baseMint) ?? 0n;
-        if (unclaimed <= 0n && claimed <= 0n) continue;
+        if (unclaimed <= 0n) continue;
 
         fees.push({
           tokenAddress: p.baseMint,
           tokenSymbol: null,
           chain: 'sol',
           platform: 'bags',
-          totalEarned: (unclaimed + claimed).toString(),
-          totalClaimed: claimed.toString(),
+          totalEarned: unclaimed.toString(),
+          totalClaimed: '0',
           totalUnclaimed: unclaimed.toString(),
           totalEarnedUsd: null,
           royaltyBps: p.userBps ?? null,
@@ -580,26 +579,22 @@ export const bagsAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
+      // Live polling: only fetch unclaimed positions (1 API call via cache).
+      // Do NOT compute claimed amounts here — that's expensive (800+ API calls)
+      // and should only happen during the initial getFeesByHandle scan.
       const data = await getClaimablePositionsCached(wallet);
-      const activePositions = data.filter(
-        (p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0
-      );
-      const claimTotals = activePositions.length > 0
-        ? await computeClaimedAmounts(activePositions, wallet)
-        : new Map<string, bigint>();
 
       const fees = data
         .filter((p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0)
         .map((p) => {
           const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
-          const claimed = claimTotals.get(p.baseMint) ?? 0n;
           return {
             tokenAddress: p.baseMint,
             tokenSymbol: null as string | null,
             chain: 'sol' as const,
             platform: 'bags' as const,
-            totalEarned: (unclaimed + claimed).toString(),
-            totalClaimed: claimed.toString(),
+            totalEarned: unclaimed.toString(),
+            totalClaimed: '0',
             totalUnclaimed: unclaimed.toString(),
             totalEarnedUsd: null,
             royaltyBps: p.userBps ?? null,
