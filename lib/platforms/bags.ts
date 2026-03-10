@@ -165,7 +165,7 @@ async function fetchClaimStatsCached(tokenMint: string): Promise<BagsClaimStatEn
   }
 
   const res = await bagsFetch<BagsApiResponse<BagsClaimStatEntry[]>>(
-    `/token-launch/fee-share/claim-stats?tokenMint=${encodeURIComponent(tokenMint)}`
+    `/token-launch/claim-stats?tokenMint=${encodeURIComponent(tokenMint)}`
   );
   const data = Array.isArray(res?.response) ? res.response : [];
 
@@ -235,8 +235,10 @@ function solDecimalToLamports(raw: string): bigint {
   return BigInt((whole || '0') + paddedFrac);
 }
 
-/** Max mints to query claim-stats for. Caps API calls to avoid excessive load. */
-const MAX_CLAIM_STATS_MINTS = 50;
+/** Max mints to query claim-stats for. Must be generous — creators with many
+ *  tokens (e.g. 300+) need accurate totals. Requests are concurrent, so the
+ *  wall-clock cost is ~1-2 extra seconds, not 200× sequential delay. */
+const MAX_CLAIM_STATS_MINTS = 500;
 
 async function getClaimTotalsForWallet(
   wallet: string,
