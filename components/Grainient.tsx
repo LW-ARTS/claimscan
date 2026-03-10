@@ -213,17 +213,24 @@ const Grainient: React.FC<GrainientProps> = ({
 
       const mesh = new Mesh(gl, { geometry, program });
 
+      let lastW = 0;
       const setSize = () => {
         const rect = container.getBoundingClientRect();
         const width = Math.max(1, Math.floor(rect.width));
         const height = Math.max(1, Math.floor(rect.height));
+        lastW = width;
         renderer.setSize(width, height);
         const res = (program.uniforms.iResolution as { value: Float32Array }).value;
         res[0] = gl.drawingBufferWidth;
         res[1] = gl.drawingBufferHeight;
       };
 
-      ro = new ResizeObserver(setSize);
+      ro = new ResizeObserver(() => {
+        // Skip height-only changes — iOS Safari address bar show/hide during scroll
+        const w = Math.max(1, Math.floor(container.getBoundingClientRect().width));
+        if (lastW > 0 && w === lastW) return;
+        setSize();
+      });
       ro.observe(container);
       setSize();
 

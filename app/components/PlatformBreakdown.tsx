@@ -198,7 +198,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
         {filteredFees.length > 0 ? (
           <TokenFeeTable fees={filteredFees} solPrice={solPrice} ethPrice={ethPrice} />
         ) : (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-border/30 py-12 text-center">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-border/30 bg-card py-12 text-center">
             <PlatformIcon platform={activeTab} className="mb-2 h-6 w-6 text-muted-foreground/30" aria-hidden />
             <p className="text-sm text-muted-foreground/60">
               {activeTab === 'all'
