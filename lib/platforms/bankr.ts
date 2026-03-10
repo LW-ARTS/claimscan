@@ -235,7 +235,7 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
   const response = await promptBankrAgent(prompt, timeoutMs);
   if (!response) return [];
 
-  console.log(`[bankr] agent response for @${handle}:`, response.slice(0, 200));
+  console.debug(`[bankr] agent response for @${handle}:`, response.slice(0, 200));
 
   const parsed = parseAgentFeeResponse(response);
   if (parsed.length === 0) {

@@ -353,7 +353,7 @@ async function computeClaimedAmounts(
   const withBps = eligible.filter((p) => p.userBps != null && p.userBps > 0);
   const withoutBps = eligible.filter((p) => p.userBps == null || p.userBps <= 0);
 
-  console.log(`[bags] computeClaimedAmounts for ${handle ?? wallet.slice(0, 8)}: ${eligible.length} positions (withBps=${withBps.length}, withoutBps=${withoutBps.length})`);
+  console.debug(`[bags] computeClaimedAmounts for ${handle ?? wallet.slice(0, 8)}: ${eligible.length} positions (withBps=${withBps.length}, withoutBps=${withoutBps.length})`);
 
   // Bail early if all API keys are rate limited
   if (isRateLimited()) {
@@ -378,7 +378,7 @@ async function computeClaimedAmounts(
       ? sorted.filter((p) => BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0)) >= minLamports)
       : sorted;
     if (aboveThreshold.length < sorted.length) {
-      console.log(`[bags] dust filter ($${MIN_UNCLAIMED_USD} @ SOL=$${solPrice.toFixed(0)}): ${sorted.length} → ${aboveThreshold.length} positions (saved ${sorted.length - aboveThreshold.length} API calls)`);
+      console.debug(`[bags] dust filter ($${MIN_UNCLAIMED_USD} @ SOL=$${solPrice.toFixed(0)}): ${sorted.length} → ${aboveThreshold.length} positions (saved ${sorted.length - aboveThreshold.length} API calls)`);
     }
 
     if (aboveThreshold.length > MAX_LIFETIME_FEE_MINTS) {
@@ -421,10 +421,10 @@ async function computeClaimedAmounts(
 
       // Log progress every few batches
       if (batchStart % (CONCURRENCY_LIMIT * 5) === 0 || batchStart + CONCURRENCY_LIMIT >= capped.length) {
-        console.log(`[bags] lifetime-fees progress: ${Math.min(batchStart + CONCURRENCY_LIMIT, capped.length)}/${capped.length} (hits=${lfHits}, fetchFail=${lfFetchFail}, zero=${lfZero})`);
+        console.debug(`[bags] lifetime-fees progress: ${Math.min(batchStart + CONCURRENCY_LIMIT, capped.length)}/${capped.length} (hits=${lfHits}, fetchFail=${lfFetchFail}, zero=${lfZero})`);
       }
     }
-    console.log(`[bags] lifetime-fees DONE: ${capped.length} queried → ${lfHits} claimed>0, ${lfZero} zero, ${lfFetchFail} fetchFail, ${lfErrors} rejected`);
+    console.debug(`[bags] lifetime-fees DONE: ${capped.length} queried → ${lfHits} claimed>0, ${lfZero} zero, ${lfFetchFail} fetchFail, ${lfErrors} rejected`);
   }
 
   // --- Fallback: claim-stats for positions without BPS ---
@@ -438,7 +438,7 @@ async function computeClaimedAmounts(
       ? sorted.filter((p) => BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0)) >= minLamports)
       : sorted;
     if (aboveThreshold.length < sorted.length) {
-      console.log(`[bags] claim-stats dust filter: ${sorted.length} → ${aboveThreshold.length} positions`);
+      console.debug(`[bags] claim-stats dust filter: ${sorted.length} → ${aboveThreshold.length} positions`);
     }
     if (aboveThreshold.length > MAX_CLAIM_STATS_FALLBACK_MINTS) {
       console.warn(`[bags] claim-stats fallback capped at ${MAX_CLAIM_STATS_FALLBACK_MINTS}/${aboveThreshold.length} mints`);
@@ -475,10 +475,10 @@ async function computeClaimedAmounts(
         if (r.status === 'rejected') csErrors++;
       }
     }
-    console.log(`[bags] claim-stats fallback: ${capped.length} queried → ${csHits} with claimed > 0, ${csErrors} errors`);
+    console.debug(`[bags] claim-stats fallback: ${capped.length} queried → ${csHits} with claimed > 0, ${csErrors} errors`);
   }
 
-  console.log(`[bags] computeClaimedAmounts result: ${claimMap.size} mints with claimed > 0`);
+  console.debug(`[bags] computeClaimedAmounts result: ${claimMap.size} mints with claimed > 0`);
   return claimMap;
 }
 

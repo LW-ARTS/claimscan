@@ -7,11 +7,6 @@ import { getAddress, type Address } from 'viem';
 // Solana Program IDs
 export const PUMP_PROGRAM_ID = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P';
 export const PUMPSWAP_PROGRAM_ID = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA';
-// NOTE: PUMP_FEE_PROGRAM_ID ('pfee...') is not used — fees are read from vault PDAs.
-// Kept as reference for potential future use with the fee claim instruction.
-// NOTE: BAGS_FEE_SHARE_V2 was removed — the previous value was an invalid
-// 56-character string (Solana pubkeys are max 44 chars base58).
-// Re-add with the correct program ID when Bags publishes their V2 address.
 export const METEORA_DBC_PROGRAM = 'dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN';
 export const COINBARREL_PROGRAM_ID = '7HxbxHnTUBaUfWjVPbPLs8gqqScmjmBWjRnETBjS9DMj';
 export const RAYDIUM_LAUNCHLAB_PROGRAM_ID = 'LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj';
