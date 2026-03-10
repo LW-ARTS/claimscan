@@ -140,3 +140,107 @@ function detectPlatformFromTx(tx: EnhancedTransaction): Platform | null {
   }
   return null;
 }
+
+// ═══════════════════════════════════════════════
+// Vault Claim Total — Paginated SOL outflow sum
+// Queries a vault PDA's tx history and sums all
+// outbound SOL transfers (= total claimed by creator).
+// ═══════════════════════════════════════════════
+
+const MAX_PAGES = 5;
+const PAGE_SIZE = 100;
+
+/**
+ * Sum all outbound SOL transfers from a vault address.
+ * This represents the total SOL claimed from that vault.
+ *
+ * Cost: 100 credits per page (up to MAX_PAGES pages).
+ */
+export async function fetchVaultClaimTotal(
+  vaultAddress: string
+): Promise<bigint> {
+  if (!isHeliusAvailable()) return 0n;
+
+  let total = 0n;
+  let beforeSig: string | undefined;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    let path = `/v0/addresses/${vaultAddress}/transactions?limit=${PAGE_SIZE}`;
+    if (beforeSig) path += `&before=${beforeSig}`;
+
+    const txns = await heliusRestApi<EnhancedTransaction[]>(
+      path,
+      { method: 'GET' },
+      `vault-claim-${page}`
+    );
+
+    if (!txns || txns.length === 0) break;
+
+    for (const tx of txns) {
+      for (const transfer of tx.nativeTransfers ?? []) {
+        if (
+          transfer.fromUserAccount === vaultAddress &&
+          transfer.amount > 0
+        ) {
+          total += BigInt(Math.floor(transfer.amount));
+        }
+      }
+    }
+
+    // Paginate if we got a full page
+    if (txns.length < PAGE_SIZE) break;
+    beforeSig = txns[txns.length - 1].signature;
+  }
+
+  return total;
+}
+
+/**
+ * Sum all outbound SPL token transfers of a specific mint
+ * from a source address to a recipient.
+ *
+ * Used for Token-2022 RevShare claim totals where
+ * the "vault" is the mint address itself.
+ *
+ * Cost: 100 credits per page (up to MAX_PAGES pages).
+ */
+export async function fetchTokenClaimTotal(
+  sourceAddress: string,
+  recipient: string,
+  tokenMint: string
+): Promise<bigint> {
+  if (!isHeliusAvailable()) return 0n;
+
+  let total = 0n;
+  let beforeSig: string | undefined;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    let path = `/v0/addresses/${sourceAddress}/transactions?limit=${PAGE_SIZE}`;
+    if (beforeSig) path += `&before=${beforeSig}`;
+
+    const txns = await heliusRestApi<EnhancedTransaction[]>(
+      path,
+      { method: 'GET' },
+      `token-claim-${page}`
+    );
+
+    if (!txns || txns.length === 0) break;
+
+    for (const tx of txns) {
+      for (const transfer of tx.tokenTransfers ?? []) {
+        if (
+          transfer.toUserAccount === recipient &&
+          transfer.mint === tokenMint &&
+          transfer.tokenAmount > 0
+        ) {
+          total += BigInt(Math.floor(transfer.tokenAmount));
+        }
+      }
+    }
+
+    if (txns.length < PAGE_SIZE) break;
+    beforeSig = txns[txns.length - 1].signature;
+  }
+
+  return total;
+}

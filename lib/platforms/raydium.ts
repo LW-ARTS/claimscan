@@ -2,6 +2,7 @@ import 'server-only';
 import { PublicKey } from '@solana/web3.js';
 import { RAYDIUM_LAUNCHLAB_API, RAYDIUM_LAUNCHLAB_PROGRAM_ID } from '@/lib/constants';
 import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
+import { fetchVaultClaimTotal } from '@/lib/helius/transactions';
 import { sanitizeTokenName, sanitizeTokenSymbol } from '@/lib/utils';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -144,25 +145,27 @@ export const raydiumAdapter: PlatformAdapter = {
     try {
       const creatorPk = new PublicKey(wallet);
       const [vault] = deriveCreatorVault(creatorPk);
+      const vaultAddr = vault.toBase58();
 
-      const balance = await withRpcFallback(
-        (c) => c.getBalance(vault),
-        'raydium-vault-balance'
-      );
-      const balanceBig = BigInt(balance);
-      const unclaimed = balanceBig > RENT_EXEMPT_MINIMUM
-        ? balanceBig - RENT_EXEMPT_MINIMUM
-        : 0n;
+      // Fetch unclaimed balance + claimed total in parallel
+      const [balanceResult, claimedResult] = await Promise.allSettled([
+        withRpcFallback((c) => c.getBalance(vault), 'raydium-vault-balance'),
+        fetchVaultClaimTotal(vaultAddr),
+      ]);
 
-      if (unclaimed === 0n) return [];
+      const balance = balanceResult.status === 'fulfilled' ? BigInt(balanceResult.value) : 0n;
+      const unclaimed = balance > RENT_EXEMPT_MINIMUM ? balance - RENT_EXEMPT_MINIMUM : 0n;
+      const claimed = claimedResult.status === 'fulfilled' ? claimedResult.value : 0n;
+
+      if (unclaimed === 0n && claimed === 0n) return [];
 
       return [{
-        tokenAddress: `SOL:raydium:${vault.toBase58()}`,
+        tokenAddress: `SOL:raydium:${vaultAddr}`,
         tokenSymbol: 'SOL',
         chain: 'sol',
         platform: 'raydium',
-        totalEarned: '0',
-        totalClaimed: '0',
+        totalEarned: (unclaimed + claimed).toString(),
+        totalClaimed: claimed.toString(),
         totalUnclaimed: unclaimed.toString(),
         totalEarnedUsd: null,
         royaltyBps: null,

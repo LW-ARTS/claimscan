@@ -122,10 +122,14 @@ async function resolveHandleToWallet(
 }
 
 // ═══════════════════════════════════════════════
-// Short-lived cache for claimable-positions (avoids duplicate API calls within a scan)
+// Short-lived caches (avoid duplicate API calls within a scan)
 // ═══════════════════════════════════════════════
 const positionsCache = new Map<string, { data: BagsClaimablePosition[]; ts: number }>();
 const POSITIONS_CACHE_TTL_MS = 30_000; // 30 seconds
+
+/** Cache claim-stats per tokenMint (keyed by mint address). */
+const claimStatsCache = new Map<string, { data: BagsClaimStatEntry[]; ts: number }>();
+const CLAIM_STATS_CACHE_TTL_MS = 60_000; // 1 minute
 
 async function getClaimablePositionsCached(wallet: string): Promise<BagsClaimablePosition[]> {
   const cached = positionsCache.get(wallet);
@@ -148,6 +152,65 @@ async function getClaimablePositionsCached(wallet: string): Promise<BagsClaimabl
 
   positionsCache.set(wallet, { data, ts: Date.now() });
   return data;
+}
+
+/**
+ * Fetch claim-stats for a single token mint (cached).
+ * Returns all claimer entries for this mint.
+ */
+async function fetchClaimStatsCached(tokenMint: string): Promise<BagsClaimStatEntry[]> {
+  const cached = claimStatsCache.get(tokenMint);
+  if (cached && Date.now() - cached.ts < CLAIM_STATS_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const res = await bagsFetch<BagsApiResponse<BagsClaimStatEntry[]>>(
+    `/token-launch/fee-share/claim-stats?tokenMint=${encodeURIComponent(tokenMint)}`
+  );
+  const data = Array.isArray(res?.response) ? res.response : [];
+
+  // Evict stale entries
+  if (claimStatsCache.size > 200) {
+    const now = Date.now();
+    for (const [key, entry] of claimStatsCache) {
+      if (now - entry.ts > CLAIM_STATS_CACHE_TTL_MS) claimStatsCache.delete(key);
+    }
+  }
+
+  claimStatsCache.set(tokenMint, { data, ts: Date.now() });
+  return data;
+}
+
+/**
+ * Get totalClaimed (lamports) for a wallet across multiple token mints.
+ * Caps at 20 mints to avoid excessive API calls.
+ */
+async function getClaimTotalsForWallet(
+  wallet: string,
+  mints: string[]
+): Promise<Map<string, bigint>> {
+  const claimMap = new Map<string, bigint>();
+  const cappedMints = mints.slice(0, 20);
+
+  const results = await Promise.allSettled(
+    cappedMints.map(async (mint) => {
+      const stats = await fetchClaimStatsCached(mint);
+      // Find this wallet's entry (match by wallet address)
+      const entry = stats.find((s) => s.wallet === wallet);
+      if (entry?.totalClaimed) {
+        const claimed = BigInt(entry.totalClaimed);
+        if (claimed > 0n) claimMap.set(mint, claimed);
+      }
+    })
+  );
+
+  for (const r of results) {
+    if (r.status === 'rejected') {
+      console.warn('[bags] claim-stats fetch failed:', r.reason instanceof Error ? r.reason.message : r.reason);
+    }
+  }
+
+  return claimMap;
 }
 
 // ═══════════════════════════════════════════════
@@ -231,34 +294,79 @@ export const bagsAdapter: PlatformAdapter = {
   },
 
   async getHistoricalFees(wallet: string): Promise<TokenFee[]> {
-    // Bags doesn't expose historical fee totals per wallet.
-    // claim-stats requires tokenMint (not wallet).
-    // claimable-positions only shows current unclaimed balances.
-    // Return empty — historical data would require indexing claim events.
-    return [];
+    if (!isValidSolanaAddress(wallet)) return [];
+
+    try {
+      const positions = await getClaimablePositionsCached(wallet);
+      if (positions.length === 0) return [];
+
+      const mints = positions.filter((p) => p.baseMint).map((p) => p.baseMint);
+      const claimTotals = await getClaimTotalsForWallet(wallet, mints);
+
+      const fees: TokenFee[] = [];
+      for (const p of positions) {
+        if (!p.baseMint) continue;
+        const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
+        const claimed = claimTotals.get(p.baseMint) ?? 0n;
+        if (unclaimed <= 0n && claimed <= 0n) continue;
+
+        fees.push({
+          tokenAddress: p.baseMint,
+          tokenSymbol: null,
+          chain: 'sol',
+          platform: 'bags',
+          totalEarned: (unclaimed + claimed).toString(),
+          totalClaimed: claimed.toString(),
+          totalUnclaimed: unclaimed.toString(),
+          totalEarnedUsd: null,
+          royaltyBps: p.userBps ?? null,
+        });
+      }
+
+      return enrichSolanaTokenSymbols(fees);
+    } catch (err) {
+      console.warn('[bags] getHistoricalFees failed:', err instanceof Error ? err.message : err);
+      return [];
+    }
   },
 
   async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
-    const data = await getClaimablePositionsCached(wallet);
+    if (!isValidSolanaAddress(wallet)) return [];
 
-    const fees = data
-      .filter((p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0)
-      .map((p) => {
-        const lamports = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
-        return {
-          tokenAddress: p.baseMint,
-          tokenSymbol: null as string | null,
-          chain: 'sol' as const,
-          platform: 'bags' as const,
-          totalEarned: '0',
-          totalClaimed: '0',
-          totalUnclaimed: lamports.toString(),
-          totalEarnedUsd: null,
-          royaltyBps: p.userBps ?? null,
-        };
-      });
+    try {
+      const data = await getClaimablePositionsCached(wallet);
+      const activeMints = data
+        .filter((p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0)
+        .map((p) => p.baseMint);
 
-    return enrichSolanaTokenSymbols(fees);
+      // Fetch claimed totals in parallel for active positions
+      const claimTotals = activeMints.length > 0
+        ? await getClaimTotalsForWallet(wallet, activeMints)
+        : new Map<string, bigint>();
+
+      const fees = data
+        .filter((p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0)
+        .map((p) => {
+          const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
+          const claimed = claimTotals.get(p.baseMint) ?? 0n;
+          return {
+            tokenAddress: p.baseMint,
+            tokenSymbol: null as string | null,
+            chain: 'sol' as const,
+            platform: 'bags' as const,
+            totalEarned: (unclaimed + claimed).toString(),
+            totalClaimed: claimed.toString(),
+            totalUnclaimed: unclaimed.toString(),
+            totalEarnedUsd: null,
+            royaltyBps: p.userBps ?? null,
+          };
+        });
+
+      return enrichSolanaTokenSymbols(fees);
+    } catch (err) {
+      console.warn('[bags] getLiveUnclaimedFees failed:', err instanceof Error ? err.message : err);
+      return [];
+    }
   },
 
   async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {

@@ -2,6 +2,7 @@ import 'server-only';
 import { PublicKey } from '@solana/web3.js';
 import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { getConnection, isValidSolanaAddress } from '@/lib/chains/solana';
+import { fetchVaultClaimTotal } from '@/lib/helius/transactions';
 import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -132,28 +133,41 @@ export const believeAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
-      // Use shared GPA instead of separate getPoolsFeesByCreator call.
-      // This gives us baseMint (which getPoolsFeesByCreator drops).
       const pools = await getPoolsByCreatorCached(wallet);
       if (pools.length === 0) return [];
 
+      // Sort by unclaimed fee descending, cap at 10 pools for Helius queries
+      const poolsWithFees = pools
+        .map((p) => ({
+          pool: p,
+          quoteFee: bnToBigInt(p.account.creatorQuoteFee),
+          poolAddress: p.publicKey.toBase58(),
+        }))
+        .filter((p) => p.quoteFee > 0n)
+        .sort((a, b) => (b.quoteFee > a.quoteFee ? 1 : -1))
+        .slice(0, 10);
+
+      if (poolsWithFees.length === 0) return [];
+
+      // Fetch claimed totals from Helius vault history in parallel
+      const claimResults = await Promise.allSettled(
+        poolsWithFees.map((p) => fetchVaultClaimTotal(p.poolAddress))
+      );
+
       const fees: TokenFee[] = [];
-
-      for (const pool of pools) {
-        const creatorQuote = bnToBigInt(pool.account.creatorQuoteFee);
-
-        if (creatorQuote === 0n) continue;
-
-        const poolAddress = pool.publicKey.toBase58();
+      for (let i = 0; i < poolsWithFees.length; i++) {
+        const { quoteFee, poolAddress } = poolsWithFees[i];
+        const cr = claimResults[i];
+        const claimed = cr.status === 'fulfilled' ? cr.value : 0n;
 
         fees.push({
           tokenAddress: `SOL:believe:${poolAddress}`,
           tokenSymbol: 'SOL',
           chain: 'sol',
           platform: 'believe',
-          totalEarned: '0',
-          totalClaimed: '0',
-          totalUnclaimed: creatorQuote.toString(),
+          totalEarned: (quoteFee + claimed).toString(),
+          totalClaimed: claimed.toString(),
+          totalUnclaimed: quoteFee.toString(),
           totalEarnedUsd: null,
           royaltyBps: null,
         });
@@ -176,45 +190,65 @@ export const believeAdapter: PlatformAdapter = {
       const pools = await getPoolsByCreatorCached(wallet);
       if (pools.length === 0) return [];
 
+      // Collect active pools with SOL fees for Helius claim history
+      const activePools = pools
+        .filter((p) => !isMigrated(p.account))
+        .map((p) => ({
+          pool: p,
+          quoteFee: bnToBigInt(p.account.creatorQuoteFee),
+          baseFee: bnToBigInt(p.account.creatorBaseFee),
+          baseMint: (p.account.baseMint as PublicKey).toBase58(),
+          poolAddress: p.publicKey.toBase58(),
+        }))
+        .filter((p) => p.quoteFee > 0n || p.baseFee > 0n);
+
+      if (activePools.length === 0) return [];
+
+      // Fetch claimed totals for top 10 pools (by SOL fees) in parallel
+      const poolsForClaim = activePools
+        .filter((p) => p.quoteFee > 0n)
+        .sort((a, b) => (b.quoteFee > a.quoteFee ? 1 : -1))
+        .slice(0, 10);
+
+      const claimResults = await Promise.allSettled(
+        poolsForClaim.map((p) => fetchVaultClaimTotal(p.poolAddress))
+      );
+
+      const claimMap = new Map<string, bigint>();
+      for (let i = 0; i < poolsForClaim.length; i++) {
+        const cr = claimResults[i];
+        if (cr.status === 'fulfilled' && cr.value > 0n) {
+          claimMap.set(poolsForClaim[i].poolAddress, cr.value);
+        }
+      }
+
       const fees: TokenFee[] = [];
+      for (const p of activePools) {
+        const claimed = claimMap.get(p.poolAddress) ?? 0n;
 
-      for (const pool of pools) {
-        // Skip graduated/migrated pools — fees should have been claimed pre-migration
-        if (isMigrated(pool.account)) continue;
-
-        const creatorQuoteFee = bnToBigInt(pool.account.creatorQuoteFee);
-        const creatorBaseFee = bnToBigInt(pool.account.creatorBaseFee);
-
-        if (creatorQuoteFee === 0n && creatorBaseFee === 0n) continue;
-
-        const baseMint = (pool.account.baseMint as PublicKey).toBase58();
-        const poolAddress = pool.publicKey.toBase58();
-
-        // Report SOL (quote) fees
-        if (creatorQuoteFee > 0n) {
+        if (p.quoteFee > 0n) {
           fees.push({
-            tokenAddress: `SOL:believe:${poolAddress}`,
+            tokenAddress: `SOL:believe:${p.poolAddress}`,
             tokenSymbol: 'SOL',
             chain: 'sol',
             platform: 'believe',
-            totalEarned: '0',
-            totalClaimed: '0',
-            totalUnclaimed: creatorQuoteFee.toString(),
+            totalEarned: (p.quoteFee + claimed).toString(),
+            totalClaimed: claimed.toString(),
+            totalUnclaimed: p.quoteFee.toString(),
             totalEarnedUsd: null,
             royaltyBps: null,
           });
         }
 
-        // Report base token fees (meme coin fees)
-        if (creatorBaseFee > 0n) {
+        if (p.baseFee > 0n) {
           fees.push({
-            tokenAddress: baseMint,
+            tokenAddress: p.baseMint,
             tokenSymbol: null,
             chain: 'sol',
             platform: 'believe',
-            totalEarned: '0',
+            totalEarned: p.baseFee.toString(),
             totalClaimed: '0',
-            totalUnclaimed: creatorBaseFee.toString(),
+            totalUnclaimed: p.baseFee.toString(),
             totalEarnedUsd: null,
             royaltyBps: null,
           });

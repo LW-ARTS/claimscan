@@ -1,5 +1,5 @@
 import 'server-only';
-import { createPublicClient, http, fallback, parseAbi, type Address } from 'viem';
+import { createPublicClient, http, fallback, parseAbi, parseAbiItem, type Address } from 'viem';
 import { mainnet } from 'viem/chains';
 import { ZORA_PROTOCOL_REWARDS } from '@/lib/constants';
 
@@ -57,6 +57,40 @@ export async function getZoraProtocolRewardsBalanceEth(
     });
   } catch (err) {
     console.warn('[eth] Zora ProtocolRewards balanceOf failed:', err instanceof Error ? err.message : err);
+    return 0n;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Zora Withdraw Logs (ETH Mainnet)
+// ═══════════════════════════════════════════════
+
+const zoraWithdrawEvent = parseAbiItem(
+  'event Withdraw(address indexed from, address indexed to, uint256 amount)'
+);
+
+/**
+ * Get total withdrawn (claimed) ETH from Zora ProtocolRewards on ETH mainnet.
+ */
+export async function getZoraWithdrawLogsEth(
+  account: Address
+): Promise<bigint> {
+  try {
+    const logs = await ethClient.getLogs({
+      address: ZORA_PROTOCOL_REWARDS,
+      event: zoraWithdrawEvent,
+      args: { from: account },
+      fromBlock: 'earliest',
+      toBlock: 'latest',
+    });
+
+    let total = 0n;
+    for (const log of logs) {
+      total += log.args.amount ?? 0n;
+    }
+    return total;
+  } catch (err) {
+    console.warn('[eth] getZoraWithdrawLogsEth failed:', err instanceof Error ? err.message : err);
     return 0n;
   }
 }

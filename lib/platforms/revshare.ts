@@ -6,6 +6,7 @@ import {
   getTransferFeeConfig,
 } from '@solana/spl-token';
 import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
+import { fetchTokenClaimTotal } from '@/lib/helius/transactions';
 import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -127,15 +128,19 @@ export const revshareAdapter: PlatformAdapter = {
             if (!feeConfig) return null;
 
             const withheldAmount = BigInt(feeConfig.withheldAmount.toString());
-            if (withheldAmount === 0n) return null;
+
+            // Fetch claimed total from Helius token transfer history
+            const claimed = await fetchTokenClaimTotal(mintAddr, wallet, mintAddr);
+
+            if (withheldAmount === 0n && claimed === 0n) return null;
 
             return {
               tokenAddress: mintAddr,
               tokenSymbol: null as string | null,
               chain: 'sol' as const,
               platform: 'revshare' as const,
-              totalEarned: '0',
-              totalClaimed: '0',
+              totalEarned: (withheldAmount + claimed).toString(),
+              totalClaimed: claimed.toString(),
               totalUnclaimed: withheldAmount.toString(),
               totalEarnedUsd: null,
               royaltyBps: feeConfig.newerTransferFee?.transferFeeBasisPoints

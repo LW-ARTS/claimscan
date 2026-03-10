@@ -1,6 +1,6 @@
 import 'server-only';
-import { getZoraProtocolRewardsBalance, isValidEvmAddress } from '@/lib/chains/base';
-import { getZoraProtocolRewardsBalanceEth } from '@/lib/chains/eth';
+import { getZoraProtocolRewardsBalance, getZoraWithdrawLogs, isValidEvmAddress } from '@/lib/chains/base';
+import { getZoraProtocolRewardsBalanceEth, getZoraWithdrawLogsEth } from '@/lib/chains/eth';
 import { getAddress } from 'viem';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -52,10 +52,12 @@ export const zoraAdapter: PlatformAdapter = {
     const checksummed = getAddress(wallet);
     const fees: TokenFee[] = [];
 
-    // Query Base and ETH mainnet ProtocolRewards in parallel
-    const [baseBalance, ethBalance] = await Promise.allSettled([
+    // Query balances + withdraw logs on both chains in parallel
+    const [baseBalance, ethBalance, baseClaimed, ethClaimed] = await Promise.allSettled([
       getZoraProtocolRewardsBalance(checksummed),
       getZoraProtocolRewardsBalanceEth(checksummed),
+      getZoraWithdrawLogs(checksummed),
+      getZoraWithdrawLogsEth(checksummed),
     ]);
 
     let baseBal = 0n;
@@ -72,28 +74,31 @@ export const zoraAdapter: PlatformAdapter = {
       console.warn('[zora] ETH ProtocolRewards query failed:', ethBalance.reason instanceof Error ? ethBalance.reason.message : ethBalance.reason);
     }
 
-    if (baseBal > 0n) {
+    const baseClaimedTotal = baseClaimed.status === 'fulfilled' ? baseClaimed.value : 0n;
+    const ethClaimedTotal = ethClaimed.status === 'fulfilled' ? ethClaimed.value : 0n;
+
+    if (baseBal > 0n || baseClaimedTotal > 0n) {
       fees.push({
         tokenAddress: 'ETH:zora:base',
         tokenSymbol: 'ETH (Zora Base)',
         chain: 'base',
         platform: 'zora',
-        totalEarned: '0',
-        totalClaimed: '0',
+        totalEarned: (baseBal + baseClaimedTotal).toString(),
+        totalClaimed: baseClaimedTotal.toString(),
         totalUnclaimed: baseBal.toString(),
         totalEarnedUsd: null,
         royaltyBps: null,
       });
     }
 
-    if (ethBal > 0n) {
+    if (ethBal > 0n || ethClaimedTotal > 0n) {
       fees.push({
         tokenAddress: 'ETH:zora:eth',
         tokenSymbol: 'ETH (Zora Mainnet)',
         chain: 'eth',
         platform: 'zora',
-        totalEarned: '0',
-        totalClaimed: '0',
+        totalEarned: (ethBal + ethClaimedTotal).toString(),
+        totalClaimed: ethClaimedTotal.toString(),
         totalUnclaimed: ethBal.toString(),
         totalEarnedUsd: null,
         royaltyBps: null,

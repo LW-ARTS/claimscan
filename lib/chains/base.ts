@@ -1,5 +1,5 @@
 import 'server-only';
-import { createPublicClient, http, fallback, isAddress, getAddress, parseAbi, formatEther, type Address } from 'viem';
+import { createPublicClient, http, fallback, isAddress, getAddress, parseAbi, parseAbiItem, formatEther, type Address } from 'viem';
 import { base } from 'viem/chains';
 import {
   CLANKER_FEE_LOCKER,
@@ -156,6 +156,104 @@ export async function getZoraProtocolRewardsBalance(
     });
   } catch (err) {
     console.warn('[base] Zora ProtocolRewards balanceOf failed:', err instanceof Error ? err.message : err);
+    return 0n;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Clanker Claim Logs (Event-based claimed totals)
+// ═══════════════════════════════════════════════
+
+/**
+ * ERC20 Transfer event — used to detect fee claims from FeeLocker to owner.
+ * When a creator calls collectFees(), the FeeLocker transfers tokens to them.
+ */
+const erc20TransferEvent = parseAbiItem(
+  'event Transfer(address indexed from, address indexed to, uint256 value)'
+);
+
+/** FeeLocker deployed ~late 2024 on Base. */
+const CLANKER_FEELOCKER_DEPLOY_BLOCK = 20_000_000n;
+
+/**
+ * Get total claimed fees per token by scanning Transfer events FROM the FeeLocker TO the owner.
+ * Returns a Map of lowercase token address → total claimed wei.
+ */
+export async function getClankerClaimLogs(
+  owner: Address,
+  tokens: Address[]
+): Promise<Map<string, bigint>> {
+  const claimMap = new Map<string, bigint>();
+  if (tokens.length === 0) return claimMap;
+
+  try {
+    // Scan Transfer events FROM FeeLocker TO owner across all token contracts
+    // We query per-token to get accurate per-token totals
+    const results = await Promise.allSettled(
+      tokens.map(async (token) => {
+        const logs = await baseClient.getLogs({
+          address: token,
+          event: erc20TransferEvent,
+          args: {
+            from: CLANKER_FEE_LOCKER,
+            to: owner,
+          },
+          fromBlock: CLANKER_FEELOCKER_DEPLOY_BLOCK,
+          toBlock: 'latest',
+        });
+
+        let total = 0n;
+        for (const log of logs) {
+          total += log.args.value ?? 0n;
+        }
+        if (total > 0n) {
+          claimMap.set(token.toLowerCase(), total);
+        }
+      })
+    );
+
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        console.warn('[base] getClankerClaimLogs failed for a token:', r.reason instanceof Error ? r.reason.message : r.reason);
+      }
+    }
+  } catch (err) {
+    console.warn('[base] getClankerClaimLogs failed:', err instanceof Error ? err.message : err);
+  }
+
+  return claimMap;
+}
+
+// ═══════════════════════════════════════════════
+// Zora Withdraw Logs (Event-based claimed totals)
+// ═══════════════════════════════════════════════
+
+const zoraWithdrawEvent = parseAbiItem(
+  'event Withdraw(address indexed from, address indexed to, uint256 amount)'
+);
+
+/**
+ * Get total withdrawn (claimed) ETH from Zora ProtocolRewards on Base.
+ */
+export async function getZoraWithdrawLogs(
+  account: Address
+): Promise<bigint> {
+  try {
+    const logs = await baseClient.getLogs({
+      address: ZORA_PROTOCOL_REWARDS,
+      event: zoraWithdrawEvent,
+      args: { from: account },
+      fromBlock: 'earliest',
+      toBlock: 'latest',
+    });
+
+    let total = 0n;
+    for (const log of logs) {
+      total += log.args.amount ?? 0n;
+    }
+    return total;
+  } catch (err) {
+    console.warn('[base] getZoraWithdrawLogs failed:', err instanceof Error ? err.message : err);
     return 0n;
   }
 }

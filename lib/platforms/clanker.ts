@@ -1,6 +1,6 @@
 import 'server-only';
 import { CLANKER_API_BASE } from '@/lib/constants';
-import { batchClankerFees, isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
+import { batchClankerFees, getClankerClaimLogs, isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
 import { safeBigInt, sanitizeTokenSymbol, sanitizeTokenName } from '@/lib/utils';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import { getAddress, type Address } from 'viem';
@@ -183,28 +183,34 @@ export const clankerAdapter: PlatformAdapter = {
       tokenAddresses
     );
 
-    // NOTE: The FeeLocker contract only exposes availableFees (unclaimed).
-    // Claimed totals are not readable onchain — they require event log parsing.
-    // totalEarned is set to the same as totalUnclaimed (best available data).
     const validTokenMap = new Map(validTokens.map((t) => [getAddress(t.tokenAddress) as string, t]));
 
-    // Filter out tokens with zero available fees.
-    // Since the FeeLocker doesn't expose claimedFees(), we can't tell if 0 means
-    // "already claimed" or "not yet distributed from v4 hook". Showing them as
-    // "claimed" with $0 is misleading, so we exclude them entirely.
-    return feeResults
-      .filter((f) => f.available > 0n)
-      .map((f) => ({
+    // Fetch claimed totals from ERC20 Transfer event logs (FeeLocker → owner)
+    const claimLogs = await getClankerClaimLogs(
+      getAddress(wallet),
+      tokenAddresses
+    );
+
+    // Include tokens with either unclaimed OR claimed fees.
+    // Now that we have event logs, we can show tokens that were fully claimed.
+    const fees: TokenFee[] = [];
+    for (const f of feeResults) {
+      const claimed = claimLogs.get(f.token.toLowerCase()) ?? 0n;
+      const available = f.available;
+      if (available === 0n && claimed === 0n) continue;
+      fees.push({
         tokenAddress: f.token,
         tokenSymbol: validTokenMap.get(f.token)?.symbol ?? null,
         chain: 'base' as const,
         platform: 'clanker' as const,
-        totalEarned: f.available.toString(),
-        totalClaimed: '0',
-        totalUnclaimed: f.available.toString(),
+        totalEarned: (available + claimed).toString(),
+        totalClaimed: claimed.toString(),
+        totalUnclaimed: available.toString(),
         totalEarnedUsd: null,
         royaltyBps: null,
-      }));
+      });
+    }
+    return fees;
   },
 
   async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {

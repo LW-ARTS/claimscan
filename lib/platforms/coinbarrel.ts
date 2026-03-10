@@ -6,6 +6,7 @@ import {
   POOL_OFFSETS,
 } from '@coinbarrel/sdk';
 import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
+import { fetchVaultClaimTotal } from '@/lib/helius/transactions';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
   PlatformAdapter,
@@ -133,7 +134,7 @@ async function findBondingCurvesByCreator(
  */
 async function findPoolsByCreator(
   wallet: PublicKey
-): Promise<{ tokenMint: PublicKey; creatorFeesA: bigint; creatorFeesB: bigint }[]> {
+): Promise<{ poolAddress: string; tokenMint: PublicKey; creatorFeesA: bigint; creatorFeesB: bigint }[]> {
   // Pool accounts have CREATOR_FEE_RECIPIENT at offset 245
   // Pool minimum size is 317 bytes (from getPoolState check of 269, plus reward fields)
   const accounts = await raceTimeout(
@@ -153,9 +154,9 @@ async function findPoolsByCreator(
     'coinbarrel-pools-gpa'
   );
 
-  const results: { tokenMint: PublicKey; creatorFeesA: bigint; creatorFeesB: bigint }[] = [];
+  const results: { poolAddress: string; tokenMint: PublicKey; creatorFeesA: bigint; creatorFeesB: bigint }[] = [];
 
-  for (const { account } of accounts) {
+  for (const { pubkey, account } of accounts) {
     try {
       const data = account.data as Buffer;
       // Only process if account is large enough to be a pool
@@ -164,7 +165,7 @@ async function findPoolsByCreator(
       const tokenMint = readPubkey(data, POOL_OFFSETS.TOKEN_A_MINT);
       const creatorFeesA = readU64LE(data, POOL_OFFSETS.ACCUMULATED_CREATOR_TRADER_FEES_A);
       const creatorFeesB = readU64LE(data, POOL_OFFSETS.ACCUMULATED_CREATOR_TRADER_FEES_B);
-      results.push({ tokenMint, creatorFeesA, creatorFeesB });
+      results.push({ poolAddress: pubkey.toBase58(), tokenMint, creatorFeesA, creatorFeesB });
     } catch (err) {
       console.warn('[coinbarrel] malformed pool account:', err instanceof Error ? err.message : err);
     }
@@ -236,21 +237,43 @@ export const coinbarrelAdapter: PlatformAdapter = {
       // Track pool token mints to avoid double-counting
       const poolTokenMints = new Set<string>();
 
+      // Fetch claimed totals for top 10 pools (by SOL fees) via Helius
+      const poolsForClaim = pools.status === 'fulfilled'
+        ? pools.value
+            .filter((p) => p.creatorFeesB > 0n)
+            .sort((a, b) => (b.creatorFeesB > a.creatorFeesB ? 1 : -1))
+            .slice(0, 10)
+        : [];
+
+      const claimResults = await Promise.allSettled(
+        poolsForClaim.map((p) => fetchVaultClaimTotal(p.poolAddress))
+      );
+
+      const claimMap = new Map<string, bigint>();
+      for (let i = 0; i < poolsForClaim.length; i++) {
+        const cr = claimResults[i];
+        if (cr.status === 'fulfilled' && cr.value > 0n) {
+          claimMap.set(poolsForClaim[i].poolAddress, cr.value);
+        }
+      }
+
       // Process pools (migrated tokens) — these have explicit creator fee tracking
       if (pools.status === 'fulfilled') {
         for (const pool of pools.value) {
           const mintAddr = pool.tokenMint.toBase58();
           poolTokenMints.add(mintAddr);
 
+          const claimed = claimMap.get(pool.poolAddress) ?? 0n;
+
           // creatorFeesB is SOL (quote token) fees accumulated for creator
-          if (pool.creatorFeesB > 0n) {
+          if (pool.creatorFeesB > 0n || claimed > 0n) {
             fees.push({
               tokenAddress: mintAddr,
               tokenSymbol: 'SOL',
               chain: 'sol',
               platform: 'coinbarrel',
-              totalEarned: '0',
-              totalClaimed: '0',
+              totalEarned: (pool.creatorFeesB + claimed).toString(),
+              totalClaimed: claimed.toString(),
               totalUnclaimed: pool.creatorFeesB.toString(),
               totalEarnedUsd: null,
               royaltyBps: null,
@@ -275,7 +298,7 @@ export const coinbarrelAdapter: PlatformAdapter = {
               tokenSymbol: 'SOL',
               chain: 'sol',
               platform: 'coinbarrel',
-              totalEarned: '0',
+              totalEarned: curve.accumulatedHolderRewards.toString(),
               totalClaimed: '0',
               totalUnclaimed: curve.accumulatedHolderRewards.toString(),
               totalEarnedUsd: null,

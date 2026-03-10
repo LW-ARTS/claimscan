@@ -3,8 +3,11 @@ import { PublicKey } from '@solana/web3.js';
 import {
   getUnclaimedPumpFees,
   getUnclaimedPumpSwapFees,
+  deriveCreatorVault,
+  derivePumpSwapVault,
   isValidSolanaAddress,
 } from '@/lib/chains/solana';
+import { fetchVaultClaimTotal } from '@/lib/helius/transactions';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
   PlatformAdapter,
@@ -55,9 +58,15 @@ export const pumpAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
     try {
       const creator = new PublicKey(wallet);
-      const [pumpFees, pumpSwapFees] = await Promise.allSettled([
+      const [pumpVault] = deriveCreatorVault(creator);
+      const [swapVault] = derivePumpSwapVault(creator);
+
+      // Fetch unclaimed balances + claimed totals in parallel
+      const [pumpFees, pumpSwapFees, pumpClaimed, swapClaimed] = await Promise.allSettled([
         getUnclaimedPumpFees(creator),
         getUnclaimedPumpSwapFees(creator),
+        fetchVaultClaimTotal(pumpVault.toBase58()),
+        fetchVaultClaimTotal(swapVault.toBase58()),
       ]);
 
       const fees: TokenFee[] = [];
@@ -68,17 +77,16 @@ export const pumpAdapter: PlatformAdapter = {
       } else {
         console.warn('[pump] getUnclaimedPumpFees failed:', pumpFees.reason instanceof Error ? pumpFees.reason.message : pumpFees.reason);
       }
-      if (pumpBalance > 0n) {
+      const pumpClaimedTotal = pumpClaimed.status === 'fulfilled' ? pumpClaimed.value : 0n;
+
+      if (pumpBalance > 0n || pumpClaimedTotal > 0n) {
         fees.push({
-          // Use 'SOL:pump' to distinguish from PumpSwap vault in DB upsert.
-          // The DB conflict key is (creator_id, platform, chain, token_address),
-          // so both vaults need unique token_address values.
           tokenAddress: 'SOL:pump',
           tokenSymbol: 'SOL',
           chain: 'sol',
           platform: 'pump',
-          totalEarned: '0',
-          totalClaimed: '0',
+          totalEarned: (pumpBalance + pumpClaimedTotal).toString(),
+          totalClaimed: pumpClaimedTotal.toString(),
           totalUnclaimed: pumpBalance.toString(),
           totalEarnedUsd: null,
           royaltyBps: null,
@@ -91,14 +99,16 @@ export const pumpAdapter: PlatformAdapter = {
       } else {
         console.warn('[pump] getUnclaimedPumpSwapFees failed:', pumpSwapFees.reason instanceof Error ? pumpSwapFees.reason.message : pumpSwapFees.reason);
       }
-      if (swapBalance > 0n) {
+      const swapClaimedTotal = swapClaimed.status === 'fulfilled' ? swapClaimed.value : 0n;
+
+      if (swapBalance > 0n || swapClaimedTotal > 0n) {
         fees.push({
           tokenAddress: 'SOL:pumpswap',
           tokenSymbol: 'SOL (PumpSwap)',
           chain: 'sol',
           platform: 'pump',
-          totalEarned: '0',
-          totalClaimed: '0',
+          totalEarned: (swapBalance + swapClaimedTotal).toString(),
+          totalClaimed: swapClaimedTotal.toString(),
           totalUnclaimed: swapBalance.toString(),
           totalEarnedUsd: null,
           royaltyBps: null,
