@@ -138,24 +138,47 @@ export function sanitizeTokenName(val: unknown): string | null {
 }
 
 /**
+ * Platforms where fees are denominated in the chain's native token (SOL or ETH).
+ * For these platforms, the fallback conversion (amount × native price) is correct.
+ * Platforms NOT in this set have fees in non-native tokens (e.g. the meme token itself),
+ * so the fallback would produce wrong USD values — return 0 instead.
+ */
+const NATIVE_TOKEN_FEE_PLATFORMS = new Set([
+  'pump',       // SOL from vault PDAs
+  'zora',       // ETH from ProtocolRewards
+  'raydium',    // SOL from vault PDAs
+  'coinbarrel', // SOL from Meteora DAMM pools
+  'bags',       // SOL (lamports) from claimable-positions
+]);
+
+/**
  * Compute USD value for a fee record.
- * Prefers DB-stored total_earned_usd; falls back to amount × native token price.
- *
- * TODO(#15): Fallback assumes native token decimals (SOL=9, ETH=18).
- * Incorrect for RevShare and similar platforms where fees are in the
- * meme token's own denomination. Needs server-side USD or token_decimals field.
+ * Prefers DB-stored total_earned_usd; falls back to amount × native token price
+ * ONLY for platforms that denominate fees in the native token.
+ * For non-native token platforms (RevShare, Clanker, Bankr, Believe),
+ * returns 0 when total_earned_usd is not available to avoid wrong USD values.
  */
 export function computeFeeUsd(
-  fee: { total_earned_usd?: number | null; total_unclaimed: string | null; total_earned: string | null; chain: string },
+  fee: { total_earned_usd?: number | null; total_unclaimed: string | null; total_earned: string | null; chain: string; platform?: string; token_address?: string },
   solPrice: number,
   ethPrice: number,
 ): number {
   if (fee.total_earned_usd != null && fee.total_earned_usd > 0) {
     return fee.total_earned_usd;
   }
+  // Only apply native-price fallback for platforms with native token fees,
+  // OR for fee rows explicitly denominated in SOL/ETH (e.g. Believe's SOL quote fees
+  // use tokenAddress like "SOL:believe:<pool>"). Other platforms' meme-token fees
+  // would get wrong USD from native price conversion.
+  const isNativePlatform = fee.platform && NATIVE_TOKEN_FEE_PLATFORMS.has(fee.platform);
+  const isNativeTokenRow = fee.token_address?.startsWith('SOL:') || fee.token_address?.startsWith('ETH:');
+  if (!isNativePlatform && !isNativeTokenRow) {
+    return 0;
+  }
   const unclaimed = safeBigInt(fee.total_unclaimed);
   const earned = safeBigInt(fee.total_earned);
-  const amount = unclaimed > 0n ? unclaimed : earned;
+  // Prefer total_earned (claimed + unclaimed) when populated; fall back to unclaimed for stale data
+  const amount = earned > 0n ? earned : unclaimed;
   if (amount === 0n) return 0;
   const price = fee.chain === 'sol' ? solPrice : ethPrice;
   const decimals = fee.chain === 'sol' ? 9 : 18;

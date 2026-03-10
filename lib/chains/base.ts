@@ -175,6 +175,13 @@ const erc20TransferEvent = parseAbiItem(
 /** FeeLocker deployed ~late 2024 on Base. */
 const CLANKER_FEELOCKER_DEPLOY_BLOCK = 20_000_000n;
 
+/** Zora ProtocolRewards deployed ~Aug 2023 on Base (shortly after Base launch).
+ * Conservative floor to avoid scanning from genesis while being safely before deployment. */
+const ZORA_REWARDS_BASE_DEPLOY_BLOCK = 1_000_000n;
+
+/** Max tokens per getClankerClaimLogs batch to avoid overwhelming RPCs with concurrent getLogs. */
+const CLAIM_LOGS_BATCH_SIZE = 5;
+
 /**
  * Get total claimed fees per token by scanning Transfer events FROM the FeeLocker TO the owner.
  * Returns a Map of lowercase token address → total claimed wei.
@@ -187,34 +194,38 @@ export async function getClankerClaimLogs(
   if (tokens.length === 0) return claimMap;
 
   try {
-    // Scan Transfer events FROM FeeLocker TO owner across all token contracts
-    // We query per-token to get accurate per-token totals
-    const results = await Promise.allSettled(
-      tokens.map(async (token) => {
-        const logs = await baseClient.getLogs({
-          address: token,
-          event: erc20TransferEvent,
-          args: {
-            from: CLANKER_FEE_LOCKER,
-            to: owner,
-          },
-          fromBlock: CLANKER_FEELOCKER_DEPLOY_BLOCK,
-          toBlock: 'latest',
-        });
+    // Scan Transfer events FROM FeeLocker TO owner across all token contracts.
+    // Process in batches of CLAIM_LOGS_BATCH_SIZE to avoid overwhelming RPCs
+    // with concurrent getLogs calls (each scans ~20M+ blocks).
+    for (let i = 0; i < tokens.length; i += CLAIM_LOGS_BATCH_SIZE) {
+      const batch = tokens.slice(i, i + CLAIM_LOGS_BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(async (token) => {
+          const logs = await baseClient.getLogs({
+            address: token,
+            event: erc20TransferEvent,
+            args: {
+              from: CLANKER_FEE_LOCKER,
+              to: owner,
+            },
+            fromBlock: CLANKER_FEELOCKER_DEPLOY_BLOCK,
+            toBlock: 'latest',
+          });
 
-        let total = 0n;
-        for (const log of logs) {
-          total += log.args.value ?? 0n;
-        }
-        if (total > 0n) {
-          claimMap.set(token.toLowerCase(), total);
-        }
-      })
-    );
+          let total = 0n;
+          for (const log of logs) {
+            total += log.args.value ?? 0n;
+          }
+          if (total > 0n) {
+            claimMap.set(token.toLowerCase(), total);
+          }
+        })
+      );
 
-    for (const r of results) {
-      if (r.status === 'rejected') {
-        console.warn('[base] getClankerClaimLogs failed for a token:', r.reason instanceof Error ? r.reason.message : r.reason);
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          console.warn('[base] getClankerClaimLogs failed for a token:', r.reason instanceof Error ? r.reason.message : r.reason);
+        }
       }
     }
   } catch (err) {
@@ -243,7 +254,7 @@ export async function getZoraWithdrawLogs(
       address: ZORA_PROTOCOL_REWARDS,
       event: zoraWithdrawEvent,
       args: { from: account },
-      fromBlock: 'earliest',
+      fromBlock: ZORA_REWARDS_BASE_DEPLOY_BLOCK,
       toBlock: 'latest',
     });
 

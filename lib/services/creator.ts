@@ -245,9 +245,9 @@ async function freshResolve(
     const walletFees = wallets.length > 0 ? await fetchAllFees(wallets) : [];
 
     // Merge handle-based fees + wallet-based fees, dedup by platform+chain+tokenAddress.
-    // When both sources return a fee for the same token, keep the one with the
-    // richer data (higher totalEarned). This handles the case where one source
-    // includes claimed history and the other doesn't.
+    // When both sources return a fee for the same token, take the MAX of each field
+    // across both sources. This ensures claimed data isn't lost when one source has
+    // better unclaimed data and the other has better claimed data.
     const feeMap = new Map<string, typeof handleFees[number]>();
     for (const fee of handleFees) {
       const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
@@ -258,8 +258,22 @@ async function freshResolve(
       const existing = feeMap.get(key);
       if (!existing) {
         feeMap.set(key, fee);
-      } else if (safeBigInt(fee.totalEarned) > safeBigInt(existing.totalEarned)) {
-        feeMap.set(key, fee);
+      } else {
+        // Both sources report the same pool — keep the snapshot with higher totalEarned.
+        // Taking MAX of claimed/unclaimed independently would break the invariant
+        // totalEarned == totalClaimed + totalUnclaimed and could overcount.
+        // As a tiebreaker, prefer the source with claimed data (richer history).
+        const feeEarned = safeBigInt(fee.totalEarned);
+        const existingEarned = safeBigInt(existing.totalEarned);
+        if (feeEarned > existingEarned ||
+            (feeEarned === existingEarned && safeBigInt(fee.totalClaimed) > safeBigInt(existing.totalClaimed))) {
+          feeMap.set(key, {
+            ...fee,
+            totalEarnedUsd: fee.totalEarnedUsd ?? existing.totalEarnedUsd,
+            tokenSymbol: fee.tokenSymbol ?? existing.tokenSymbol,
+            royaltyBps: fee.royaltyBps ?? existing.royaltyBps,
+          });
+        }
       }
     }
     const allFees = Array.from(feeMap.values());

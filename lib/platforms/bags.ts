@@ -182,27 +182,83 @@ async function fetchClaimStatsCached(tokenMint: string): Promise<BagsClaimStatEn
 }
 
 /**
- * Get totalClaimed (lamports) for a wallet across multiple token mints.
- * Caps at 20 mints to avoid excessive API calls.
+ * Find the best matching claimer entry from claim-stats results.
+ * The /fee-share/wallet/v2 endpoint returns a fee vault wallet that may
+ * differ from the personal wallet stored in claim-stats entries. To handle
+ * this, we try multiple matching strategies in priority order.
  */
+function findClaimerEntry(
+  stats: BagsClaimStatEntry[],
+  wallet: string,
+  handle?: string
+): BagsClaimStatEntry | undefined {
+  // 1. Exact wallet match (works when vault wallet === claim-stats wallet)
+  let entry = stats.find((s) => s.wallet === wallet);
+  if (entry) return entry;
+
+  // 2. Match by Twitter/username handle (more specific than isCreator flag)
+  if (handle) {
+    const lower = handle.toLowerCase();
+    entry = stats.find(
+      (s) =>
+        s.twitterUsername?.toLowerCase() === lower ||
+        s.username?.toLowerCase() === lower
+    );
+    if (entry) return entry;
+  }
+
+  // 3. Match by isCreator flag — only use as last resort since multiple
+  // claimers can have isCreator=true (co-creators), which could return
+  // the wrong claimer's totalClaimed.
+  entry = stats.find((s) => s.isCreator === true);
+  if (entry) return entry;
+
+  return undefined;
+}
+
+/**
+ * Get totalClaimed (lamports) for a wallet across multiple token mints.
+ * Caps at MAX_CLAIM_STATS_MINTS to avoid excessive API calls; logs a warning when truncated.
+ * When `handle` is provided (handle-based lookup), uses it as a fallback
+ * matching strategy if the wallet address doesn't match claim-stats entries.
+ */
+/**
+ * Convert a decimal SOL string (e.g. "1.234567890") to lamports using
+ * string manipulation instead of floating-point arithmetic.
+ * This avoids precision loss for amounts > ~9 SOL where
+ * `parseFloat(raw) * 1e9` would exceed Number.MAX_SAFE_INTEGER.
+ */
+function solDecimalToLamports(raw: string): bigint {
+  const [whole, frac = ''] = raw.split('.');
+  // Pad or truncate fractional part to exactly 9 digits (lamports precision)
+  const paddedFrac = frac.padEnd(9, '0').slice(0, 9);
+  return BigInt((whole || '0') + paddedFrac);
+}
+
+/** Max mints to query claim-stats for. Caps API calls to avoid excessive load. */
+const MAX_CLAIM_STATS_MINTS = 50;
+
 async function getClaimTotalsForWallet(
   wallet: string,
-  mints: string[]
+  mints: string[],
+  handle?: string
 ): Promise<Map<string, bigint>> {
   const claimMap = new Map<string, bigint>();
-  const cappedMints = mints.slice(0, 20);
+  if (mints.length > MAX_CLAIM_STATS_MINTS) {
+    console.warn(`[bags] claim-stats capped at ${MAX_CLAIM_STATS_MINTS}/${mints.length} mints for wallet ${wallet.slice(0, 8)}...`);
+  }
+  const cappedMints = mints.slice(0, MAX_CLAIM_STATS_MINTS);
 
   const results = await Promise.allSettled(
     cappedMints.map(async (mint) => {
       const stats = await fetchClaimStatsCached(mint);
-      // Find this wallet's entry (match by wallet address)
-      const entry = stats.find((s) => s.wallet === wallet);
+      const entry = findClaimerEntry(stats, wallet, handle);
       if (entry?.totalClaimed) {
         // claim-stats may return lamports (integer string) or SOL (decimal string).
-        // Handle both: if it contains a decimal point, parse as float and convert to lamports.
+        // Use string-based conversion to avoid parseFloat precision loss.
         const raw = entry.totalClaimed;
         const claimed = raw.includes('.')
-          ? BigInt(Math.floor(parseFloat(raw) * 1_000_000_000))
+          ? solDecimalToLamports(raw)
           : BigInt(raw);
         if (claimed > 0n) claimMap.set(mint, claimed);
       }
@@ -259,9 +315,9 @@ export const bagsAdapter: PlatformAdapter = {
     const positions = await getClaimablePositionsCached(wallet);
     if (positions.length === 0) return [];
 
-    // Step 3: Fetch claimed totals via claim-stats API
+    // Step 3: Fetch claimed totals via claim-stats API (pass handle for fallback matching)
     const mints = positions.filter((p) => p.baseMint).map((p) => p.baseMint);
-    const claimTotals = await getClaimTotalsForWallet(wallet, mints);
+    const claimTotals = await getClaimTotalsForWallet(wallet, mints, handle);
 
     const fees: TokenFee[] = [];
     for (const p of positions) {

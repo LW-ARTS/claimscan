@@ -143,9 +143,10 @@ export const believeAdapter: PlatformAdapter = {
       const pools = await getPoolsByCreatorCached(wallet);
       if (pools.length === 0) return [];
 
-      // Collect active pools with SOL fees for Helius claim history
+      // Collect all pools with unclaimed fees — including migrated pools.
+      // Migrated pools may still hold creatorQuoteFee/creatorBaseFee that
+      // accumulated before migration. Only getCreatorTokens filters these out.
       const activePools = pools
-        .filter((p) => !isMigrated(p.account))
         .map((p) => ({
           pool: p,
           quoteFee: bnToBigInt(p.account.creatorQuoteFee),

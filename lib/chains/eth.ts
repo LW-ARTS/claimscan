@@ -3,6 +3,10 @@ import { createPublicClient, http, fallback, parseAbi, parseAbiItem, type Addres
 import { mainnet } from 'viem/chains';
 import { ZORA_PROTOCOL_REWARDS } from '@/lib/constants';
 
+/** Zora ProtocolRewards deployed ~mid 2023 on ETH mainnet.
+ * Conservative floor to avoid scanning from genesis while being safely before deployment. */
+const ZORA_REWARDS_ETH_DEPLOY_BLOCK = 17_000_000n;
+
 // ═══════════════════════════════════════════════
 // Client (multi-RPC with adaptive fallback)
 // ═══════════════════════════════════════════════
@@ -80,7 +84,7 @@ export async function getZoraWithdrawLogsEth(
       address: ZORA_PROTOCOL_REWARDS,
       event: zoraWithdrawEvent,
       args: { from: account },
-      fromBlock: 'earliest',
+      fromBlock: ZORA_REWARDS_ETH_DEPLOY_BLOCK,
       toBlock: 'latest',
     });
 

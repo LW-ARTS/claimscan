@@ -63,9 +63,14 @@ function raceTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
   });
 }
 
+/** Known bonding curve account sizes: v1 (241 bytes), v2 with launch_tier (242 bytes). */
+const BONDING_CURVE_MIN_SIZE = 241;
+const BONDING_CURVE_MAX_SIZE = 242;
+
 /**
  * Find all bonding curve accounts where CREATOR_FEE_RECIPIENT = wallet.
- * Returns tokenMint for each curve.
+ * Single GPA query without dataSize filter — validates account size client-side.
+ * This avoids two separate RPC round-trips for v1 (241) and v2 (242) accounts.
  */
 async function findBondingCurvesByCreator(
   wallet: PublicKey
@@ -74,7 +79,6 @@ async function findBondingCurvesByCreator(
     withRpcFallback(
       (conn) => conn.getProgramAccounts(COINBARREL_PROGRAM, {
         filters: [
-          { dataSize: 241 }, // bonding curve account size (or 242 for v2 with launch_tier)
           {
             memcmp: {
               offset: BONDING_CURVE_OFFSETS.CREATOR_FEE_RECIPIENT,
@@ -88,37 +92,16 @@ async function findBondingCurvesByCreator(
     'coinbarrel-curves-gpa'
   );
 
-  // Also try v2 size (242 bytes)
-  let v2Accounts: typeof accounts = [];
-  try {
-    v2Accounts = await raceTimeout(
-      withRpcFallback(
-        (conn) => conn.getProgramAccounts(COINBARREL_PROGRAM, {
-          filters: [
-            { dataSize: 242 },
-            {
-              memcmp: {
-                offset: BONDING_CURVE_OFFSETS.CREATOR_FEE_RECIPIENT,
-                bytes: wallet.toBase58(),
-              },
-            },
-          ],
-        }),
-        'coinbarrel-curves-v2-gpa'
-      ),
-      'coinbarrel-curves-v2-gpa'
-    );
-  } catch (err) {
-    console.warn('[coinbarrel] v2 GPA query failed:', err instanceof Error ? err.message : err);
-  }
-
-  const allAccounts = [...accounts, ...v2Accounts];
   const results: { tokenMint: PublicKey; accumulatedHolderRewards: bigint }[] = [];
 
-  for (const { account } of allAccounts) {
+  for (const { account } of accounts) {
     try {
-      const tokenMint = readPubkey(account.data as Buffer, BONDING_CURVE_OFFSETS.TOKEN_MINT);
-      const rewards = readU64LE(account.data as Buffer, BONDING_CURVE_OFFSETS.ACCUMULATED_HOLDER_REWARDS_SOL);
+      const data = account.data as Buffer;
+      // Client-side size validation: only process known bonding curve sizes
+      if (data.length < BONDING_CURVE_MIN_SIZE || data.length > BONDING_CURVE_MAX_SIZE) continue;
+
+      const tokenMint = readPubkey(data, BONDING_CURVE_OFFSETS.TOKEN_MINT);
+      const rewards = readU64LE(data, BONDING_CURVE_OFFSETS.ACCUMULATED_HOLDER_REWARDS_SOL);
       results.push({ tokenMint, accumulatedHolderRewards: rewards });
     } catch (err) {
       console.warn('[coinbarrel] malformed bonding curve account:', err instanceof Error ? err.message : err);

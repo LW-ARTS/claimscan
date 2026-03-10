@@ -149,7 +149,8 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
             } else {
               const unclaimed = toBigInt(f.total_unclaimed);
               const earned = toBigInt(f.total_earned);
-              const amount = unclaimed > 0n ? unclaimed : earned;
+              // Prefer total_earned (claimed + unclaimed) when populated; fall back to unclaimed for stale data
+              const amount = earned > 0n ? earned : unclaimed;
               if (amount > 0n) {
                 const price = f.chain === 'sol' ? prices.sol : prices.eth;
                 const decimals = f.chain === 'sol' ? 9 : 18;
@@ -434,7 +435,7 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
                   fontFamily: 'Space Mono',
                 }}
               >
-                TOTAL UNCLAIMED
+                TOTAL EARNED
               </span>
             </div>
 

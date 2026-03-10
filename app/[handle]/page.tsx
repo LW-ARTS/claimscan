@@ -118,7 +118,8 @@ export default async function ProfilePage({ params }: PageProps) {
     if (typeof dbUsd === 'number' && Number.isFinite(dbUsd) && dbUsd > 0) return dbUsd;
     const unclaimed = safeBigInt(fee.total_unclaimed);
     const earned = safeBigInt(fee.total_earned);
-    const amount = unclaimed > 0n ? unclaimed : earned;
+    // Prefer total_earned (claimed + unclaimed) when populated; fall back to unclaimed for stale data
+    const amount = earned > 0n ? earned : unclaimed;
     if (amount === 0n) return 0;
     const price = fee.chain === 'sol' ? prices.sol : prices.eth;
     const decimals = fee.chain === 'sol' ? 9 : 18;
