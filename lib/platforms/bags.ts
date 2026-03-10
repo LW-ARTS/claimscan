@@ -299,10 +299,10 @@ function solDecimalToLamports(raw: string): bigint {
 
 /** Max mints for lifetime-fees primary method (positions with known BPS).
  *  This is the PRIMARY method — avoids wallet-matching issues of claim-stats. */
-const MAX_LIFETIME_FEE_MINTS = 800;
+const MAX_LIFETIME_FEE_MINTS = 400;
 
 /** Max mints for claim-stats fallback (positions with unknown BPS). */
-const MAX_CLAIM_STATS_FALLBACK_MINTS = 200;
+const MAX_CLAIM_STATS_FALLBACK_MINTS = 100;
 
 /** Max concurrent API requests to avoid overwhelming bags.fm or Vercel connection limits. */
 const CONCURRENCY_LIMIT = 40;
