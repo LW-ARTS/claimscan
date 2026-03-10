@@ -239,13 +239,12 @@ function solDecimalToLamports(raw: string): bigint {
   return BigInt((whole || '0') + paddedFrac);
 }
 
-/** Max mints to query claim-stats for. Must be generous — creators with many
- *  tokens (e.g. 300+) need accurate totals. Requests are concurrent, so the
- *  wall-clock cost is ~1-2 extra seconds, not 200× sequential delay. */
-const MAX_CLAIM_STATS_MINTS = 1000;
+/** Max mints for lifetime-fees primary method (positions with known BPS).
+ *  This is the PRIMARY method — avoids wallet-matching issues of claim-stats. */
+const MAX_LIFETIME_FEE_MINTS = 400;
 
-/** Max mints to query lifetime-fees for (fallback when claim-stats fails). */
-const MAX_LIFETIME_FEES_MINTS = 500;
+/** Max mints for claim-stats fallback (positions with unknown BPS). */
+const MAX_CLAIM_STATS_FALLBACK_MINTS = 100;
 
 /**
  * Fetch lifetime-fees for a token (total fees collected, all claimers combined).
@@ -263,92 +262,46 @@ async function fetchLifetimeFees(tokenMint: string): Promise<bigint> {
   }
 }
 
-async function getClaimTotalsForWallet(
+/**
+ * Compute claimed amounts for positions using two strategies:
+ *
+ * 1. PRIMARY (positions with known userBps):
+ *    claimed = (lifetimeFees × userBps / 10000) − unclaimed
+ *    This avoids wallet-matching issues entirely.
+ *
+ * 2. FALLBACK (positions with unknown userBps):
+ *    Use claim-stats with findClaimerEntry matching.
+ *
+ * Total API calls: ≤ MAX_LIFETIME_FEE_MINTS + MAX_CLAIM_STATS_FALLBACK_MINTS (≤500).
+ */
+async function computeClaimedAmounts(
+  positions: BagsClaimablePosition[],
   wallet: string,
-  mints: string[],
   handle?: string
 ): Promise<Map<string, bigint>> {
   const claimMap = new Map<string, bigint>();
-  if (mints.length > MAX_CLAIM_STATS_MINTS) {
-    console.warn(`[bags] claim-stats capped at ${MAX_CLAIM_STATS_MINTS}/${mints.length} mints for wallet ${wallet.slice(0, 8)}...`);
-  }
-  const cappedMints = mints.slice(0, MAX_CLAIM_STATS_MINTS);
+  const eligible = positions.filter((p) => p.baseMint);
+  if (eligible.length === 0) return claimMap;
 
-  // Diagnostic counters
-  let emptyCount = 0;
-  let matchedCount = 0;
-  let unmatchedMultiCount = 0;
-  let claimedZeroCount = 0;
-  let errorCount = 0;
+  const withBps = eligible.filter((p) => p.userBps != null && p.userBps > 0);
+  const withoutBps = eligible.filter((p) => p.userBps == null || p.userBps <= 0);
 
-  const results = await Promise.allSettled(
-    cappedMints.map(async (mint) => {
-      const stats = await fetchClaimStatsCached(mint);
-      if (stats.length === 0) { emptyCount++; return; }
-      const entry = findClaimerEntry(stats, wallet, handle);
-      if (!entry) { unmatchedMultiCount++; return; }
-      if (!entry.totalClaimed) { claimedZeroCount++; return; }
-      matchedCount++;
-      const raw = entry.totalClaimed;
-      const claimed = raw.includes('.')
-        ? solDecimalToLamports(raw)
-        : BigInt(raw);
-      if (claimed > 0n) claimMap.set(mint, claimed);
-    })
-  );
+  console.log(`[bags] computeClaimedAmounts for ${handle ?? wallet.slice(0, 8)}: ${eligible.length} positions (withBps=${withBps.length}, withoutBps=${withoutBps.length})`);
 
-  for (const r of results) {
-    if (r.status === 'rejected') {
-      errorCount++;
-      console.warn('[bags] claim-stats fetch failed:', r.reason instanceof Error ? r.reason.message : r.reason);
-    }
-  }
-
-  console.log(`[bags] claim-stats summary for ${handle ?? wallet.slice(0, 8)}: ${cappedMints.length} mints → matched=${matchedCount}, empty=${emptyCount}, unmatched=${unmatchedMultiCount}, claimedZero=${claimedZeroCount}, errors=${errorCount}, claimMap=${claimMap.size}`);
-
-  return claimMap;
-}
-
-/**
- * Fallback: for positions where claim-stats matching failed, use lifetime-fees
- * to estimate the user's total earned and derive claimed amount.
- *
- * Formula: userEarned = lifetimeFees × userBps / 10000
- *          claimed = userEarned − unclaimed  (clamped to ≥ 0)
- *
- * Only called for positions with userBps available and 0 claimed from claim-stats.
- */
-async function fillClaimedFromLifetimeFees(
-  positions: BagsClaimablePosition[],
-  claimMap: Map<string, bigint>
-): Promise<void> {
-  const allNeedFallback = positions.filter(
-    (p) => p.baseMint && !claimMap.has(p.baseMint)
-  );
-  if (allNeedFallback.length === 0) return;
-
-  // Split into positions with known BPS and unknown BPS
-  const withBps = allNeedFallback.filter((p) => p.userBps != null && p.userBps > 0);
-  const withoutBps = allNeedFallback.filter((p) => p.userBps == null || p.userBps <= 0);
-
-  console.log(`[bags] lifetime-fees fallback: ${allNeedFallback.length} need fallback (withBps=${withBps.length}, withoutBps=${withoutBps.length})`);
-
-  // --- Group A: positions with known BPS → use lifetime-fees formula ---
+  // --- Primary: lifetime-fees for positions with known BPS ---
   if (withBps.length > 0) {
-    withBps.sort(
-      (a, b) =>
-        (b.totalClaimableLamportsUserShare || 0) -
-        (a.totalClaimableLamportsUserShare || 0)
+    const sorted = [...withBps].sort(
+      (a, b) => (b.totalClaimableLamportsUserShare || 0) - (a.totalClaimableLamportsUserShare || 0)
     );
-    const cappedA = withBps.slice(0, MAX_LIFETIME_FEES_MINTS);
-    if (withBps.length > MAX_LIFETIME_FEES_MINTS) {
-      console.warn(
-        `[bags] lifetime-fees (BPS) fallback capped at ${MAX_LIFETIME_FEES_MINTS}/${withBps.length} mints`
-      );
+    if (sorted.length > MAX_LIFETIME_FEE_MINTS) {
+      console.warn(`[bags] lifetime-fees capped at ${MAX_LIFETIME_FEE_MINTS}/${sorted.length} mints`);
     }
+    const capped = sorted.slice(0, MAX_LIFETIME_FEE_MINTS);
 
-    const resultsA = await Promise.allSettled(
-      cappedA.map(async (p) => {
+    let lfHits = 0;
+    let lfErrors = 0;
+    const results = await Promise.allSettled(
+      capped.map(async (p) => {
         const lifetimeLamports = await fetchLifetimeFees(p.baseMint);
         if (lifetimeLamports <= 0n) return;
 
@@ -359,63 +312,52 @@ async function fillClaimedFromLifetimeFees(
 
         if (claimed > 0n) {
           claimMap.set(p.baseMint, claimed);
+          lfHits++;
         }
       })
     );
-    for (const r of resultsA) {
-      if (r.status === 'rejected') {
-        console.warn('[bags] lifetime-fees (BPS) fallback failed:', r.reason instanceof Error ? r.reason.message : r.reason);
-      }
+    for (const r of results) {
+      if (r.status === 'rejected') lfErrors++;
     }
+    console.log(`[bags] lifetime-fees: ${capped.length} queried → ${lfHits} with claimed > 0, ${lfErrors} errors`);
   }
 
-  // --- Group B: positions with unknown BPS → try claim-stats single-entry match ---
-  // For these mints, claim-stats may have been beyond the cap or returned 2+ entries.
-  // Re-check: if there's a single claimer entry, its totalClaimed belongs to our user.
+  // --- Fallback: claim-stats for positions without BPS ---
   if (withoutBps.length > 0) {
-    withoutBps.sort(
-      (a, b) =>
-        (b.totalClaimableLamportsUserShare || 0) -
-        (a.totalClaimableLamportsUserShare || 0)
+    const sorted = [...withoutBps].sort(
+      (a, b) => (b.totalClaimableLamportsUserShare || 0) - (a.totalClaimableLamportsUserShare || 0)
     );
-    const cappedB = withoutBps.slice(0, MAX_LIFETIME_FEES_MINTS);
-    if (withoutBps.length > MAX_LIFETIME_FEES_MINTS) {
-      console.warn(
-        `[bags] claim-stats (null BPS) fallback capped at ${MAX_LIFETIME_FEES_MINTS}/${withoutBps.length} mints`
-      );
+    if (sorted.length > MAX_CLAIM_STATS_FALLBACK_MINTS) {
+      console.warn(`[bags] claim-stats fallback capped at ${MAX_CLAIM_STATS_FALLBACK_MINTS}/${sorted.length} mints`);
     }
+    const capped = sorted.slice(0, MAX_CLAIM_STATS_FALLBACK_MINTS);
 
-    const resultsB = await Promise.allSettled(
-      cappedB.map(async (p) => {
-        // Fetch claim-stats (cached if already fetched in main flow)
+    let csHits = 0;
+    let csErrors = 0;
+    const results = await Promise.allSettled(
+      capped.map(async (p) => {
         const stats = await fetchClaimStatsCached(p.baseMint);
-        // Single-entry: must be our user since they have a claimable position
-        if (stats.length === 1 && stats[0].totalClaimed) {
-          const raw = stats[0].totalClaimed;
+        const entry = findClaimerEntry(stats, wallet, handle);
+        if (entry?.totalClaimed) {
+          const raw = entry.totalClaimed;
           const claimed = raw.includes('.')
             ? solDecimalToLamports(raw)
             : BigInt(raw);
-          if (claimed > 0n) claimMap.set(p.baseMint, claimed);
-          return;
-        }
-        // Multi-entry with royaltyBps: try matching by unclaimed proportion
-        // via lifetime-fees — use creator entry's royaltyBps as a proxy
-        const creatorEntry = stats.find((s) => s.isCreator === true);
-        if (creatorEntry?.totalClaimed && creatorEntry.royaltyBps != null && creatorEntry.royaltyBps > 0) {
-          const raw = creatorEntry.totalClaimed;
-          const claimed = raw.includes('.')
-            ? solDecimalToLamports(raw)
-            : BigInt(raw);
-          if (claimed > 0n) claimMap.set(p.baseMint, claimed);
+          if (claimed > 0n) {
+            claimMap.set(p.baseMint, claimed);
+            csHits++;
+          }
         }
       })
     );
-    for (const r of resultsB) {
-      if (r.status === 'rejected') {
-        console.warn('[bags] claim-stats (null BPS) fallback failed:', r.reason instanceof Error ? r.reason.message : r.reason);
-      }
+    for (const r of results) {
+      if (r.status === 'rejected') csErrors++;
     }
+    console.log(`[bags] claim-stats fallback: ${capped.length} queried → ${csHits} with claimed > 0, ${csErrors} errors`);
   }
+
+  console.log(`[bags] computeClaimedAmounts result: ${claimMap.size} mints with claimed > 0`);
+  return claimMap;
 }
 
 // ═══════════════════════════════════════════════
@@ -459,16 +401,8 @@ export const bagsAdapter: PlatformAdapter = {
     const positions = await getClaimablePositionsCached(wallet);
     if (positions.length === 0) return [];
 
-    // Step 3: Fetch claimed totals via claim-stats API (pass handle for fallback matching)
-    // Sort by unclaimed desc so the most valuable positions are checked first (within cap)
-    const sorted = [...positions].sort(
-      (a, b) => (b.totalClaimableLamportsUserShare || 0) - (a.totalClaimableLamportsUserShare || 0)
-    );
-    const mints = sorted.filter((p) => p.baseMint).map((p) => p.baseMint);
-    const claimTotals = await getClaimTotalsForWallet(wallet, mints, handle);
-
-    // Step 4: For positions where claim-stats had no match, use lifetime-fees fallback
-    await fillClaimedFromLifetimeFees(positions, claimTotals);
+    // Step 3: Compute claimed amounts (lifetime-fees primary, claim-stats fallback)
+    const claimTotals = await computeClaimedAmounts(positions, wallet, handle);
 
     const fees: TokenFee[] = [];
     for (const p of positions) {
@@ -518,12 +452,7 @@ export const bagsAdapter: PlatformAdapter = {
       const positions = await getClaimablePositionsCached(wallet);
       if (positions.length === 0) return [];
 
-      const sorted = [...positions].sort(
-        (a, b) => (b.totalClaimableLamportsUserShare || 0) - (a.totalClaimableLamportsUserShare || 0)
-      );
-      const mints = sorted.filter((p) => p.baseMint).map((p) => p.baseMint);
-      const claimTotals = await getClaimTotalsForWallet(wallet, mints);
-      await fillClaimedFromLifetimeFees(positions, claimTotals);
+      const claimTotals = await computeClaimedAmounts(positions, wallet);
 
       const fees: TokenFee[] = [];
       for (const p of positions) {
@@ -557,20 +486,12 @@ export const bagsAdapter: PlatformAdapter = {
 
     try {
       const data = await getClaimablePositionsCached(wallet);
-      const activeMints = data
-        .filter((p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0)
-        .map((p) => p.baseMint);
-
-      // Fetch claimed totals in parallel for active positions
-      const claimTotals = activeMints.length > 0
-        ? await getClaimTotalsForWallet(wallet, activeMints)
-        : new Map<string, bigint>();
-
-      // Lifetime-fees fallback for positions where claim-stats had no match
       const activePositions = data.filter(
         (p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0
       );
-      await fillClaimedFromLifetimeFees(activePositions, claimTotals);
+      const claimTotals = activePositions.length > 0
+        ? await computeClaimedAmounts(activePositions, wallet)
+        : new Map<string, bigint>();
 
       const fees = data
         .filter((p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0)
