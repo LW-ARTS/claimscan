@@ -110,7 +110,11 @@ function getAvailableKey(): string | null {
 }
 
 function isRateLimited(): boolean {
-  return getAvailableKey() === null;
+  // Check without side effects (don't advance keyIndex)
+  const keys = getApiKeys();
+  if (keys.length === 0) return true;
+  const now = Date.now();
+  return keys.every((k) => (keyRateLimits.get(k) ?? 0) > now);
 }
 
 async function bagsFetch<T>(path: string): Promise<T | null> {
@@ -300,6 +304,9 @@ const MAX_LIFETIME_FEE_MINTS = 800;
 /** Max mints for claim-stats fallback (positions with unknown BPS). */
 const MAX_CLAIM_STATS_FALLBACK_MINTS = 200;
 
+/** Max concurrent API requests to avoid overwhelming bags.fm or Vercel connection limits. */
+const CONCURRENCY_LIMIT = 40;
+
 /**
  * Fetch lifetime-fees for a token (total fees collected, all claimers combined).
  * Returns lamports as bigint, or 0n on failure.
@@ -308,7 +315,8 @@ async function fetchLifetimeFees(tokenMint: string): Promise<bigint> {
   const res = await bagsFetch<BagsApiResponse<string>>(
     `/token-launch/lifetime-fees?tokenMint=${encodeURIComponent(tokenMint)}`
   );
-  if (!res?.response) return 0n;
+  if (res === null) return -1n; // null = fetch failed or rate limited (distinct from 0)
+  if (!res.response) return 0n;
   try {
     return BigInt(res.response);
   } catch {
@@ -360,26 +368,43 @@ async function computeClaimedAmounts(
 
     let lfHits = 0;
     let lfErrors = 0;
-    const results = await Promise.allSettled(
-      capped.map(async (p) => {
-        const lifetimeLamports = await fetchLifetimeFees(p.baseMint);
-        if (lifetimeLamports <= 0n) return;
+    let lfZero = 0;
+    let lfFetchFail = 0;
 
-        const userBps = BigInt(p.userBps!);
-        const userEarned = (lifetimeLamports * userBps) / 10000n;
-        const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
-        const claimed = userEarned > unclaimed ? userEarned - unclaimed : 0n;
+    // Process in batches to avoid overwhelming bags.fm / Vercel connection limits
+    for (let batchStart = 0; batchStart < capped.length; batchStart += CONCURRENCY_LIMIT) {
+      if (isRateLimited()) {
+        console.warn(`[bags] lifetime-fees: aborting at batch ${batchStart}/${capped.length} — all keys rate limited`);
+        break;
+      }
+      const batch = capped.slice(batchStart, batchStart + CONCURRENCY_LIMIT);
+      const results = await Promise.allSettled(
+        batch.map(async (p) => {
+          const lifetimeLamports = await fetchLifetimeFees(p.baseMint);
+          if (lifetimeLamports === -1n) { lfFetchFail++; return; } // fetch failed
+          if (lifetimeLamports === 0n) { lfZero++; return; }
 
-        if (claimed > 0n) {
-          claimMap.set(p.baseMint, claimed);
-          lfHits++;
-        }
-      })
-    );
-    for (const r of results) {
-      if (r.status === 'rejected') lfErrors++;
+          const userBps = BigInt(p.userBps!);
+          const userEarned = (lifetimeLamports * userBps) / 10000n;
+          const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
+          const claimed = userEarned > unclaimed ? userEarned - unclaimed : 0n;
+
+          if (claimed > 0n) {
+            claimMap.set(p.baseMint, claimed);
+            lfHits++;
+          }
+        })
+      );
+      for (const r of results) {
+        if (r.status === 'rejected') lfErrors++;
+      }
+
+      // Log progress every few batches
+      if (batchStart % (CONCURRENCY_LIMIT * 5) === 0 || batchStart + CONCURRENCY_LIMIT >= capped.length) {
+        console.log(`[bags] lifetime-fees progress: ${Math.min(batchStart + CONCURRENCY_LIMIT, capped.length)}/${capped.length} (hits=${lfHits}, fetchFail=${lfFetchFail}, zero=${lfZero})`);
+      }
     }
-    console.log(`[bags] lifetime-fees: ${capped.length} queried → ${lfHits} with claimed > 0, ${lfErrors} errors`);
+    console.log(`[bags] lifetime-fees DONE: ${capped.length} queried → ${lfHits} claimed>0, ${lfZero} zero, ${lfFetchFail} fetchFail, ${lfErrors} rejected`);
   }
 
   // --- Fallback: claim-stats for positions without BPS ---
@@ -395,24 +420,33 @@ async function computeClaimedAmounts(
 
     let csHits = 0;
     let csErrors = 0;
-    const results = await Promise.allSettled(
-      capped.map(async (p) => {
-        const stats = await fetchClaimStatsCached(p.baseMint);
-        const entry = findClaimerEntry(stats, wallet, handle);
-        if (entry?.totalClaimed) {
-          const raw = entry.totalClaimed;
-          const claimed = raw.includes('.')
-            ? solDecimalToLamports(raw)
-            : BigInt(raw);
-          if (claimed > 0n) {
-            claimMap.set(p.baseMint, claimed);
-            csHits++;
+
+    // Process in batches
+    for (let batchStart = 0; batchStart < capped.length; batchStart += CONCURRENCY_LIMIT) {
+      if (isRateLimited()) {
+        console.warn(`[bags] claim-stats: aborting at batch ${batchStart}/${capped.length} — all keys rate limited`);
+        break;
+      }
+      const batch = capped.slice(batchStart, batchStart + CONCURRENCY_LIMIT);
+      const results = await Promise.allSettled(
+        batch.map(async (p) => {
+          const stats = await fetchClaimStatsCached(p.baseMint);
+          const entry = findClaimerEntry(stats, wallet, handle);
+          if (entry?.totalClaimed) {
+            const raw = entry.totalClaimed;
+            const claimed = raw.includes('.')
+              ? solDecimalToLamports(raw)
+              : BigInt(raw);
+            if (claimed > 0n) {
+              claimMap.set(p.baseMint, claimed);
+              csHits++;
+            }
           }
-        }
-      })
-    );
-    for (const r of results) {
-      if (r.status === 'rejected') csErrors++;
+        })
+      );
+      for (const r of results) {
+        if (r.status === 'rejected') csErrors++;
+      }
     }
     console.log(`[bags] claim-stats fallback: ${capped.length} queried → ${csHits} with claimed > 0, ${csErrors} errors`);
   }
