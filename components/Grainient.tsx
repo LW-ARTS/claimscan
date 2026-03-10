@@ -176,7 +176,6 @@ const Grainient: React.FC<GrainientProps> = ({
       canvasEl.style.width = '100%';
       canvasEl.style.height = '100%';
       canvasEl.style.display = 'block';
-      canvasEl.style.willChange = 'transform';
       canvasEl.style.backfaceVisibility = 'hidden';
 
       container.appendChild(canvasEl);

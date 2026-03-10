@@ -129,7 +129,7 @@ export default function RootLayout({
           <GrainientBackground />
 
           {/* Navigation */}
-          <header className="animate-fade-in-down sticky top-0 z-50 border-b border-white/10 bg-background/20 backdrop-blur-xl shadow-sm dark:shadow-none">
+          <header className="animate-fade-in-down sticky top-0 z-50 border-b border-white/10 bg-background/60 backdrop-blur-md sm:bg-background/20 sm:backdrop-blur-xl shadow-sm dark:shadow-none">
             <nav aria-label="Main navigation" className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
               <Link href="/" className="group flex items-center gap-2.5" aria-label="ClaimScan home">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground p-1" aria-hidden="true">

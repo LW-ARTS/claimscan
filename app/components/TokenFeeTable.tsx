@@ -69,35 +69,35 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
   return (
     <>
     {/* Mobile: stacked card layout */}
-    <div className="space-y-4 md:hidden">
+    <div className="space-y-3 md:hidden">
       {displayedFees.map(({ fee, usd, display: { label, badge } }) => {
         const platformConfig = PLATFORM_CONFIG[fee.platform];
         const decimals = fee.chain === 'sol' ? 9 : 18;
         return (
-          <div key={fee.id} className="border-b border-border/30 pb-4 last:border-b-0 last:pb-0">
+          <div key={fee.id} className="rounded-xl border border-border/40 bg-card/60 p-3.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-bold uppercase text-muted-foreground">
                   {badge}
                 </span>
-                <span className="font-mono text-sm font-medium">
+                <span className="font-mono text-sm font-semibold">
                   {label}
                 </span>
               </div>
               <ClaimStatusBadge status={fee.claim_status} />
             </div>
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <PlatformIcon platform={fee.platform} className="h-3.5 w-3.5 opacity-70" aria-hidden />
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <PlatformIcon platform={fee.platform} className="h-3.5 w-3.5" aria-hidden />
               <span>{platformConfig?.name ?? fee.platform}</span>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Earned</p>
                 <p className="font-mono tabular-nums">{formatTokenAmount(fee.total_earned, decimals)}{currencyLabel(fee.chain)}</p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">USD</p>
-                <p className="font-medium tabular-nums">{formatUsd(usd)}</p>
+                <p className="font-semibold tabular-nums">{formatUsd(usd)}</p>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Unclaimed</p>

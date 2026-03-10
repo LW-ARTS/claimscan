@@ -76,30 +76,17 @@ export default function Home() {
 
         {/* Platforms + Stats */}
         <div className="animate-fade-in-up delay-500 mx-auto mt-10 sm:mt-16 max-w-2xl">
-          {/* Platform pills — 5 per row */}
-          <div className="flex flex-col items-center gap-1.5">
-            <div className="flex flex-wrap justify-center gap-1.5">
-              {platformEntries.slice(0, 5).map(([key, p]) => (
-                <span
-                  key={key}
-                  className="inline-flex cursor-default items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-all duration-200 hover:border-foreground/20 hover:text-foreground"
-                >
-                  <PlatformIcon platform={key} className="h-3 w-3 opacity-50" aria-hidden />
-                  <span>{p.name}</span>
-                </span>
-              ))}
-            </div>
-            <div className="flex flex-wrap justify-center gap-1.5">
-              {platformEntries.slice(5).map(([key, p]) => (
-                <span
-                  key={key}
-                  className="inline-flex cursor-default items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-all duration-200 hover:border-foreground/20 hover:text-foreground"
-                >
-                  <PlatformIcon platform={key} className="h-3 w-3 opacity-50" aria-hidden />
-                  <span>{p.name}</span>
-                </span>
-              ))}
-            </div>
+          {/* Platform pills */}
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {platformEntries.map(([key, p]) => (
+              <span
+                key={key}
+                className="inline-flex cursor-default items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-all duration-200 hover:border-foreground/20 hover:text-foreground"
+              >
+                <PlatformIcon platform={key} className="h-3 w-3 opacity-50" aria-hidden />
+                <span>{p.name}</span>
+              </span>
+            ))}
           </div>
           {/* Value prop strip */}
           <div className="shimmer mt-4 overflow-hidden rounded-2xl border border-foreground/[0.08] glass-strong">
