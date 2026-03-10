@@ -245,7 +245,9 @@ async function freshResolve(
     const walletFees = wallets.length > 0 ? await fetchAllFees(wallets) : [];
 
     // Merge handle-based fees + wallet-based fees, dedup by platform+chain+tokenAddress.
-    // Handle-based fees take priority (they come from the authoritative source).
+    // When both sources return a fee for the same token, keep the one with the
+    // richer data (higher totalEarned). This handles the case where one source
+    // includes claimed history and the other doesn't.
     const feeMap = new Map<string, typeof handleFees[number]>();
     for (const fee of handleFees) {
       const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
@@ -253,7 +255,10 @@ async function freshResolve(
     }
     for (const fee of walletFees) {
       const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
-      if (!feeMap.has(key)) {
+      const existing = feeMap.get(key);
+      if (!existing) {
+        feeMap.set(key, fee);
+      } else if (safeBigInt(fee.totalEarned) > safeBigInt(existing.totalEarned)) {
         feeMap.set(key, fee);
       }
     }

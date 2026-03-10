@@ -252,22 +252,28 @@ export const bagsAdapter: PlatformAdapter = {
 
     // Step 2: Get claimable positions for that wallet (cached to avoid duplicate calls).
     const positions = await getClaimablePositionsCached(wallet);
+    if (positions.length === 0) return [];
+
+    // Step 3: Fetch claimed totals via claim-stats API
+    const mints = positions.filter((p) => p.baseMint).map((p) => p.baseMint);
+    const claimTotals = await getClaimTotalsForWallet(wallet, mints);
 
     const fees: TokenFee[] = [];
     for (const p of positions) {
       if (!p.baseMint) continue;
       // totalClaimableLamportsUserShare is in lamports (1 SOL = 1e9 lamports)
-      const lamports = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
-      if (lamports <= 0n) continue;
+      const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
+      const claimed = claimTotals.get(p.baseMint) ?? 0n;
+      if (unclaimed <= 0n && claimed <= 0n) continue;
 
       fees.push({
         tokenAddress: p.baseMint,
         tokenSymbol: null,
         chain: 'sol',
         platform: 'bags',
-        totalEarned: '0',
-        totalClaimed: '0',
-        totalUnclaimed: lamports.toString(),
+        totalEarned: (unclaimed + claimed).toString(),
+        totalClaimed: claimed.toString(),
+        totalUnclaimed: unclaimed.toString(),
         totalEarnedUsd: null,
         royaltyBps: p.userBps ?? null,
       });
