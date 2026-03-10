@@ -1,6 +1,7 @@
 import 'server-only';
 import { BAGS_API_BASE } from '@/lib/constants';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
+import { getNativeTokenPrices } from '@/lib/prices';
 import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -307,6 +308,10 @@ const MAX_CLAIM_STATS_FALLBACK_MINTS = 100;
 /** Max concurrent API requests to avoid overwhelming bags.fm or Vercel connection limits. */
 const CONCURRENCY_LIMIT = 40;
 
+/** Minimum unclaimed value in USD to be worth fetching lifetime-fees for.
+ *  Filters out dust positions, saving API calls. Uses live SOL price. */
+const MIN_UNCLAIMED_USD = 15;
+
 /**
  * Fetch lifetime-fees for a token (total fees collected, all claimers combined).
  * Returns lamports as bigint, or 0n on failure.
@@ -356,15 +361,30 @@ async function computeClaimedAmounts(
     return claimMap;
   }
 
+  // Fetch live SOL price to filter out dust positions (< $MIN_UNCLAIMED_USD)
+  const { sol: solPrice } = await getNativeTokenPrices();
+  const minLamports = solPrice > 0
+    ? BigInt(Math.floor((MIN_UNCLAIMED_USD / solPrice) * 1e9))
+    : 0n; // If price fetch fails, skip filtering (don't drop positions)
+
   // --- Primary: lifetime-fees for positions with known BPS ---
   if (withBps.length > 0) {
     const sorted = [...withBps].sort(
       (a, b) => (b.totalClaimableLamportsUserShare || 0) - (a.totalClaimableLamportsUserShare || 0)
     );
-    if (sorted.length > MAX_LIFETIME_FEE_MINTS) {
-      console.warn(`[bags] lifetime-fees capped at ${MAX_LIFETIME_FEE_MINTS}/${sorted.length} mints`);
+
+    // Filter out dust positions below $MIN_UNCLAIMED_USD threshold
+    const aboveThreshold = minLamports > 0n
+      ? sorted.filter((p) => BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0)) >= minLamports)
+      : sorted;
+    if (aboveThreshold.length < sorted.length) {
+      console.log(`[bags] dust filter ($${MIN_UNCLAIMED_USD} @ SOL=$${solPrice.toFixed(0)}): ${sorted.length} → ${aboveThreshold.length} positions (saved ${sorted.length - aboveThreshold.length} API calls)`);
     }
-    const capped = sorted.slice(0, MAX_LIFETIME_FEE_MINTS);
+
+    if (aboveThreshold.length > MAX_LIFETIME_FEE_MINTS) {
+      console.warn(`[bags] lifetime-fees capped at ${MAX_LIFETIME_FEE_MINTS}/${aboveThreshold.length} mints`);
+    }
+    const capped = aboveThreshold.slice(0, MAX_LIFETIME_FEE_MINTS);
 
     let lfHits = 0;
     let lfErrors = 0;
@@ -413,10 +433,17 @@ async function computeClaimedAmounts(
     const sorted = [...withoutBps].sort(
       (a, b) => (b.totalClaimableLamportsUserShare || 0) - (a.totalClaimableLamportsUserShare || 0)
     );
-    if (sorted.length > MAX_CLAIM_STATS_FALLBACK_MINTS) {
-      console.warn(`[bags] claim-stats fallback capped at ${MAX_CLAIM_STATS_FALLBACK_MINTS}/${sorted.length} mints`);
+    // Apply same dust filter
+    const aboveThreshold = minLamports > 0n
+      ? sorted.filter((p) => BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0)) >= minLamports)
+      : sorted;
+    if (aboveThreshold.length < sorted.length) {
+      console.log(`[bags] claim-stats dust filter: ${sorted.length} → ${aboveThreshold.length} positions`);
     }
-    const capped = sorted.slice(0, MAX_CLAIM_STATS_FALLBACK_MINTS);
+    if (aboveThreshold.length > MAX_CLAIM_STATS_FALLBACK_MINTS) {
+      console.warn(`[bags] claim-stats fallback capped at ${MAX_CLAIM_STATS_FALLBACK_MINTS}/${aboveThreshold.length} mints`);
+    }
+    const capped = aboveThreshold.slice(0, MAX_CLAIM_STATS_FALLBACK_MINTS);
 
     let csHits = 0;
     let csErrors = 0;
