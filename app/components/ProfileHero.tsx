@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import Image from 'next/image';
 import { PlatformIcon } from './PlatformIcon';
 import { ShareButton } from './ShareButton';
 import { PLATFORM_CONFIG, LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
@@ -154,6 +153,7 @@ export function ProfileHero({
   useEffect(() => {
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout>;
+    let eventSource: EventSource | null = null;
 
     async function pollLiveFees() {
       try {
@@ -185,21 +185,54 @@ export function ProfileHero({
       }
     }
 
+    function connectSSE() {
+      try {
+        const walletData = JSON.parse(walletsKey);
+        const url = `/api/fees/stream?wallets=${encodeURIComponent(JSON.stringify(walletData))}`;
+        eventSource = new EventSource(url);
+
+        eventSource.onmessage = () => {
+          // Webhook triggered — refresh live fees
+          pollLiveFees();
+        };
+
+        eventSource.onerror = () => {
+          // SSE failed — fall back to polling
+          eventSource?.close();
+          eventSource = null;
+          if (!controller.signal.aborted) {
+            timeoutId = setTimeout(pollAndSchedule, LIVE_POLL_INTERVAL_MS);
+          }
+        };
+      } catch {
+        // SSE not supported — use polling
+        if (!controller.signal.aborted) {
+          timeoutId = setTimeout(pollAndSchedule, LIVE_POLL_INTERVAL_MS);
+        }
+      }
+    }
+
+    // Initial poll, then try SSE with polling fallback
     pollLiveFees().then(() => {
       if (!controller.signal.aborted) {
-        timeoutId = setTimeout(pollAndSchedule, LIVE_POLL_INTERVAL_MS);
+        connectSSE();
       }
     });
 
     function handleVisibility() {
       if (document.hidden) {
         clearTimeout(timeoutId);
-      } else {
+        // Keep SSE alive — it's low overhead when idle
+      } else if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
+        // No active SSE — poll and reconnect
         pollLiveFees().then(() => {
           if (!controller.signal.aborted) {
-            timeoutId = setTimeout(pollAndSchedule, LIVE_POLL_INTERVAL_MS);
+            connectSSE();
           }
         });
+      } else {
+        // SSE active — just refresh data
+        pollLiveFees();
       }
     }
     document.addEventListener('visibilitychange', handleVisibility);
@@ -207,6 +240,7 @@ export function ProfileHero({
     return () => {
       clearTimeout(timeoutId);
       controller.abort();
+      eventSource?.close();
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [walletsKey]);
@@ -241,7 +275,12 @@ export function ProfileHero({
   // ── Display values ──
   const displayName = creator.display_name || creator.twitter_handle || creator.github_handle || 'Unknown';
   const chains = [...new Set(wallets.map((w) => w.chain))];
-  const avatarUrl = creator.twitter_handle ? `/api/avatar?handle=${encodeURIComponent(creator.twitter_handle)}` : null;
+  // Use unavatar.io directly (same source as OG card) — bypasses /api/avatar proxy
+  // Daily cache buster ensures browser doesn't serve stale avatars after profile pic changes
+  const avatarHandle = handle || creator.twitter_handle;
+  const isValidHandle = avatarHandle && /^[a-zA-Z0-9_]{1,50}$/.test(avatarHandle);
+  const cacheBuster = new Date().toISOString().slice(0, 10);
+  const avatarUrl = isValidHandle ? `https://unavatar.io/x/${avatarHandle}?_cb=${cacheBuster}` : null;
 
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -254,14 +293,13 @@ export function ProfileHero({
             {/* Avatar */}
             <div className="relative shrink-0">
               {avatarUrl && !avatarError ? (
-                <Image
+                <img
                   src={avatarUrl}
                   alt={displayName}
                   width={72}
                   height={72}
                   className="h-14 w-14 rounded-full border-2 border-border object-cover sm:h-[72px] sm:w-[72px]"
                   onError={() => setAvatarError(true)}
-                  priority
                   referrerPolicy="no-referrer"
                 />
               ) : (

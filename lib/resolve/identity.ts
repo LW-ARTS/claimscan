@@ -6,6 +6,8 @@ import type { IdentityProvider } from '@/lib/supabase/types';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
 import { safeBigInt } from '@/lib/utils';
+import { isHeliusAvailable } from '@/lib/helius/client';
+import { discoverWalletTokens } from '@/lib/helius/discovery';
 
 // ═══════════════════════════════════════════════
 // Identity Detection
@@ -219,6 +221,38 @@ export async function fetchAllFees(
       }
     } else {
       console.warn(`[fees] ${meta?.platform} ${meta?.type} failed:`, result.reason);
+    }
+  }
+
+  // DAS Discovery Pass — find tokens the individual adapters missed.
+  // Only runs when HELIUS_API_KEY is set. Additive only: never overwrites adapter results.
+  if (isHeliusAvailable()) {
+    const solWallets = wallets.filter((w) => w.chain === 'sol');
+    for (const wallet of solWallets) {
+      try {
+        const discovered = await discoverWalletTokens(wallet.address);
+        for (const token of discovered) {
+          const key = `${token.platform}:${token.chain}:${token.tokenAddress}`;
+          if (!feeMap.has(key)) {
+            feeMap.set(key, {
+              fee: {
+                tokenAddress: token.tokenAddress,
+                tokenSymbol: token.symbol,
+                chain: token.chain,
+                platform: token.platform,
+                totalEarned: '0',
+                totalClaimed: '0',
+                totalUnclaimed: '0',
+                totalEarnedUsd: null,
+                royaltyBps: null,
+              },
+              isHistorical: false,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[fees] DAS discovery failed for', wallet.address, err instanceof Error ? err.message : err);
+      }
     }
   }
 

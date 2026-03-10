@@ -45,6 +45,10 @@ export const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 export const DEXSCREENER_API = 'https://api.dexscreener.com';
 export const JUPITER_PRICE_API = 'https://api.jup.ag/price/v3';
 
+// Helius APIs
+export const HELIUS_DAS_URL = 'https://mainnet.helius-rpc.com';
+export const HELIUS_REST_URL = 'https://api-mainnet.helius-rpc.com';
+
 // ═══════════════════════════════════════════════
 // Chain Config
 // ═══════════════════════════════════════════════

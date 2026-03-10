@@ -1,5 +1,6 @@
 import 'server-only';
 import { fetchTokenMetadataBatch } from '@/lib/chains/solana';
+import { heliusDasRpc, isHeliusAvailable } from '@/lib/helius/client';
 import { sanitizeTokenSymbol } from '@/lib/utils';
 import type { TokenFee } from './types';
 
@@ -16,73 +17,37 @@ interface HeliusDasAsset {
   token_info?: { symbol?: string; decimals?: number };
 }
 
-interface HeliusDasResponse {
-  result?: HeliusDasAsset[];
-}
-
 const HELIUS_BATCH_SIZE = 1000;
-const HELIUS_TIMEOUT_MS = 10_000;
 
 /**
  * Fetch token metadata via Helius DAS `getAssetBatch`.
  * Returns a Map<mint, {symbol, name}> for found tokens.
- * Requires HELIUS_API_KEY env var.
  */
 async function fetchHeliusMetadata(
   mints: string[]
 ): Promise<Map<string, { symbol: string; name: string }>> {
   const result = new Map<string, { symbol: string; name: string }>();
-  const apiKey = process.env.HELIUS_API_KEY;
-  if (!apiKey || mints.length === 0) return result;
+  if (mints.length === 0) return result;
 
   for (let i = 0; i < mints.length; i += HELIUS_BATCH_SIZE) {
     const batch = mints.slice(i, i + HELIUS_BATCH_SIZE);
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), HELIUS_TIMEOUT_MS);
-      const res = await fetch(
-        'https://mainnet.helius-rpc.com',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 'claimscan-metadata',
-            method: 'getAssetBatch',
-            params: {
-              ids: batch,
-              displayOptions: { showFungible: true },
-            },
-          }),
-          signal: controller.signal,
-        }
-      );
-      clearTimeout(timeout);
-      if (!res.ok) {
-        console.warn(`[solana-metadata] Helius DAS returned HTTP ${res.status}`);
-        continue;
-      }
+    const data = await heliusDasRpc<HeliusDasAsset[]>(
+      'getAssetBatch',
+      { ids: batch, displayOptions: { showFungible: true } },
+      `metadata-batch-${i}`
+    );
 
-      const data = (await res.json()) as HeliusDasResponse;
-      for (const asset of data.result ?? []) {
-        const symbol =
-          asset.token_info?.symbol ||
-          asset.content?.metadata?.symbol ||
-          '';
-        const name = asset.content?.metadata?.name || '';
-        if (symbol || name) {
-          result.set(asset.id, { symbol, name });
-        }
+    if (!data) continue;
+
+    for (const asset of data) {
+      const symbol =
+        asset.token_info?.symbol ||
+        asset.content?.metadata?.symbol ||
+        '';
+      const name = asset.content?.metadata?.name || '';
+      if (symbol || name) {
+        result.set(asset.id, { symbol, name });
       }
-    } catch (err) {
-      console.warn(
-        '[solana-metadata] Helius DAS batch failed:',
-        err instanceof Error ? err.message : err
-      );
-      continue;
     }
   }
 
@@ -115,10 +80,9 @@ export async function enrichSolanaTokenSymbols(
   if (unknownMints.length === 0) return fees;
 
   try {
-    // Try Helius DAS first (faster, richer, handles Token-2022)
     let metadata: Map<string, { symbol: string; name: string }>;
 
-    if (process.env.HELIUS_API_KEY) {
+    if (isHeliusAvailable()) {
       metadata = await fetchHeliusMetadata(unknownMints);
 
       // If Helius returned nothing (API error, key invalid), fallback to Metaplex

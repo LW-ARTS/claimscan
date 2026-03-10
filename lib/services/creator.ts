@@ -10,6 +10,8 @@ import {
   fetchAllFees,
   fetchFeesByHandle,
 } from '@/lib/resolve/identity';
+import { isHeliusAvailable } from '@/lib/helius/client';
+import { fetchClaimHistory } from '@/lib/helius/transactions';
 
 // ═══════════════════════════════════════════════
 // In-flight deduplication to prevent thundering herd.
@@ -269,6 +271,47 @@ async function freshResolve(
       if (feeError) {
         console.warn('[creator] fee_records upsert error:', feeError.message);
       }
+    }
+
+    // Fetch and persist claim history for Solana wallets via Helius Enhanced Transactions.
+    // Fire-and-forget: failure doesn't block the main resolve flow.
+    if (isHeliusAvailable() && wallets.some((w) => w.chain === 'sol')) {
+      Promise.resolve(
+        (async () => {
+          const solWallets = wallets.filter((w) => w.chain === 'sol');
+          for (const wallet of solWallets) {
+            try {
+              const claims = await fetchClaimHistory(wallet.address, { limit: 50 });
+              if (claims.length > 0) {
+                const claimRows = claims
+                  .filter((c) => c.txHash) // Only persist claims with tx_hash for dedup
+                  .map((c) => ({
+                    creator_id: creatorId!,
+                    platform: c.platform,
+                    chain: c.chain,
+                    token_address: c.tokenAddress,
+                    amount: c.amount,
+                    amount_usd: c.amountUsd,
+                    tx_hash: c.txHash,
+                    claimed_at: c.claimedAt,
+                  }));
+                if (claimRows.length > 0) {
+                  const { error: claimError } = await supabase
+                    .from('claim_events')
+                    .upsert(claimRows, { onConflict: 'tx_hash' });
+                  if (claimError) {
+                    console.warn('[creator] claim_events upsert error:', claimError.message);
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('[creator] claim history failed for', wallet.address, err instanceof Error ? err.message : err);
+            }
+          }
+        })()
+      ).catch((err) => {
+        console.warn('[creator] claim history batch failed:', err instanceof Error ? err.message : err);
+      });
     }
 
     // Update search_log with creator_id — all queries are hashed
