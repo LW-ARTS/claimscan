@@ -274,27 +274,37 @@ async function getClaimTotalsForWallet(
   }
   const cappedMints = mints.slice(0, MAX_CLAIM_STATS_MINTS);
 
+  // Diagnostic counters
+  let emptyCount = 0;
+  let matchedCount = 0;
+  let unmatchedMultiCount = 0;
+  let claimedZeroCount = 0;
+  let errorCount = 0;
+
   const results = await Promise.allSettled(
     cappedMints.map(async (mint) => {
       const stats = await fetchClaimStatsCached(mint);
+      if (stats.length === 0) { emptyCount++; return; }
       const entry = findClaimerEntry(stats, wallet, handle);
-      if (entry?.totalClaimed) {
-        // claim-stats may return lamports (integer string) or SOL (decimal string).
-        // Use string-based conversion to avoid parseFloat precision loss.
-        const raw = entry.totalClaimed;
-        const claimed = raw.includes('.')
-          ? solDecimalToLamports(raw)
-          : BigInt(raw);
-        if (claimed > 0n) claimMap.set(mint, claimed);
-      }
+      if (!entry) { unmatchedMultiCount++; return; }
+      if (!entry.totalClaimed) { claimedZeroCount++; return; }
+      matchedCount++;
+      const raw = entry.totalClaimed;
+      const claimed = raw.includes('.')
+        ? solDecimalToLamports(raw)
+        : BigInt(raw);
+      if (claimed > 0n) claimMap.set(mint, claimed);
     })
   );
 
   for (const r of results) {
     if (r.status === 'rejected') {
+      errorCount++;
       console.warn('[bags] claim-stats fetch failed:', r.reason instanceof Error ? r.reason.message : r.reason);
     }
   }
+
+  console.log(`[bags] claim-stats summary for ${handle ?? wallet.slice(0, 8)}: ${cappedMints.length} mints → matched=${matchedCount}, empty=${emptyCount}, unmatched=${unmatchedMultiCount}, claimedZero=${claimedZeroCount}, errors=${errorCount}, claimMap=${claimMap.size}`);
 
   return claimMap;
 }
@@ -320,6 +330,8 @@ async function fillClaimedFromLifetimeFees(
   // Split into positions with known BPS and unknown BPS
   const withBps = allNeedFallback.filter((p) => p.userBps != null && p.userBps > 0);
   const withoutBps = allNeedFallback.filter((p) => p.userBps == null || p.userBps <= 0);
+
+  console.log(`[bags] lifetime-fees fallback: ${allNeedFallback.length} need fallback (withBps=${withBps.length}, withoutBps=${withoutBps.length})`);
 
   // --- Group A: positions with known BPS → use lifetime-fees formula ---
   if (withBps.length > 0) {
