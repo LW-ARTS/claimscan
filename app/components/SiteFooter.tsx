@@ -34,10 +34,10 @@ export function SiteFooter() {
           </div>
 
           {/* Right side — links + social */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <Link
               href="/docs"
-              className="text-[11px] text-muted-foreground/50 transition-colors hover:text-foreground"
+              className="inline-flex items-center px-2 py-2 text-[11px] text-muted-foreground/50 transition-colors hover:text-foreground"
             >
               Docs
             </Link>
@@ -46,7 +46,7 @@ export function SiteFooter() {
               href="https://x.com/lwartss"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center gap-1.5 text-[11px] text-muted-foreground/50 transition-colors hover:text-foreground"
+              className="group inline-flex items-center gap-1.5 px-2 py-2 text-[11px] text-muted-foreground/50 transition-colors hover:text-foreground"
               aria-label="Follow LW ARTS on X (Twitter)"
             >
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">

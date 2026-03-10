@@ -107,14 +107,14 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             name="query"
             autoComplete="off"
             spellCheck={false}
-            placeholder="Search @handle, GitHub, or wallet..."
+            placeholder="@handle or wallet"
             aria-label="Search by Twitter handle, GitHub username, or wallet address"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             disabled={loading}
-            className={`w-full select-text bg-transparent outline-none placeholder:text-muted-foreground/40 ${isLarge ? 'h-12 pl-11 pr-2 text-lg' : 'h-9 pl-9 text-sm'
+            className={`w-full select-text bg-transparent outline-none placeholder:text-muted-foreground/40 ${isLarge ? 'h-12 pl-11 pr-2 text-base sm:text-lg' : 'h-11 pl-9 text-sm'
               }`}
           />
           {/* Keyboard shortcut hint — visible only on large variant when not focused */}
@@ -129,9 +129,9 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
           disabled={loading || !canSearch}
           aria-label={loading ? 'Searching...' : 'Scan'}
           aria-busy={loading}
-          className={`flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg font-bold uppercase tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40 min-w-[100px] ${isLarge
-            ? 'h-[44px] px-6 text-base'
-            : 'h-[36px] px-4 text-sm'
+          className={`flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg font-bold uppercase tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${isLarge
+            ? 'h-[44px] min-w-[90px] px-4 text-sm sm:min-w-[100px] sm:px-6 sm:text-base'
+            : 'h-[44px] min-w-[90px] px-4 text-sm'
             }`}
           shimmerSize="0.1em"
           background="var(--foreground)"

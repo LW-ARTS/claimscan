@@ -107,44 +107,44 @@ export default function Home() {
           </div>
 
           {/* LW ARTS attribution */}
-          <p className="mt-6 font-mono text-[11px] tracking-wide text-muted-foreground/60">
-            Built by{' '}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-1 font-mono text-[11px] tracking-wide text-muted-foreground/60">
+            <span>Built by</span>
             <a
               href="https://lwdesigns.art"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground/80 underline decoration-foreground/10 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground/30"
+              className="inline-flex items-center px-1.5 py-3 text-muted-foreground/80 underline decoration-foreground/10 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground/30"
             >
               LW ARTS
             </a>
-            {' '}&middot;{' '}
+            <span>&middot;</span>
             <Link
               href="/docs"
-              className="text-muted-foreground/80 underline decoration-foreground/10 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground/30"
+              className="inline-flex items-center px-1.5 py-3 text-muted-foreground/80 underline decoration-foreground/10 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground/30"
             >
               Docs
             </Link>
-            {' '}&middot;{' '}
+            <span>&middot;</span>
             <a
               href="https://x.com/lwartss"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground/80 underline decoration-foreground/10 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground/30"
+              className="inline-flex items-center px-2.5 py-3 text-muted-foreground/80 underline decoration-foreground/10 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground/30"
               aria-label="LW ARTS on X"
             >
               X
             </a>
-            {' '}&middot;{' '}
+            <span>&middot;</span>
             <a
               href="https://t.me/lwarts"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground/80 underline decoration-foreground/10 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground/30"
+              className="inline-flex items-center px-1.5 py-3 text-muted-foreground/80 underline decoration-foreground/10 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground/30"
               aria-label="LW ARTS on Telegram"
             >
               Telegram
             </a>
-          </p>
+          </div>
         </div>
       </div>
     </div>

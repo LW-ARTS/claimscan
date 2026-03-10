@@ -131,7 +131,7 @@ export default function RootLayout({
           {/* Navigation */}
           <header className="animate-fade-in-down sticky top-0 z-50 border-b border-white/10 bg-background/60 backdrop-blur-md sm:bg-background/20 sm:backdrop-blur-xl shadow-sm dark:shadow-none">
             <nav aria-label="Main navigation" className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-              <Link href="/" className="group flex items-center gap-2.5" aria-label="ClaimScan home">
+              <Link href="/" className="group flex items-center gap-2.5 py-1.5" aria-label="ClaimScan home">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground p-1" aria-hidden="true">
                   <svg className="h-full w-full" viewBox="0 0 1536 1536" fill="white">
                     <path d="M423.29,1057.61c73.39,27.03,157.91,21.13,226.43-18.56,27.81,12.19,56.66,20.64,87.33,23.87,22.65,2.38,44.08,1.23,67.87-.08-66.43,70.96-159.31,117.02-255.01,125.04-92.42,7.74-184.22-18.8-259.71-72.07-43.39-30.62-80.98-68.05-110.52-112.52-51.31-77.25-75.89-170.48-70.2-263.06,1.82-29.67,7.02-57.88,14.6-86.33,18.65-70,57.7-135.89,108.18-187.69,22.72-23.31,47.86-42.92,75.34-60.42,73.79-46.98,165.41-69.45,252.43-57.8,33.74,4.51,65.9,12.76,97.27,25.66,35.6,14.64,68.23,33.16,98.73,56.89l-33.54,43.05c-26.27,4.38-51.1,11.69-75.71,22.37-17.76-9.51-35.36-17.84-54.95-23.75-65.88-19.89-137.14-13.95-198.62,17.02-58.64,29.53-105.98,80.25-135.29,138.4-11.67,23.16-19.73,46.63-25.44,71.78-19.66,86.59-1.01,177.29,50.58,249.4,35.41,49.48,82.97,87.65,140.22,108.82Z"/>
@@ -147,7 +147,7 @@ export default function RootLayout({
               <div className="flex items-center gap-2">
                 <Link
                   href="/docs"
-                  className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  className="px-2 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
                 >
                   Docs
                 </Link>
