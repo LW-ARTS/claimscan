@@ -18,7 +18,7 @@ export default function Home() {
 
   return (
     <HeroReveal>
-    <div className="flex min-h-[calc(75vh-4rem)] flex-col items-center justify-center pt-8 sm:pt-0">
+    <div className="flex min-h-0 flex-col items-center pt-4 pb-8 sm:min-h-[calc(75vh-4rem)] sm:justify-center sm:pt-0 sm:pb-0">
       {/* Orbiting logos — homepage only, hidden on mobile */}
       <div className="fixed pointer-events-none -z-10 opacity-50 hidden md:block md:bottom-0 md:left-0 md:-translate-x-1/3 md:translate-y-1/3 md:w-[500px] md:h-[500px]">
         <OrbitingLogos />
@@ -26,7 +26,7 @@ export default function Home() {
 
       <div className="relative w-full max-w-3xl text-center">
         {/* Status line */}
-        <div className="animate-fade-in-up mb-8 inline-flex items-center gap-3 font-mono text-xs tracking-wide text-muted-foreground">
+        <div className="animate-fade-in-up mb-6 inline-flex items-center gap-3 font-mono text-xs tracking-wide text-muted-foreground sm:mb-8">
           <span className="scan-line relative overflow-hidden rounded-sm border border-foreground/10 bg-foreground/[0.03] px-2.5 py-1 uppercase">
             {platformEntries.length} launchpads
           </span>
@@ -51,7 +51,7 @@ export default function Home() {
         {/* Main heading — animated TrueFocus */}
         <div className="animate-fade-in-up delay-100 flex flex-col items-center gap-1 sm:gap-2">
           <div className="flex items-center justify-center gap-2 sm:gap-3">
-            <span className="text-4xl font-black uppercase tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">Track your</span>
+            <span className="text-3xl font-black uppercase tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">Track your</span>
             <MoneyFaceEmoji size={64} className="size-7 sm:size-10 md:size-14 lg:size-[72px]" />
           </div>
           <TrueFocus
@@ -61,21 +61,21 @@ export default function Home() {
             borderColor="currentColor"
             animationDuration={0.4}
             pauseBetweenAnimations={1.5}
-            className="text-4xl font-black uppercase tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl text-muted-foreground"
+            className="text-3xl font-black uppercase tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl text-muted-foreground"
           />
         </div>
 
-        <p className="animate-fade-in-up delay-200 mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
+        <p className="animate-fade-in-up delay-200 mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-xl">
           Paste any @handle or wallet. See what you&apos;ve earned, claimed, and left on the table across {platformEntries.length} launchpads.
         </p>
 
         {/* Search bar */}
-        <div className="animate-fade-in-up delay-300 mx-auto mt-10 w-full max-w-xl">
+        <div className="animate-fade-in-up delay-300 mx-auto mt-8 w-full max-w-xl sm:mt-10">
           <SearchBar size="lg" />
         </div>
 
         {/* Platforms + Stats */}
-        <div className="animate-fade-in-up delay-500 mx-auto mt-10 sm:mt-16 max-w-2xl">
+        <div className="animate-fade-in-up delay-500 mx-auto mt-8 max-w-2xl sm:mt-16">
           {/* Platform pills */}
           <div className="flex flex-wrap justify-center gap-1.5">
             {platformEntries.map(([key, p]) => (

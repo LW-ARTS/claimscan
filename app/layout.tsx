@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     template: '%s | ClaimScan',
   },
   description:
-    'Find unclaimed creator fees on Pump.fun, Bags.fm, Clanker, Zora and 10+ launchpads. Paste any @handle or wallet to see earnings across Solana and Base in seconds.',
+    'Find unclaimed creator fees on Pump.fun, Bags.fm, Clanker, Zora and 9 launchpads. Paste any @handle or wallet to see earnings across Solana and Base in seconds.',
   keywords: [
     'DeFi fees', 'creator fees', 'Pump.fun fees', 'Bags.fm', 'Clanker',
     'Zora', 'Solana', 'Base', 'cross-chain', 'fee tracker', 'unclaimed fees',
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     siteName: 'ClaimScan',
     title: 'ClaimScan | Track Unclaimed Creator Fees Across DeFi',
     description:
-      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 10+ launchpads on Solana and Base.',
+      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 9 launchpads on Solana and Base.',
     images: [
       {
         url: '/opengraph-image.png',
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
     creator: '@lwartss',
     title: 'ClaimScan | Track Unclaimed Creator Fees Across DeFi',
     description:
-      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 10+ launchpads.',
+      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 9 launchpads.',
     images: [
       {
         url: '/opengraph-image.png',

@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: PageProps) {
     description: `See earned, claimed, and unclaimed fees for ${displayName} across Pump.fun, Bags.fm, Clanker, Zora and more. Real-time data on Solana and Base.`,
     openGraph: {
       title: `${displayName} Creator Fees | ClaimScan`,
-      description: `Earnings breakdown for ${displayName} across 10+ DeFi launchpads on Solana and Base.`,
+      description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads on Solana and Base.`,
       images: [
         {
           url: `/${encodeURIComponent(safeName)}/opengraph-image`,
@@ -50,7 +50,7 @@ export async function generateMetadata({ params }: PageProps) {
     twitter: {
       card: 'summary_large_image' as const,
       title: `${displayName} Creator Fees | ClaimScan`,
-      description: `Earnings breakdown for ${displayName} across 10+ DeFi launchpads.`,
+      description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads.`,
       images: [
         {
           url: `/${encodeURIComponent(safeName)}/opengraph-image`,

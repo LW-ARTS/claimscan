@@ -119,7 +119,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
       <div
         role="tablist"
         aria-label="Filter by platform"
-        className="flex flex-wrap gap-1.5"
+        className="flex flex-wrap gap-2"
         onKeyDown={(e) => handleTabKeyDown(e, tabKeys)}
       >
         <button
@@ -129,7 +129,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
           id={`${tabsId}-tab-all`}
           tabIndex={activeTab === 'all' ? 0 : -1}
           onClick={() => setActiveTab('all')}
-          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-all duration-200 ${
             activeTab === 'all'
               ? 'bg-foreground text-background'
               : 'border border-border bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground'
@@ -154,13 +154,13 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
               id={`${tabsId}-tab-${platform}`}
               tabIndex={activeTab === platform ? 0 : -1}
               onClick={() => setActiveTab(platform)}
-              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-all duration-200 ${
                 activeTab === platform
                   ? 'bg-foreground text-background'
                   : 'border border-border bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground'
               }`}
             >
-              <PlatformIcon platform={platform} className="h-3 w-3" aria-hidden />
+              <PlatformIcon platform={platform} className="h-3.5 w-3.5" aria-hidden />
               <span>{config?.name ?? platform}</span>
               <span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
                 activeTab === platform ? 'bg-background/20' : 'bg-muted'

@@ -402,7 +402,7 @@ export default function DocsPage() {
               {[
                 { title: 'You Enter a Handle', desc: 'Twitter handle, Farcaster name, GitHub username, or raw wallet address. ClaimScan accepts all of them, even direct profile URLs.' },
                 { title: 'We Find Your Wallets', desc: 'Your social identity gets resolved to wallet addresses automatically. One handle can unlock multiple wallets across both chains.' },
-                { title: 'All 10 Platforms Scanned', desc: 'ClaimScan queries every supported launchpad on Solana and Base simultaneously. No manual checking. We hit them all at once.' },
+                { title: 'All 9 Platforms Scanned', desc: 'ClaimScan queries every supported launchpad on Solana and Base simultaneously. No manual checking. We hit them all at once.' },
                 { title: 'Fees Collected & Organized', desc: 'Earned, claimed, and unclaimed fees are pulled for every token on every platform. Duplicates are filtered. Data is normalized.' },
                 { title: 'Converted to USD', desc: 'Live price feeds from CoinGecko, DexScreener, and Jupiter turn raw token amounts into real dollar figures. Updated every 5 minutes.' },
                 { title: 'Live Dashboard Ready', desc: 'Your results appear with platform breakdown, chain breakdown, token-level details, and claim status, updating every 30 seconds.' },

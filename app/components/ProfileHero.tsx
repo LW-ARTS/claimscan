@@ -346,7 +346,7 @@ export function ProfileHero({
 
           {/* Right: hero total (desktop) / centered (mobile) */}
           <div className="text-center sm:text-right sm:shrink-0">
-            <p className="text-5xl font-black tabular-nums tracking-tighter sm:text-6xl">
+            <p className="text-4xl font-black tabular-nums tracking-tighter sm:text-6xl">
               {formatUsd(totalEarnedUsd)}
             </p>
             <p className="mt-1 text-xs tracking-wide text-muted-foreground/50">
@@ -356,7 +356,7 @@ export function ProfileHero({
         </div>
 
         {/* Stats row */}
-        <div className="mt-5 flex items-center gap-4 text-sm">
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground/50 text-xs">Unclaimed</span>
             <span className="font-semibold tabular-nums" aria-live="polite" aria-atomic>
