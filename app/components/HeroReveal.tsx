@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, startTransition, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 /**
@@ -36,8 +36,10 @@ export function HeroReveal({ children }: { children: ReactNode }) {
     ).matches;
 
     if (alreadyPlayed || prefersReduced) {
-      setPhase('done');
-      setSkipReveal(true);
+      startTransition(() => {
+        setPhase('done');
+        setSkipReveal(true);
+      });
       return;
     }
 
@@ -59,7 +61,7 @@ export function HeroReveal({ children }: { children: ReactNode }) {
   const [contentReady, setContentReady] = useState(false);
   useEffect(() => {
     if (skipReveal) {
-      setContentReady(true);
+      startTransition(() => setContentReady(true));
       return;
     }
     const t = setTimeout(() => setContentReady(true), CONTENT_UNBLOCK_MS);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, type ReactNode } from 'react';
+import { useRef, useState, useEffect, startTransition, type ReactNode } from 'react';
 
 interface LazySectionProps {
   children: ReactNode;
@@ -31,7 +31,7 @@ export function LazySection({
 
     // Skip animation when prefers-reduced-motion is on
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setAnimated(true);
+      startTransition(() => setAnimated(true));
       return;
     }
 
