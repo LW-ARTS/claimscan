@@ -49,6 +49,8 @@ export async function generateMetadata({ params }: PageProps) {
     },
     twitter: {
       card: 'summary_large_image' as const,
+      site: '@lwartss',
+      creator: '@lwartss',
       title: `${displayName} Creator Fees | ClaimScan`,
       description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads.`,
       images: [

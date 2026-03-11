@@ -31,7 +31,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
   const ogUrl = `/${encodeURIComponent(handle)}/opengraph-image`;
 
   const tweetText = [
-    `I had ${formatUsd(totalEarnedUsd)} in unclaimed creator fees across ${platformCount} platform${platformCount !== 1 ? 's' : ''}`,
+    `I earned ${formatUsd(totalEarnedUsd)} in creator fees across ${platformCount} platform${platformCount !== 1 ? 's' : ''}`,
     '',
     `How much are you leaving on the table?`,
     '',

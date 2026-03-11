@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { pushSSEEvent } from '@/lib/helius/sse-registry';
 
 // ═══════════════════════════════════════════════
@@ -8,6 +9,18 @@ import { pushSSEEvent } from '@/lib/helius/sse-registry';
 // ═══════════════════════════════════════════════
 
 const WEBHOOK_SECRET = process.env.HELIUS_WEBHOOK_SECRET;
+
+function verifyWebhookSecret(authHeader: string | null, secret: string): boolean {
+  if (!authHeader) return false;
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const actual = Buffer.from(authHeader);
+  const maxLen = Math.max(actual.length, expected.length);
+  const paddedActual = Buffer.alloc(maxLen);
+  const paddedExpected = Buffer.alloc(maxLen);
+  actual.copy(paddedActual);
+  expected.copy(paddedExpected);
+  return actual.length === expected.length && timingSafeEqual(paddedActual, paddedExpected);
+}
 
 interface HeliusWebhookEvent {
   type: string;
@@ -31,10 +44,10 @@ interface HeliusWebhookEvent {
 }
 
 export async function POST(request: Request) {
-  // Verify webhook secret if configured
+  // Verify webhook secret if configured (constant-time comparison)
   if (WEBHOOK_SECRET) {
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
+    if (!verifyWebhookSecret(authHeader, WEBHOOK_SECRET)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }

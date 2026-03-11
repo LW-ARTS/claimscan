@@ -1,4 +1,6 @@
 import { registerSSEClient, unregisterSSEClient } from '@/lib/helius/sse-registry';
+import { isValidSolanaAddress } from '@/lib/chains/solana';
+import { isValidEvmAddress } from '@/lib/chains/base';
 
 // ═══════════════════════════════════════════════
 // SSE Stream Endpoint
@@ -27,6 +29,7 @@ export async function GET(request: Request) {
         typeof w === 'object' && w !== null && 'address' in w && typeof (w as { address: unknown }).address === 'string'
       )
       .map((w: { address: string }) => w.address)
+      .filter((addr: string) => isValidSolanaAddress(addr) || isValidEvmAddress(addr))
       .slice(0, 10); // Max 10 wallets per connection
   } catch {
     return new Response('Invalid wallets parameter', { status: 400 });
