@@ -24,11 +24,12 @@ interface ChainSummary {
   name: string;
   totalUsd: number;
   unclaimedCount: number;
+  partialCount: number;
 }
 
 export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: PlatformBreakdownProps) {
   const [activeTab, setActiveTab] = useState('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'unclaimed' | 'claimed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unclaimed' | 'claimed' | 'partial'>('all');
   const tabsId = useId();
 
   // Arrow key navigation for WAI-ARIA tablist pattern
@@ -63,9 +64,11 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
         name: CHAIN_CONFIG[fee.chain]?.name ?? fee.chain,
         totalUsd: 0,
         unclaimedCount: 0,
+        partialCount: 0,
       };
       existing.totalUsd += computeFeeUsd(fee, solPrice, ethPrice);
-      if (fee.claim_status === 'unclaimed' || fee.claim_status === 'partially_claimed') existing.unclaimedCount += 1;
+      if (fee.claim_status === 'unclaimed') existing.unclaimedCount += 1;
+      if (fee.claim_status === 'partially_claimed') existing.partialCount += 1;
       byChain.set(fee.chain, existing);
     }
     return Array.from(byChain.values());
@@ -89,10 +92,13 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
     ? platformFiltered
     : statusFilter === 'unclaimed'
       ? platformFiltered.filter((f) => f.claim_status === 'unclaimed' || f.claim_status === 'partially_claimed')
-      : platformFiltered.filter((f) => f.claim_status === 'claimed');
+      : statusFilter === 'claimed'
+        ? platformFiltered.filter((f) => f.claim_status === 'claimed' || f.claim_status === 'partially_claimed')
+        : platformFiltered.filter((f) => f.claim_status === 'partially_claimed');
   const tabKeys = ['all', ...platformsWithData];
 
   const totalUnclaimed = chainSummaries.reduce((sum, c) => sum + c.unclaimedCount, 0);
+  const totalPartial = chainSummaries.reduce((sum, c) => sum + c.partialCount, 0);
 
   return (
     <div className="space-y-4">
@@ -106,7 +112,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
               <span className="text-sm font-semibold tabular-nums">{formatUsd(chain.totalUsd)}</span>
             </div>
           ))}
-          {totalUnclaimed > 0 && (
+          {(totalUnclaimed > 0 || totalPartial > 0) && (
             <>
               <span className="h-3.5 w-px bg-border/50" aria-hidden="true" />
               <span className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs font-semibold text-foreground">
@@ -114,7 +120,9 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
                   <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-foreground opacity-40" />
                   <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-foreground" />
                 </span>
-                {totalUnclaimed} unclaimed
+                {totalUnclaimed > 0 && <>{totalUnclaimed} unclaimed</>}
+                {totalUnclaimed > 0 && totalPartial > 0 && <span className="text-muted-foreground/40">&middot;</span>}
+                {totalPartial > 0 && <>{totalPartial} partial</>}
               </span>
             </>
           )}
@@ -196,10 +204,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
 
       {/* Status filter */}
       <div className="flex items-center gap-1">
-        {(['all', 'unclaimed', 'claimed'] as const).map((status) => (
+        {(['all', 'unclaimed', 'claimed', ...(totalPartial > 0 ? ['partial'] as const : [])] as const).map((status) => (
           <button
             key={status}
-            onClick={() => setStatusFilter(status)}
+            onClick={() => setStatusFilter(status as typeof statusFilter)}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors duration-150 ${
               statusFilter === status
                 ? 'bg-foreground text-background'
