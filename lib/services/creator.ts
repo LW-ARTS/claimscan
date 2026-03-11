@@ -294,7 +294,7 @@ async function freshResolve(
       // which would overwrite previously-computed non-zero claimed values.
       const { data: existingFees } = await supabase
         .from('fee_records')
-        .select('platform, chain, token_address, total_claimed, total_earned')
+        .select('platform, chain, token_address, total_claimed, total_earned, total_unclaimed, total_earned_usd, token_symbol, royalty_bps')
         .eq('creator_id', creatorId!);
       const existingClaimedMap = new Map<string, { claimed: string; earned: string }>();
       if (existingFees) {
@@ -352,6 +352,48 @@ async function freshResolve(
         .upsert(feeRows, { onConflict: 'creator_id,platform,chain,token_address' });
       if (feeError) {
         console.warn('[creator] fee_records upsert error:', feeError.message);
+      }
+
+      // Mark disappeared Bags tokens as fully claimed.
+      // Bags' claimable-positions API only returns tokens with unclaimed > 0.
+      // When a creator fully claims a token, it vanishes from the API entirely.
+      // Detect these by comparing DB records against fresh scan results and mark them
+      // as claimed (unclaimed = 0, claimed = totalEarned) so they still appear in the UI.
+      if (existingFees && existingFees.length > 0) {
+        const freshKeys = new Set(allFees.map((f) => `${f.platform}:${f.chain}:${f.tokenAddress}`));
+        const disappeared = existingFees.filter((ef) => {
+          if (ef.platform !== 'bags') return false; // Only Bags has this disappearing behavior
+          const key = `${ef.platform}:${ef.chain}:${ef.token_address}`;
+          if (freshKeys.has(key)) return false; // Still in scan results — not disappeared
+          // Only mark as claimed if it had meaningful earnings and still has unclaimed > 0 in DB
+          // (if unclaimed was already 0, it was already marked correctly)
+          return safeBigInt(ef.total_earned) > 0n && safeBigInt(ef.total_unclaimed) > 0n;
+        });
+
+        if (disappeared.length > 0) {
+          console.debug(`[creator] ${disappeared.length} Bags token(s) disappeared from API — marking as fully claimed`);
+          const claimedRows = disappeared.map((ef) => ({
+            creator_id: creatorId!,
+            creator_token_id: null,
+            platform: ef.platform,
+            chain: ef.chain,
+            token_address: ef.token_address,
+            token_symbol: ef.token_symbol,
+            total_earned: ef.total_earned,
+            total_claimed: ef.total_earned, // Fully claimed: claimed = earned
+            total_unclaimed: '0',
+            total_earned_usd: ef.total_earned_usd,
+            claim_status: 'claimed' as const,
+            royalty_bps: ef.royalty_bps,
+            last_synced_at: new Date().toISOString(),
+          }));
+          const { error: claimedErr } = await supabase
+            .from('fee_records')
+            .upsert(claimedRows, { onConflict: 'creator_id,platform,chain,token_address' });
+          if (claimedErr) {
+            console.warn('[creator] fully-claimed upsert error:', claimedErr.message);
+          }
+        }
       }
     }
 
