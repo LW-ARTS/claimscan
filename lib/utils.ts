@@ -81,9 +81,14 @@ export function formatTokenAmount(raw: string, decimals: number): string {
     return `${k.toFixed(2)}K`;
   }
   if (whole >= 1n) {
-    return fracStr.length > 0 ? `${whole}.${fracStr.slice(0, 4)}` : `${whole}.0000`;
+    const frac2 = fracStr.length > 0 ? fracStr.slice(0, 2).padEnd(2, '0') : '00';
+    return `${whole}.${frac2}`;
   }
-  if (fracStr.length > 0) return `${whole}.${fracStr.slice(0, 6)}`;
+  if (fracStr.length > 0) {
+    // >= 0.01: show 2 decimals (e.g. 0.25). < 0.01: show up to 4 (e.g. 0.0012)
+    const sigDigits = fracStr.length - fracStr.replace(/^0+/, '').length < 2 ? 2 : 4;
+    return `0.${fracStr.slice(0, sigDigits).padEnd(sigDigits, '0')}`;
+  }
   return `${whole}`;
 }
 

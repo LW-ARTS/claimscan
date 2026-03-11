@@ -159,8 +159,10 @@ export const clankerAdapter: PlatformAdapter = {
       if (seen.has(addr)) continue;
       seen.add(addr);
 
-      // Only include tokens where this wallet is the admin (fee recipient)
-      if (t.admin && normalizeEvmAddress(t.admin) !== normalizedWallet) continue;
+      // Only include tokens where this wallet is the admin (fee recipient).
+      // The /search-creator endpoint returns tokens for both launcher AND admin,
+      // but fees accrue to the admin — skip tokens without admin or with a different admin.
+      if (!t.admin || normalizeEvmAddress(t.admin) !== normalizedWallet) continue;
 
       unique.push(t);
     }

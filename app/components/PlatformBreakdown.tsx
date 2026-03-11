@@ -28,6 +28,7 @@ interface ChainSummary {
 
 export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: PlatformBreakdownProps) {
   const [activeTab, setActiveTab] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unclaimed' | 'claimed'>('all');
   const tabsId = useId();
 
   // Arrow key navigation for WAI-ARIA tablist pattern
@@ -83,7 +84,12 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
     return { byPlatform, platformsWithData, platformsEmpty };
   }, [fees]);
 
-  const filteredFees = activeTab === 'all' ? fees : (byPlatform.get(activeTab as Platform) ?? []);
+  const platformFiltered = activeTab === 'all' ? fees : (byPlatform.get(activeTab as Platform) ?? []);
+  const filteredFees = statusFilter === 'all'
+    ? platformFiltered
+    : statusFilter === 'unclaimed'
+      ? platformFiltered.filter((f) => f.claim_status === 'unclaimed' || f.claim_status === 'partially_claimed')
+      : platformFiltered.filter((f) => f.claim_status === 'claimed');
   const tabKeys = ['all', ...platformsWithData];
 
   const totalUnclaimed = chainSummaries.reduce((sum, c) => sum + c.unclaimedCount, 0);
@@ -187,6 +193,23 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
           {PLATFORM_CONFIG[platform]?.name ?? platform} (0)
         </button>
       ))}
+
+      {/* Status filter */}
+      <div className="flex items-center gap-1.5">
+        {(['all', 'unclaimed', 'claimed'] as const).map((status) => (
+          <button
+            key={status}
+            onClick={() => setStatusFilter(status)}
+            className={`rounded-full px-2.5 py-1 text-[11px] font-medium capitalize transition-all ${
+              statusFilter === status
+                ? 'bg-foreground/10 text-foreground'
+                : 'text-muted-foreground/50 hover:text-muted-foreground'
+            }`}
+          >
+            {status}
+          </button>
+        ))}
+      </div>
 
       {/* Tab panel */}
       <div
