@@ -13,6 +13,7 @@ type Wallet = Database['public']['Tables']['wallets']['Row'];
 interface FeeInput {
   total_earned_usd: number | null;
   total_earned: string | null;
+  total_claimed: string | null;
   total_unclaimed: string | null;
   chain: Chain;
   platform: Platform;
@@ -282,6 +283,20 @@ export function ProfileHero({
     return total;
   }, [initialFees, liveFees, solPrice, ethPrice]);
 
+  // Claimed USD computed directly from DB total_claimed — not derived from
+  // totalEarned - unclaimed, which drifts when live polling updates unclaimed.
+  const displayClaimedUsd = useMemo(() => {
+    let total = 0;
+    for (const f of initialFees) {
+      const amount = safeBigInt(f.total_claimed);
+      if (amount === 0n) continue;
+      const price = f.chain === 'sol' ? solPrice : ethPrice;
+      const decimals = f.chain === 'sol' ? 9 : 18;
+      total += toUsdValue(amount, decimals, price);
+    }
+    return total;
+  }, [initialFees, solPrice, ethPrice]);
+
   // ── Display values ──
   const displayName = creator.display_name || creator.twitter_handle || creator.github_handle || 'Unknown';
   const chains = [...new Set(wallets.map((w) => w.chain))];
@@ -362,7 +377,7 @@ export function ProfileHero({
             </p>
             {totalEarnedUsd > 0 && (
               <p className="mt-2 text-xs tabular-nums">
-                <span className="text-muted-foreground/50">{formatUsd(Math.max(0, totalEarnedUsd - displayUnclaimedUsd))} claimed</span>
+                <span className="text-muted-foreground/50">{formatUsd(displayClaimedUsd)} claimed</span>
                 <span className="mx-1.5 text-muted-foreground/30">&middot;</span>
                 <span className="text-foreground/70">{formatUsd(displayUnclaimedUsd)} unclaimed</span>
               </p>
