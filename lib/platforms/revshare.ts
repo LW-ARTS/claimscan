@@ -5,7 +5,7 @@ import {
   getMint,
   getTransferFeeConfig,
 } from '@solana/spl-token';
-import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
+import { isValidSolanaAddress, withRpcFallback, getRpcUrls } from '@/lib/chains/solana';
 import { fetchTokenClaimTotal } from '@/lib/helius/transactions';
 import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
@@ -178,9 +178,9 @@ export const revshareAdapter: PlatformAdapter = {
  * Find all Token-2022 mints where the given wallet is the
  * `withdrawWithheldAuthority` of the TransferFeeConfig extension.
  *
- * Uses getProgramAccounts with memcmp filters:
- * 1. AccountType at offset 83 = 1 (Mint)
- * 2. withdrawWithheldAuthority at offset 120 = wallet pubkey
+ * Uses Helius getProgramAccountsV2 with cursor-based pagination to handle
+ * the large Token-2022 program account set. Falls back to standard
+ * getProgramAccounts if getProgramAccountsV2 is unavailable.
  *
  * NOTE: This assumes TransferFeeConfig is the FIRST extension
  * (ExtensionType=1, the lowest value). This holds for the vast
@@ -189,52 +189,134 @@ export const revshareAdapter: PlatformAdapter = {
  */
 async function findMintsByWithdrawAuthority(wallet: string): Promise<string[]> {
   const walletPubkey = new PublicKey(wallet);
+  const rpcUrls = getRpcUrls();
 
-  const accounts = await raceGpaTimeout(
-    withRpcFallback(
-      (connection) =>
-        connection.getProgramAccounts(TOKEN_2022_PROGRAM_ID, {
-          commitment: 'confirmed',
-          filters: [
-            // Filter: AccountType = Mint (1) at offset 83.
-            // Without this filter, Token accounts (AccountType=2) that happen
-            // to have matching bytes at offset 120 would be returned as false positives.
-            {
-              memcmp: {
-                offset: ACCOUNT_TYPE_OFFSET,
-                bytes: '2', // base58 encoding of byte [1] (Mint)
-              },
-            },
-            // Filter: withdrawWithheldAuthority = wallet
-            // At offset 120 when TransferFeeConfig is the first extension.
-            {
-              memcmp: {
-                offset: WITHDRAW_AUTHORITY_OFFSET,
-                bytes: walletPubkey.toBase58(),
-              },
-            },
-          ],
-        }),
-      'revshare-find-mints'
-    ),
-    'revshare-gpa'
-  );
+  const filters = [
+    {
+      memcmp: {
+        offset: ACCOUNT_TYPE_OFFSET,
+        bytes: '2', // base58 encoding of byte [1] (Mint)
+      },
+    },
+    {
+      memcmp: {
+        offset: WITHDRAW_AUTHORITY_OFFSET,
+        bytes: walletPubkey.toBase58(),
+      },
+    },
+  ];
 
-  return accounts.map((a) => a.pubkey.toBase58());
+  // Try each RPC with fallback
+  for (let rpcIdx = 0; rpcIdx < rpcUrls.length; rpcIdx++) {
+    const rpcUrl = rpcUrls[rpcIdx];
+    try {
+      // Attempt getProgramAccountsV2 (Helius) with cursor pagination
+      const accounts = await fetchGpaV2(rpcUrl, filters);
+      return accounts;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // If method not found, this RPC doesn't support V2 — try standard GPA
+      if (msg.includes('Method not found') || msg.includes('not found')) {
+        try {
+          return await fetchGpaStandard(rpcUrl, filters);
+        } catch (fallbackErr) {
+          console.warn(
+            `[revshare] findMintsByWithdrawAuthority standard GPA failed on RPC #${rpcIdx + 1}:`,
+            fallbackErr instanceof Error ? fallbackErr.message : fallbackErr
+          );
+        }
+      } else {
+        console.warn(
+          `[revshare] findMintsByWithdrawAuthority failed on RPC #${rpcIdx + 1}:`,
+          msg
+        );
+      }
+    }
+  }
+
+  return [];
 }
 
-/**
- * Race a promise against a timeout for expensive RPC calls.
- */
-function raceGpaTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${GPA_TIMEOUT_MS}ms`)),
-      GPA_TIMEOUT_MS
-    );
-    promise.then(
-      (val) => { clearTimeout(timer); resolve(val); },
-      (err) => { clearTimeout(timer); reject(err); },
-    );
+/** Helius getProgramAccountsV2 with cursor-based pagination. */
+async function fetchGpaV2(
+  rpcUrl: string,
+  filters: Array<{ memcmp: { offset: number; bytes: string } }>
+): Promise<string[]> {
+  const accounts: string[] = [];
+  let paginationKey: string | null = null;
+  const MAX_PAGES = 20; // safety cap
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const params: Record<string, unknown> = {
+      encoding: 'base64',
+      commitment: 'confirmed',
+      dataSlice: { offset: 0, length: 0 }, // only need pubkeys
+      filters,
+    };
+    if (paginationKey) params.paginationKey = paginationKey;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), GPA_TIMEOUT_MS);
+
+    const res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getProgramAccountsV2',
+        params: [TOKEN_2022_PROGRAM_ID.toBase58(), params],
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    const json = await res.json();
+    if (json.error) throw new Error(json.error.message);
+
+    const result = json.result;
+    for (const item of result.accounts ?? []) {
+      accounts.push(item.pubkey);
+    }
+
+    paginationKey = result.paginationKey ?? null;
+    if (!paginationKey || (result.accounts ?? []).length === 0) break;
+  }
+
+  return accounts;
+}
+
+/** Standard getProgramAccounts via raw HTTP (fallback for non-Helius RPCs). */
+async function fetchGpaStandard(
+  rpcUrl: string,
+  filters: Array<{ memcmp: { offset: number; bytes: string } }>
+): Promise<string[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GPA_TIMEOUT_MS);
+
+  const res = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'getProgramAccounts',
+      params: [
+        TOKEN_2022_PROGRAM_ID.toBase58(),
+        {
+          encoding: 'base64',
+          commitment: 'confirmed',
+          dataSlice: { offset: 0, length: 0 },
+          filters,
+        },
+      ],
+    }),
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
+
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message);
+
+  return (json.result ?? []).map((item: { pubkey: string }) => item.pubkey);
 }

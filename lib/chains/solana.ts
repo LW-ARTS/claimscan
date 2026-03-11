@@ -35,6 +35,11 @@ export function getConnection(): Connection {
   return connections[0];
 }
 
+/** Get raw RPC URLs for direct HTTP calls (e.g. Helius getProgramAccountsV2). */
+export function getRpcUrls(): readonly string[] {
+  return RPC_URLS;
+}
+
 /** Track consecutive failures per RPC for adaptive ordering. */
 const rpcFailures: number[] = new Array(connections.length).fill(0);
 
