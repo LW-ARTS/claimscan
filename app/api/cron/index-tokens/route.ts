@@ -23,18 +23,17 @@ export async function GET(request: Request) {
 
   const supabase = createServiceClient();
   const wallclockStart = Date.now();
-  const WALLCLOCK_BUDGET_MS = 55_000;
+  // Leave 20s margin for the last batch of GPA calls (up to 20s each)
+  const WALLCLOCK_BUDGET_MS = 40_000;
 
   try {
-    // Fetch creators with wallets that haven't been token-indexed recently.
-    // We use the fee_records table's updated_at as a proxy — if the creator
-    // has been active (searched recently), index their tokens.
-    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-
+    // Fetch creators who haven't been token-indexed recently.
+    // Order by last_token_sync_at ASC NULLS FIRST so never-indexed creators
+    // get priority, then the most stale ones come next.
     const { data: creators } = await supabase
       .from('creators')
-      .select('id, wallets(*)')
-      .order('updated_at', { ascending: false })
+      .select('id, last_token_sync_at, wallets(*)')
+      .order('last_token_sync_at', { ascending: true, nullsFirst: true })
       .limit(15);
 
     if (!creators || creators.length === 0) {
@@ -42,6 +41,7 @@ export async function GET(request: Request) {
     }
 
     const gpaAdapters = getAllAdapters().filter((a) => GPA_PLATFORMS.has(a.platform));
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     let totalCreators = 0;
     let totalTokens = 0;
 
@@ -49,6 +49,11 @@ export async function GET(request: Request) {
       if (Date.now() - wallclockStart > WALLCLOCK_BUDGET_MS) {
         console.warn(`[index-tokens] wallclock guard: stopping after ${totalCreators} creators`);
         break;
+      }
+
+      // Skip if already indexed within the last 10 minutes
+      if (creator.last_token_sync_at && creator.last_token_sync_at > tenMinAgo) {
+        continue;
       }
 
       const wallets: ResolvedWallet[] = (creator.wallets ?? [])
@@ -60,26 +65,6 @@ export async function GET(request: Request) {
         }));
 
       if (wallets.length === 0) continue;
-
-      // Check if already indexed recently
-      const { data: existingTokens } = await supabase
-        .from('creator_tokens')
-        .select('id')
-        .eq('creator_id', creator.id)
-        .limit(1);
-
-      // If tokens exist and creator was updated recently, skip
-      if (existingTokens && existingTokens.length > 0) {
-        const { data: recentCreator } = await supabase
-          .from('creators')
-          .select('updated_at')
-          .eq('id', creator.id)
-          .single();
-
-        if (recentCreator?.updated_at && recentCreator.updated_at > tenMinAgo) {
-          continue;
-        }
-      }
 
       // Run GPA-based token discovery for each wallet × adapter
       const discoveredTokens: Array<{
@@ -131,6 +116,12 @@ export async function GET(request: Request) {
           totalTokens += discoveredTokens.length;
         }
       }
+
+      // Mark this creator as freshly indexed so the next cron run skips them
+      await supabase
+        .from('creators')
+        .update({ last_token_sync_at: new Date().toISOString() })
+        .eq('id', creator.id);
 
       totalCreators++;
     }
