@@ -1,7 +1,7 @@
 import 'server-only';
 import { createHash } from 'crypto';
 import { createServiceClient } from '@/lib/supabase/service';
-import { CACHE_TTL_MS } from '@/lib/constants';
+import { CACHE_TTL_MS, CACHE_TTL_HEAVY_MS } from '@/lib/constants';
 import { safeBigInt } from '@/lib/utils';
 import type { Database, IdentityProvider } from '@/lib/supabase/types';
 import {
@@ -21,8 +21,10 @@ import { fetchClaimHistory } from '@/lib/helius/transactions';
 // ═══════════════════════════════════════════════
 const inFlight = new Map<string, Promise<ResolveResult>>();
 
-/** Timeout for the entire resolve operation to prevent hung promises in inFlight map */
-const RESOLVE_TIMEOUT_MS = 30_000;
+/** Timeout for the entire resolve operation to prevent hung promises in inFlight map.
+ *  55s gives headroom for large creators (e.g. 6k+ Bags.fm positions) while staying
+ *  under Vercel's 60s maxDuration on the handle page. */
+const RESOLVE_TIMEOUT_MS = 55_000;
 
 type Creator = Database['public']['Tables']['creators']['Row'];
 type Wallet = Database['public']['Tables']['wallets']['Row'];
@@ -120,7 +122,8 @@ async function doResolve(
         const t = r.last_synced_at ? new Date(r.last_synced_at).getTime() : 0;
         return t > max ? t : max;
       }, 0);
-      const isFresh = maxSyncedAt > 0 && Date.now() - maxSyncedAt < CACHE_TTL_MS;
+      const ttl = feeRecords.length > 500 ? CACHE_TTL_HEAVY_MS : CACHE_TTL_MS;
+      const isFresh = maxSyncedAt > 0 && Date.now() - maxSyncedAt < ttl;
 
       if (isFresh) {
         // Query claim_events for this creator (cached path)

@@ -1,3 +1,6 @@
+// Large creators (6k+ positions) need up to ~40s to resolve. Default 15s is too short.
+export const maxDuration = 60;
+
 import { notFound } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { resolveAndPersistCreator } from '@/lib/services/creator';
