@@ -308,8 +308,9 @@ function solDecimalToLamports(raw: string): bigint {
 }
 
 /** Max mints for lifetime-fees primary method (positions with known BPS).
- *  This is the PRIMARY method — avoids wallet-matching issues of claim-stats. */
-const MAX_LIFETIME_FEE_MINTS = 400;
+ *  This is the PRIMARY method — avoids wallet-matching issues of claim-stats.
+ *  250 keeps total API time under ~20s at 40-concurrency batches. */
+const MAX_LIFETIME_FEE_MINTS = 250;
 
 /** Max mints for claim-stats fallback (positions with unknown BPS). */
 const MAX_CLAIM_STATS_FALLBACK_MINTS = 100;
