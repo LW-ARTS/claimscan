@@ -34,21 +34,18 @@ interface BagsWalletPayload {
   wallet?: string;
 }
 
-/** claim-stats response: per-token fee claimer stats (keyed by tokenMint) */
-interface BagsClaimStatEntry {
-  username?: string;
-  wallet?: string;
-  totalClaimed?: string;
-  royaltyBps?: number;
-  isCreator?: boolean;
-  twitterUsername?: string;
-  provider?: string;
-}
-
-/** claimable-positions response: unclaimed fee positions for a wallet */
+/**
+ * claimable-positions response: fee positions for a wallet.
+ *
+ * IMPORTANT: Field naming is misleading in the Bags API V2:
+ * - `totalClaimableLamportsUserShare` = TOTAL EARNED (not unclaimed!)
+ * - Real unclaimed = sum of 3 pool fields below
+ * - claimed = earned − unclaimed
+ */
 interface BagsClaimablePosition {
   baseMint: string;
   quoteMint?: string | null;
+  /** Total EARNED lamports (misleading name — this is NOT unclaimed). */
   totalClaimableLamportsUserShare: number;
   claimableDisplayAmount?: number | null;
   userBps?: number | null;
@@ -57,6 +54,12 @@ interface BagsClaimablePosition {
   virtualPool?: string;
   virtualPoolAddress?: string | null;
   dammPoolAddress?: string | null;
+  /** Unclaimed fees in the virtual pool (lamports). */
+  virtualPoolClaimableLamportsUserShare?: number | null;
+  /** Unclaimed fees in the DAMM pool (lamports). */
+  dammPoolClaimableLamportsUserShare?: number | null;
+  /** Unclaimed fees in the user vault (lamports). */
+  userVaultClaimableLamportsUserShare?: number | null;
 }
 
 // ═══════════════════════════════════════════════
@@ -189,10 +192,6 @@ async function resolveHandleToWallet(
 const positionsCache = new Map<string, { data: BagsClaimablePosition[]; ts: number }>();
 const POSITIONS_CACHE_TTL_MS = 30_000; // 30 seconds
 
-/** Cache claim-stats per tokenMint (keyed by mint address). */
-const claimStatsCache = new Map<string, { data: BagsClaimStatEntry[]; ts: number }>();
-const CLAIM_STATS_CACHE_TTL_MS = 60_000; // 1 minute
-
 async function getClaimablePositionsCached(wallet: string): Promise<BagsClaimablePosition[]> {
   const cached = positionsCache.get(wallet);
   if (cached && Date.now() - cached.ts < POSITIONS_CACHE_TTL_MS) {
@@ -216,254 +215,12 @@ async function getClaimablePositionsCached(wallet: string): Promise<BagsClaimabl
   return data;
 }
 
-/**
- * Fetch claim-stats for a single token mint (cached).
- * Returns all claimer entries for this mint.
- */
-async function fetchClaimStatsCached(tokenMint: string): Promise<BagsClaimStatEntry[]> {
-  const cached = claimStatsCache.get(tokenMint);
-  if (cached && Date.now() - cached.ts < CLAIM_STATS_CACHE_TTL_MS) {
-    return cached.data;
-  }
-
-  const res = await bagsFetch<BagsApiResponse<BagsClaimStatEntry[]>>(
-    `/token-launch/claim-stats?tokenMint=${encodeURIComponent(tokenMint)}`
-  );
-  const data = Array.isArray(res?.response) ? res.response : [];
-
-  // Evict stale entries
-  if (claimStatsCache.size > 200) {
-    const now = Date.now();
-    for (const [key, entry] of claimStatsCache) {
-      if (now - entry.ts > CLAIM_STATS_CACHE_TTL_MS) claimStatsCache.delete(key);
-    }
-  }
-
-  claimStatsCache.set(tokenMint, { data, ts: Date.now() });
-  return data;
-}
-
-/**
- * Find the best matching claimer entry from claim-stats results.
- * The /fee-share/wallet/v2 endpoint returns a fee vault wallet that may
- * differ from the personal wallet stored in claim-stats entries. To handle
- * this, we try multiple matching strategies in priority order.
- */
-function findClaimerEntry(
-  stats: BagsClaimStatEntry[],
-  wallet: string,
-  handle?: string
-): BagsClaimStatEntry | undefined {
-  // 1. Exact wallet match (works when vault wallet === claim-stats wallet)
-  let entry = stats.find((s) => s.wallet === wallet);
-  if (entry) return entry;
-
-  // 2. Match by Twitter/username handle (more specific than isCreator flag)
-  if (handle) {
-    const lower = handle.toLowerCase();
-    entry = stats.find(
-      (s) =>
-        s.twitterUsername?.toLowerCase() === lower ||
-        s.username?.toLowerCase() === lower
-    );
-    if (entry) return entry;
-  }
-
-  // 3. isCreator fallback REMOVED — multiple claimers can have isCreator=true
-  // (co-creators), which would return the wrong claimer's totalClaimed.
-  // Returning undefined is safer than returning wrong data.
-
-  // 4. Single-entry match: if only one claimer exists for this token,
-  // it must be our user (since they have a claimable position for it).
-  if (stats.length === 1) return stats[0];
-
-  return undefined;
-}
-
-/**
- * Convert a decimal SOL string (e.g. "1.234567890") to lamports using
- * string manipulation instead of floating-point arithmetic.
- * This avoids precision loss for amounts > ~9 SOL where
- * `parseFloat(raw) * 1e9` would exceed Number.MAX_SAFE_INTEGER.
- */
-function solDecimalToLamports(raw: string): bigint {
-  const clean = raw.replace(/[^0-9.]/g, '');
-  if (!clean || clean === '.' || clean === '0') return 0n;
-  const [whole, frac = ''] = clean.split('.');
-  // Pad or truncate fractional part to exactly 9 digits (lamports precision)
-  const paddedFrac = frac.padEnd(9, '0').slice(0, 9);
-  try {
-    return BigInt((whole || '0') + paddedFrac);
-  } catch {
-    return 0n;
-  }
-}
-
-/** Max mints for lifetime-fees primary method (positions with known BPS).
- *  This is the PRIMARY method — avoids wallet-matching issues of claim-stats.
- *  250 keeps total API time under ~20s at 40-concurrency batches. */
-const MAX_LIFETIME_FEE_MINTS = 250;
-
-/** Max mints for claim-stats fallback (positions with unknown BPS). */
-const MAX_CLAIM_STATS_FALLBACK_MINTS = 100;
-
 /** Max concurrent API requests to avoid overwhelming bags.fm or Vercel connection limits. */
 const CONCURRENCY_LIMIT = 40;
 
-/** Minimum unclaimed value in USD to be worth fetching lifetime-fees for.
- *  Filters out dust positions, saving API calls. Uses live SOL price. */
+/** Minimum earned value in USD to include in results.
+ *  Filters out dust positions, saving storage. Uses live SOL price. */
 const MIN_UNCLAIMED_USD = 15;
-
-/**
- * Fetch lifetime-fees for a token (total fees collected, all claimers combined).
- * Returns lamports as bigint, or 0n on failure.
- */
-async function fetchLifetimeFees(tokenMint: string): Promise<bigint> {
-  const res = await bagsFetch<BagsApiResponse<string>>(
-    `/token-launch/lifetime-fees?tokenMint=${encodeURIComponent(tokenMint)}`
-  );
-  if (res === null) return -1n; // null = fetch failed or rate limited (distinct from 0)
-  if (!res.response) return 0n;
-  try {
-    return BigInt(res.response);
-  } catch {
-    return 0n;
-  }
-}
-
-/**
- * Compute claimed amounts for positions using two strategies:
- *
- * 1. PRIMARY (positions with known userBps):
- *    claimed = (lifetimeFees × userBps / 10000) − unclaimed
- *    This avoids wallet-matching issues entirely.
- *
- * 2. FALLBACK (positions with unknown userBps):
- *    Use claim-stats with findClaimerEntry matching.
- *
- * Total API calls: ≤ MAX_LIFETIME_FEE_MINTS + MAX_CLAIM_STATS_FALLBACK_MINTS (≤1000).
- */
-async function computeClaimedAmounts(
-  positions: BagsClaimablePosition[],
-  wallet: string,
-  handle?: string
-): Promise<Map<string, bigint>> {
-  const claimMap = new Map<string, bigint>();
-  const eligible = positions.filter((p) => p.baseMint);
-  if (eligible.length === 0) return claimMap;
-
-  const withBps = eligible.filter((p) => p.userBps != null && p.userBps > 0);
-  const withoutBps = eligible.filter((p) => p.userBps == null || p.userBps <= 0);
-
-  console.debug(`[bags] computeClaimedAmounts for ${handle ?? wallet.slice(0, 8)}: ${eligible.length} positions (withBps=${withBps.length}, withoutBps=${withoutBps.length})`);
-
-  // Bail early if all API keys are rate limited
-  if (isRateLimited()) {
-    console.warn('[bags] skipping computeClaimedAmounts — all API keys rate limited');
-    return claimMap;
-  }
-
-  // --- Primary: lifetime-fees for positions with known BPS ---
-  // NOTE: No dust filter here — a position with tiny unclaimed can have large
-  // claimed history. The MAX_LIFETIME_FEE_MINTS cap controls API call volume.
-  if (withBps.length > 0) {
-    const sorted = [...withBps].sort(
-      (a, b) => (b.totalClaimableLamportsUserShare || 0) - (a.totalClaimableLamportsUserShare || 0)
-    );
-
-    if (sorted.length > MAX_LIFETIME_FEE_MINTS) {
-      console.warn(`[bags] lifetime-fees capped at ${MAX_LIFETIME_FEE_MINTS}/${sorted.length} mints`);
-    }
-    const capped = sorted.slice(0, MAX_LIFETIME_FEE_MINTS);
-
-    let lfHits = 0;
-    let lfErrors = 0;
-    let lfZero = 0;
-    let lfFetchFail = 0;
-
-    // Process in batches to avoid overwhelming bags.fm / Vercel connection limits
-    for (let batchStart = 0; batchStart < capped.length; batchStart += CONCURRENCY_LIMIT) {
-      if (isRateLimited()) {
-        console.warn(`[bags] lifetime-fees: aborting at batch ${batchStart}/${capped.length} — all keys rate limited`);
-        break;
-      }
-      const batch = capped.slice(batchStart, batchStart + CONCURRENCY_LIMIT);
-      const results = await Promise.allSettled(
-        batch.map(async (p) => {
-          const lifetimeLamports = await fetchLifetimeFees(p.baseMint);
-          if (lifetimeLamports === -1n) { lfFetchFail++; return; } // fetch failed
-          if (lifetimeLamports === 0n) { lfZero++; return; }
-
-          const userBps = BigInt(p.userBps!);
-          const userEarned = (lifetimeLamports * userBps) / 10000n;
-          const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
-          const claimed = userEarned > unclaimed ? userEarned - unclaimed : 0n;
-
-          if (claimed > 0n) {
-            claimMap.set(p.baseMint, claimed);
-            lfHits++;
-          }
-        })
-      );
-      for (const r of results) {
-        if (r.status === 'rejected') lfErrors++;
-      }
-
-      // Log progress every few batches
-      if (batchStart % (CONCURRENCY_LIMIT * 5) === 0 || batchStart + CONCURRENCY_LIMIT >= capped.length) {
-        console.debug(`[bags] lifetime-fees progress: ${Math.min(batchStart + CONCURRENCY_LIMIT, capped.length)}/${capped.length} (hits=${lfHits}, fetchFail=${lfFetchFail}, zero=${lfZero})`);
-      }
-    }
-    console.debug(`[bags] lifetime-fees DONE: ${capped.length} queried → ${lfHits} claimed>0, ${lfZero} zero, ${lfFetchFail} fetchFail, ${lfErrors} rejected`);
-  }
-
-  // --- Fallback: claim-stats for positions without BPS ---
-  // Skip if we got rate limited during primary phase
-  if (withoutBps.length > 0 && !isRateLimited()) {
-    const sorted = [...withoutBps].sort(
-      (a, b) => (b.totalClaimableLamportsUserShare || 0) - (a.totalClaimableLamportsUserShare || 0)
-    );
-    if (sorted.length > MAX_CLAIM_STATS_FALLBACK_MINTS) {
-      console.warn(`[bags] claim-stats fallback capped at ${MAX_CLAIM_STATS_FALLBACK_MINTS}/${sorted.length} mints`);
-    }
-    const capped = sorted.slice(0, MAX_CLAIM_STATS_FALLBACK_MINTS);
-
-    let csHits = 0;
-    let csErrors = 0;
-
-    // Process in batches
-    for (let batchStart = 0; batchStart < capped.length; batchStart += CONCURRENCY_LIMIT) {
-      if (isRateLimited()) {
-        console.warn(`[bags] claim-stats: aborting at batch ${batchStart}/${capped.length} — all keys rate limited`);
-        break;
-      }
-      const batch = capped.slice(batchStart, batchStart + CONCURRENCY_LIMIT);
-      const results = await Promise.allSettled(
-        batch.map(async (p) => {
-          const stats = await fetchClaimStatsCached(p.baseMint);
-          const entry = findClaimerEntry(stats, wallet, handle);
-          if (entry?.totalClaimed) {
-            const raw = entry.totalClaimed;
-            const claimed = raw.includes('.')
-              ? solDecimalToLamports(raw)
-              : BigInt(raw);
-            if (claimed > 0n) {
-              claimMap.set(p.baseMint, claimed);
-              csHits++;
-            }
-          }
-        })
-      );
-      for (const r of results) {
-        if (r.status === 'rejected') csErrors++;
-      }
-    }
-    console.debug(`[bags] claim-stats fallback: ${capped.length} queried → ${csHits} with claimed > 0, ${csErrors} errors`);
-  }
-
-  console.debug(`[bags] computeClaimedAmounts result: ${claimMap.size} mints with claimed > 0`);
-  return claimMap;
-}
 
 // ═══════════════════════════════════════════════
 // Bags.fm Adapter
@@ -506,13 +263,14 @@ export const bagsAdapter: PlatformAdapter = {
     const positions = await getClaimablePositionsCached(wallet);
     if (positions.length === 0) return [];
 
-    // Step 3: Compute claimed amounts (lifetime-fees primary, claim-stats fallback).
-    // When rate limited, claimTotals will be empty — earned = unclaimed only.
-    const claimTotals = await computeClaimedAmounts(positions, wallet, handle);
-
-    // Step 4: Build fee entries, filtering dust positions (< $MIN_UNCLAIMED_USD total earned).
-    // This prevents storing thousands of near-zero records for massive creators (e.g. finnbags 6k+).
-    const { sol: solPrice } = await getNativeTokenPrices(); // cached, near-zero overhead
+    // Step 3: Build fee entries using O(1) inline calculation.
+    // earned/claimed/unclaimed come directly from the position data — zero extra API calls.
+    //
+    // Bags API V2 field naming is misleading:
+    //   totalClaimableLamportsUserShare = TOTAL EARNED (not unclaimed!)
+    //   Real unclaimed = virtualPool + dammPool + userVault pool fields
+    //   claimed = earned − unclaimed
+    const { sol: solPrice } = await getNativeTokenPrices();
     const dustLamports = solPrice > 0
       ? BigInt(Math.floor((MIN_UNCLAIMED_USD / solPrice) * 1e9))
       : 0n;
@@ -520,20 +278,25 @@ export const bagsAdapter: PlatformAdapter = {
     const fees: TokenFee[] = [];
     for (const p of positions) {
       if (!p.baseMint) continue;
-      const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
-      const claimed = claimTotals.get(p.baseMint) ?? 0n;
-      if (unclaimed <= 0n && claimed <= 0n) continue;
 
-      // Skip dust: totalEarned < threshold AND no claimed history
-      const totalEarned = unclaimed + claimed;
-      if (dustLamports > 0n && totalEarned < dustLamports && claimed === 0n) continue;
+      // O(1): earned/claimed/unclaimed directly from position
+      const earned = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
+      const unclaimed = BigInt(Math.floor(p.virtualPoolClaimableLamportsUserShare || 0))
+                      + BigInt(Math.floor(p.dammPoolClaimableLamportsUserShare || 0))
+                      + BigInt(Math.floor(p.userVaultClaimableLamportsUserShare || 0));
+      const claimed = earned > unclaimed ? earned - unclaimed : 0n;
+
+      if (earned <= 0n) continue;
+
+      // Skip dust: earned < threshold AND no claimed history
+      if (dustLamports > 0n && earned < dustLamports && claimed === 0n) continue;
 
       fees.push({
         tokenAddress: p.baseMint,
         tokenSymbol: null,
         chain: 'sol',
         platform: 'bags',
-        totalEarned: totalEarned.toString(),
+        totalEarned: earned.toString(),
         totalClaimed: claimed.toString(),
         totalUnclaimed: unclaimed.toString(),
         totalEarnedUsd: null,
@@ -565,24 +328,29 @@ export const bagsAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
-      // Historical fees: only fetch unclaimed positions (1 API call via cache).
-      // Claimed amounts are computed only in getFeesByHandle (the initial scan).
+      // O(1): earned/claimed/unclaimed from position data — zero extra API calls.
       const positions = await getClaimablePositionsCached(wallet);
       if (positions.length === 0) return [];
 
       const fees: TokenFee[] = [];
       for (const p of positions) {
         if (!p.baseMint) continue;
-        const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
-        if (unclaimed <= 0n) continue;
+
+        const earned = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
+        const unclaimed = BigInt(Math.floor(p.virtualPoolClaimableLamportsUserShare || 0))
+                        + BigInt(Math.floor(p.dammPoolClaimableLamportsUserShare || 0))
+                        + BigInt(Math.floor(p.userVaultClaimableLamportsUserShare || 0));
+        const claimed = earned > unclaimed ? earned - unclaimed : 0n;
+
+        if (earned <= 0n) continue;
 
         fees.push({
           tokenAddress: p.baseMint,
           tokenSymbol: null,
           chain: 'sol',
           platform: 'bags',
-          totalEarned: unclaimed.toString(),
-          totalClaimed: '0',
+          totalEarned: earned.toString(),
+          totalClaimed: claimed.toString(),
           totalUnclaimed: unclaimed.toString(),
           totalEarnedUsd: null,
           royaltyBps: p.userBps ?? null,
@@ -600,22 +368,25 @@ export const bagsAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
-      // Live polling: only fetch unclaimed positions (1 API call via cache).
-      // Do NOT compute claimed amounts here — that's expensive (800+ API calls)
-      // and should only happen during the initial getFeesByHandle scan.
+      // Live polling: O(1) from position data — zero extra API calls.
       const data = await getClaimablePositionsCached(wallet);
 
       const fees = data
         .filter((p) => p.baseMint && (p.totalClaimableLamportsUserShare || 0) > 0)
         .map((p) => {
-          const unclaimed = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
+          const earned = BigInt(Math.floor(p.totalClaimableLamportsUserShare || 0));
+          const unclaimed = BigInt(Math.floor(p.virtualPoolClaimableLamportsUserShare || 0))
+                          + BigInt(Math.floor(p.dammPoolClaimableLamportsUserShare || 0))
+                          + BigInt(Math.floor(p.userVaultClaimableLamportsUserShare || 0));
+          const claimed = earned > unclaimed ? earned - unclaimed : 0n;
+
           return {
             tokenAddress: p.baseMint,
             tokenSymbol: null as string | null,
             chain: 'sol' as const,
             platform: 'bags' as const,
-            totalEarned: unclaimed.toString(),
-            totalClaimed: '0',
+            totalEarned: earned.toString(),
+            totalClaimed: claimed.toString(),
             totalUnclaimed: unclaimed.toString(),
             totalEarnedUsd: null,
             royaltyBps: p.userBps ?? null,
@@ -631,7 +402,6 @@ export const bagsAdapter: PlatformAdapter = {
 
   async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
     // Bags API doesn't expose individual claim events.
-    // Historical data comes from claim-stats aggregates.
     return [];
   },
 };

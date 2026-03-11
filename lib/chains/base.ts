@@ -203,15 +203,18 @@ const ZORA_REWARDS_BASE_DEPLOY_BLOCK = 1_000_000n;
 const LOGS_CHUNK_SIZE = 10_000n;
 
 /** Concurrent chunk requests for chunkedGetLogs. */
-const LOGS_PARALLEL_CHUNKS = 5;
+const LOGS_PARALLEL_CHUNKS = 3;
 
-/** Scan window: ~500K blocks ≈ ~11.5 days of Base blocks (2s block time).
- * All tokens are scanned in a single pass (address array), so total chunks = 500K/10K = 50.
- * At 5 parallel = 10 rounds × ~300ms = ~3s per scan. Fast enough for resolve. */
-const SCAN_WINDOW_BLOCKS = 500_000n;
+/** Scan window: ~200K blocks ≈ ~4.6 days of Base blocks (2s block time).
+ * All tokens are scanned in a single pass (address array), so total chunks = 200K/10K = 20.
+ * At 3 parallel = ~7 rounds × ~500ms = ~3.5s per scan. Combined with MAX preservation
+ * in creator.ts, claimed values never regress from partial scans. */
+const SCAN_WINDOW_BLOCKS = 200_000n;
 
-/** Timeout for getClankerClaimLogs — prevents blocking the resolve if RPCs are slow. */
-const CLAIM_LOGS_TIMEOUT_MS = 12_000;
+/** Timeout for getLogs-based scans — prevents blocking the resolve if RPCs are slow.
+ * 25s gives room for retries (1s+2s+3s backoff) across ~7 sequential rounds,
+ * while staying within the 55s overall resolve budget. */
+const CLAIM_LOGS_TIMEOUT_MS = 25_000;
 
 // ═══════════════════════════════════════════════
 // Chunked getLogs (works around RPC block limits)
@@ -292,6 +295,11 @@ async function chunkedGetLogs(params: {
         console.warn('[base] chunkedGetLogs chunk failed:', r.reason instanceof Error ? r.reason.message : r.reason);
       }
     }
+
+    // Throttle between rounds to avoid overwhelming public RPCs
+    if (i + LOGS_PARALLEL_CHUNKS < chunks.length) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
   }
 
   return allLogs;
@@ -367,11 +375,12 @@ const zoraWithdrawEvent = parseAbiItem(
 
 /**
  * Get total withdrawn (claimed) ETH from Zora ProtocolRewards on Base.
+ * Uses chunked getLogs via public RPCs with timeout protection.
  */
 export async function getZoraWithdrawLogs(
   account: Address
 ): Promise<bigint> {
-  try {
+  const scan = async (): Promise<bigint> => {
     const latestBlock = await baseLogsClient.getBlockNumber();
     const fromBlock = latestBlock > SCAN_WINDOW_BLOCKS
       ? latestBlock - SCAN_WINDOW_BLOCKS
@@ -390,6 +399,18 @@ export async function getZoraWithdrawLogs(
       total += (log.args.amount as bigint) ?? 0n;
     }
     return total;
+  };
+
+  try {
+    return await Promise.race([
+      scan(),
+      new Promise<bigint>((resolve) =>
+        setTimeout(() => {
+          console.warn(`[base] getZoraWithdrawLogs: timed out after ${CLAIM_LOGS_TIMEOUT_MS}ms`);
+          resolve(0n);
+        }, CLAIM_LOGS_TIMEOUT_MS)
+      ),
+    ]);
   } catch (err) {
     console.warn('[base] getZoraWithdrawLogs failed:', err instanceof Error ? err.message : err);
     return 0n;
