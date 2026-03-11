@@ -303,7 +303,8 @@ interface BankrTokenFeeResponse {
 
 async function searchLaunchesPaginated(
   query: string,
-  maxPages = 3
+  maxPages = 3,
+  externalSignal?: AbortSignal
 ): Promise<BankrTokenLaunch[]> {
   if (!HAS_BANKR_AUTH) return [];
 
@@ -312,15 +313,19 @@ async function searchLaunchesPaginated(
   let cursor: string | undefined;
 
   for (let page = 0; page < maxPages; page++) {
+    if (externalSignal?.aborted) break;
     try {
       const params = new URLSearchParams({ q: query, group: 'byFeeRecipient' });
       if (cursor) params.set('cursor', cursor);
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 12_000);
+      const combinedSignal = externalSignal
+        ? AbortSignal.any([externalSignal, controller.signal])
+        : controller.signal;
       const res = await fetch(
         `${BANKR_LAUNCHES_API}/search/paginated?${params.toString()}`,
-        { headers: bankrAuthHeaders(), signal: controller.signal }
+        { headers: bankrAuthHeaders(), signal: combinedSignal }
       );
       clearTimeout(timeout);
       if (!res.ok) { console.warn(`[bankr] searchLaunchesPaginated returned HTTP ${res.status}`); break; }
@@ -359,12 +364,15 @@ async function searchLaunches(query: string): Promise<BankrSearchResponse> {
   }
 }
 
-async function getTokenFees(tokenAddress: string): Promise<BankrTokenFeeResponse | null> {
+async function getTokenFees(tokenAddress: string, externalSignal?: AbortSignal): Promise<BankrTokenFeeResponse | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
+    const combinedSignal = externalSignal
+      ? AbortSignal.any([externalSignal, controller.signal])
+      : controller.signal;
     const res = await fetch(`${BANKR_PUBLIC_API}/token-fees/${tokenAddress}`, {
-      signal: controller.signal,
+      signal: combinedSignal,
     });
     clearTimeout(timeout);
     if (!res.ok) { console.warn(`[bankr] getTokenFees returned HTTP ${res.status} for ${tokenAddress}`); return null; }
@@ -396,10 +404,10 @@ function wethToWei(val: string | null | undefined): string {
   return (whole + frac).replace(/^0+/, '') || '0';
 }
 
-async function fetchFeesForTokens(tokens: BankrTokenLaunch[]): Promise<TokenFee[]> {
+async function fetchFeesForTokens(tokens: BankrTokenLaunch[], signal?: AbortSignal): Promise<TokenFee[]> {
   if (tokens.length === 0) return [];
   const batch = tokens.slice(0, 30);
-  const feeResults = await Promise.allSettled(batch.map((t) => getTokenFees(t.tokenAddress)));
+  const feeResults = await Promise.allSettled(batch.map((t) => getTokenFees(t.tokenAddress, signal)));
   const fees: TokenFee[] = [];
 
   for (let i = 0; i < feeResults.length; i++) {
@@ -520,7 +528,9 @@ export const bankrAdapter: PlatformAdapter = {
   async getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
-    const allFees = await bankrAdapter.getHistoricalFees(wallet);
+    // Call internal functions directly to thread signal (interface doesn't expose it)
+    const tokens = HAS_BANKR_AUTH ? await searchLaunchesPaginated(wallet, 3, signal) : [];
+    const allFees = await fetchFeesForTokens(tokens, signal);
     return allFees.filter((f) => {
       try {
         return BigInt(f.totalUnclaimed) > 0n;
