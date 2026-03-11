@@ -27,6 +27,7 @@ interface WalletInput {
 interface LiveFee {
   totalUnclaimed: string;
   chain: string;
+  platform: string;
 }
 
 interface ProfileHeroProps {
@@ -248,31 +249,38 @@ export function ProfileHero({
   }, [walletsKey]);
 
   // ── Computed values ──
-  function computeUnclaimedTotal(items: Array<{ chain: string; amount: string | null }>) {
-    let total = 0;
-    for (const item of items) {
-      const amount = safeBigInt(item.amount);
+  // Per-platform merge with floor: live data can increase a platform's unclaimed
+  // total (new fees arrived) but never reduce it below the cached DB value.
+  // This prevents incomplete live API responses (e.g. Bags.fm claimable-positions
+  // returns only currently-claimable tokens, not all unclaimed) from zeroing out
+  // the hero total. The cached value refreshes on next page load.
+  const displayUnclaimedUsd = useMemo(() => {
+    const platformUsd = new Map<string, number>();
+    for (const f of initialFees) {
+      const amount = safeBigInt(f.total_unclaimed);
       if (amount === 0n) continue;
-      const price = item.chain === 'sol' ? solPrice : ethPrice;
-      const decimals = item.chain === 'sol' ? 9 : 18;
-      total += toUsdValue(amount, decimals, price);
+      const price = f.chain === 'sol' ? solPrice : ethPrice;
+      const decimals = f.chain === 'sol' ? 9 : 18;
+      platformUsd.set(f.platform, (platformUsd.get(f.platform) ?? 0) + toUsdValue(amount, decimals, price));
     }
+    if (liveFees.length > 0) {
+      const livePlatformUsd = new Map<string, number>();
+      for (const f of liveFees) {
+        const amount = safeBigInt(f.totalUnclaimed);
+        if (amount === 0n) continue;
+        const price = f.chain === 'sol' ? solPrice : ethPrice;
+        const decimals = f.chain === 'sol' ? 9 : 18;
+        livePlatformUsd.set(f.platform, (livePlatformUsd.get(f.platform) ?? 0) + toUsdValue(amount, decimals, price));
+      }
+      for (const [platform, liveUsd] of livePlatformUsd) {
+        const cachedUsd = platformUsd.get(platform) ?? 0;
+        platformUsd.set(platform, Math.max(cachedUsd, liveUsd));
+      }
+    }
+    let total = 0;
+    for (const usd of platformUsd.values()) total += usd;
     return total;
-  }
-
-  const cachedUnclaimedUsd = useMemo(
-    () => computeUnclaimedTotal(initialFees.map((f) => ({ chain: f.chain, amount: f.total_unclaimed }))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [initialFees, solPrice, ethPrice],
-  );
-
-  const liveUnclaimedUsd = useMemo(
-    () => computeUnclaimedTotal(liveFees.map((f) => ({ chain: f.chain, amount: f.totalUnclaimed }))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [liveFees, solPrice, ethPrice],
-  );
-
-  const displayUnclaimedUsd = liveFees.length > 0 ? liveUnclaimedUsd : cachedUnclaimedUsd;
+  }, [initialFees, liveFees, solPrice, ethPrice]);
 
   // ── Display values ──
   const displayName = creator.display_name || creator.twitter_handle || creator.github_handle || 'Unknown';
