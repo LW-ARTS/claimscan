@@ -137,9 +137,11 @@ export default async function ProfilePage({ params }: PageProps) {
 
   // Identity disclaimers for notable handles
   const handleLower = decoded.toLowerCase();
-  const IDENTITY_DISCLAIMERS: Record<string, string> = {
-    elonmusk:
-      'Is this the real Elon Musk? No. Someone registered \u201celonmusk\u201d on Bags.fm by linking the @elonmusk X account. These are their fees, not Elon\u2019s.',
+  const IDENTITY_DISCLAIMERS: Record<string, { title: string; body: string }> = {
+    elonmusk: {
+      title: 'Is this the real Elon Musk? No.',
+      body: 'Someone registered \u201celonmusk\u201d on Bags.fm by linking the @elonmusk X account. These are their fees, not Elon\u2019s.',
+    },
   };
   const NOTABLE_HANDLES = new Set([
     'elonmusk', 'vitalikbuterin', 'cz_binance', 'jack', 'naval',
@@ -148,7 +150,7 @@ export default async function ProfilePage({ params }: PageProps) {
   ]);
   const identityDisclaimer = IDENTITY_DISCLAIMERS[handleLower] ?? (
     NOTABLE_HANDLES.has(handleLower)
-      ? 'ClaimScan shows fees for the wallet that registered this handle. It does not verify identity. Anyone can claim a username on supported platforms.'
+      ? { title: 'Handle not verified', body: 'ClaimScan shows fees for the wallet that registered this handle. It does not verify identity. Anyone can claim a username on supported platforms.' }
       : null
   );
 
@@ -176,11 +178,16 @@ export default async function ProfilePage({ params }: PageProps) {
 
       {/* Identity disclaimer for notable/celebrity handles */}
       {identityDisclaimer && (
-        <div className="animate-fade-in-up delay-100 flex items-start gap-3.5 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] px-5 py-4">
-          <svg className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-          </svg>
-          <p className="text-sm leading-relaxed text-foreground/70">{identityDisclaimer}</p>
+        <div className="animate-fade-in-up delay-100 flex items-start gap-4 rounded-xl border border-border/40 bg-card/80 px-5 py-4">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06]">
+            <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+            </svg>
+          </div>
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-sm font-medium text-foreground/90">{identityDisclaimer.title}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{identityDisclaimer.body}</p>
+          </div>
         </div>
       )}
 
