@@ -121,7 +121,7 @@ export default function DocsPage() {
                 href={`#${item.id}`}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5 text-xs font-medium transition-colors hover:border-foreground/30 hover:bg-muted/50"
               >
-                <span className="text-[10px] text-muted-foreground/60">0{i + 1}</span>
+                <span className="text-[10px] text-muted-foreground/60">{String(i + 1).padStart(2, '0')}</span>
                 {item.label}
               </a>
             ))}
