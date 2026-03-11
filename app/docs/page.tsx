@@ -52,6 +52,7 @@ const techStack = [
 
 const toc = [
   { id: 'v2', label: 'V2 Roadmap' },
+  { id: 'bot', label: 'Telegram Bot' },
   { id: 'intro', label: 'Introduction' },
   { id: 'problem', label: 'The Problem' },
   { id: 'solution', label: 'The Solution' },
@@ -174,6 +175,49 @@ export default function DocsPage() {
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-background/50" />
               </span>
               In development. Solana and Base.
+            </div>
+          </InvertedCard>
+        </div>
+      </ScrollReveal>
+
+      {/* ─── TELEGRAM BOT ─── */}
+      <ScrollReveal className="w-full max-w-3xl" delay={0.15}>
+        <div id="bot">
+          <InvertedCard>
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center rounded-md bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-foreground">
+                Telegram Bot
+              </span>
+              <h2 className="text-lg font-bold tracking-tight text-background sm:text-xl">
+                ClaimScan Bot
+              </h2>
+              <span className="rounded-md border border-background/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-background/50">
+                In Development
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-background/60">
+              Your group chat just became a fee scanner. Paste any Solana or Base contract address and ClaimScan Bot replies with earned, claimed, and unclaimed fees instantly.
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              {[
+                { title: 'Paste a CA', desc: 'Drop any Solana or Base contract address in the chat. The bot detects it automatically and replies with full fee data. No commands, no prefixes.' },
+                { title: 'Handles & Wallets', desc: 'Works with Twitter handles, GitHub usernames, and raw wallet addresses too. Drop it in, get the breakdown.' },
+                { title: 'Full Breakdown', desc: 'Earned, claimed, and unclaimed in native tokens plus USD. Claim status for every position. Inline buttons to view on ClaimScan or share on X.' },
+              ].map((item) => (
+                <div key={item.title} className="rounded-lg border border-background/10 bg-background/5 p-3.5">
+                  <h3 className="text-xs font-bold text-background">{item.title}</h3>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-background/50">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center gap-2 text-[11px] text-background/40">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-background/30" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-background/50" />
+              </span>
+              In development. Groups and DMs. Solana and Base.
             </div>
           </InvertedCard>
         </div>
@@ -575,6 +619,7 @@ resolution   addresses     & USD values`}
                       'Fee recipient discovery (who gets paid)',
                       'Earnings breakdown (earned, claimed, unclaimed in USD)',
                       'Tri-state claim status (claimed, partial, unclaimed)',
+                      'Telegram Bot (paste CA in groups/DMs for instant fee data)',
                       'One-click claim across all platforms',
                       'Additional chain support (Ethereum L1, Arbitrum)',
                     ].map((item) => (
