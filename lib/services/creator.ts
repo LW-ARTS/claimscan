@@ -301,11 +301,13 @@ async function freshResolve(
         total_unclaimed: fee.totalUnclaimed,
         total_earned_usd: fee.totalEarnedUsd,
         claim_status:
-          safeBigInt(fee.totalUnclaimed) > 0n
-            ? 'unclaimed' as const
-            : safeBigInt(fee.totalEarned) > 0n
-              ? 'claimed' as const   // genuinely claimed — earned > 0 but unclaimed = 0
-              : 'unclaimed' as const, // no fee data — don't falsely mark as claimed
+          safeBigInt(fee.totalUnclaimed) > 0n && safeBigInt(fee.totalClaimed) > 0n
+            ? 'partially_claimed' as const // some claimed, some remaining
+            : safeBigInt(fee.totalUnclaimed) > 0n
+              ? 'unclaimed' as const       // nothing claimed yet
+              : safeBigInt(fee.totalEarned) > 0n
+                ? 'claimed' as const       // fully claimed
+                : 'unclaimed' as const,    // no fee data
         royalty_bps: fee.royaltyBps,
         last_synced_at: new Date().toISOString(),
       }));

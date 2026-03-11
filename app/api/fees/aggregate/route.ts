@@ -34,12 +34,14 @@ export async function GET(request: Request) {
   let totalEarnedUsd = 0;
   let totalClaimedCount = 0;
   let totalUnclaimedCount = 0;
+  let totalPartialCount = 0;
 
   for (const fee of fees ?? []) {
     const usd = fee.total_earned_usd;
     if (typeof usd === 'number' && Number.isFinite(usd) && usd >= 0) totalEarnedUsd += usd;
     if (fee.claim_status === 'claimed') totalClaimedCount++;
     if (fee.claim_status === 'unclaimed') totalUnclaimedCount++;
+    if (fee.claim_status === 'partially_claimed') totalPartialCount++;
   }
 
   return NextResponse.json({
@@ -49,6 +51,7 @@ export async function GET(request: Request) {
       totalRecords: fees?.length ?? 0,
       claimedCount: totalClaimedCount,
       unclaimedCount: totalUnclaimedCount,
+      partiallyClaimedCount: totalPartialCount,
     },
   });
 }

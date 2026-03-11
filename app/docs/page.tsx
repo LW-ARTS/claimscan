@@ -152,7 +152,7 @@ export default function DocsPage() {
               {[
                 { title: 'Who Gets Paid', desc: 'Paste a contract address. See which wallet collects the creator fees and trace their on-chain identity.' },
                 { title: 'How Much', desc: 'Earned, claimed, and unclaimed. Every number in native tokens with live USD conversion.' },
-                { title: 'Claimed or Not', desc: 'Check if the creator already collected their fees or if the money is still sitting on-chain.' },
+                { title: 'Claim Status', desc: 'Three states: Claimed (fully collected), Partial (some collected, some remaining), and Unclaimed (nothing claimed yet).' },
               ].map((item) => (
                 <div key={item.title} className="rounded-lg border border-background/10 bg-background/5 p-3.5">
                   <h3 className="text-xs font-bold text-background">{item.title}</h3>
@@ -351,7 +351,7 @@ export default function DocsPage() {
                   { title: 'You Enter a Handle', desc: 'Twitter handle, Farcaster name, GitHub username, or raw wallet address.' },
                   { title: 'We Find Your Wallets', desc: 'Your social identity gets resolved to wallet addresses across both chains.' },
                   { title: 'All 9 Platforms Scanned', desc: 'Every supported launchpad queried simultaneously. No manual checking.' },
-                  { title: 'Fees Collected & Organized', desc: 'Earned, claimed, and unclaimed fees pulled for every token. Duplicates filtered.' },
+                  { title: 'Fees Collected & Organized', desc: 'Earned, claimed, partially claimed, and unclaimed fees pulled for every token. Duplicates filtered.' },
                   { title: 'Converted to USD', desc: 'Live price feeds turn raw token amounts into real dollar figures.' },
                   { title: 'Live Dashboard Ready', desc: 'Platform breakdown, chain breakdown, token-level details, updating every 30s.' },
                 ].map((step, i) => (
@@ -574,7 +574,7 @@ resolution   addresses     & USD values`}
                       'Token Fee Scanner (paste any contract address)',
                       'Fee recipient discovery (who gets paid)',
                       'Earnings breakdown (earned, claimed, unclaimed in USD)',
-                      'Claim status checker',
+                      'Tri-state claim status (claimed, partial, unclaimed)',
                       'One-click claim across all platforms',
                       'Additional chain support (Ethereum L1, Arbitrum)',
                     ].map((item) => (

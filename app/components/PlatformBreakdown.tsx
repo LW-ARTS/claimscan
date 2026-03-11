@@ -64,7 +64,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
         unclaimedCount: 0,
       };
       existing.totalUsd += computeFeeUsd(fee, solPrice, ethPrice);
-      if (fee.claim_status === 'unclaimed') existing.unclaimedCount += 1;
+      if (fee.claim_status === 'unclaimed' || fee.claim_status === 'partially_claimed') existing.unclaimedCount += 1;
       byChain.set(fee.chain, existing);
     }
     return Array.from(byChain.values());
