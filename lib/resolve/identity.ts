@@ -294,15 +294,21 @@ export async function fetchFeesByHandle(
   return allFees;
 }
 
+/** Route-level budget for the entire live-fee aggregation.
+ * Vercel Hobby hard limit = 10s. Leave 1.5s for JSON serialization + network. */
+const LIVE_AGGREGATION_TIMEOUT_MS = 8_500;
+
 /**
  * Fetch live unclaimed fees for wallets across all platforms.
  * Uses Promise.allSettled to tolerate individual adapter failures.
+ * Wrapped in a route-level wallclock guard to prevent silent Vercel 504s —
+ * if the slowest adapter exceeds the budget, we return partial results
+ * from adapters that already completed.
  */
 export async function fetchLiveUnclaimedFees(
   wallets: ResolvedWallet[]
 ): Promise<TokenFee[]> {
   const adapters = getAllAdapters().filter((a) => a.supportsLiveFees);
-  const allFees: TokenFee[] = [];
 
   const taskMeta: Array<{ platform: string; wallet: string }> = [];
   const tasks = wallets.flatMap((wallet) =>
@@ -314,7 +320,33 @@ export async function fetchLiveUnclaimedFees(
       })
   );
 
-  const results = await Promise.allSettled(tasks);
+  // Race the aggregation against a wallclock timeout.
+  // On timeout we collect whatever results are already settled.
+  const allFees: TokenFee[] = [];
+  let results: PromiseSettledResult<TokenFee[]>[];
+
+  try {
+    results = await Promise.race([
+      Promise.allSettled(tasks),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('LIVE_AGGREGATION_TIMEOUT')),
+          LIVE_AGGREGATION_TIMEOUT_MS
+        )
+      ),
+    ]);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'LIVE_AGGREGATION_TIMEOUT') {
+      console.warn(`[fees] live aggregation timed out after ${LIVE_AGGREGATION_TIMEOUT_MS}ms — collecting partial results`);
+      // Collect results from tasks that already settled
+      results = await Promise.allSettled(
+        tasks.map((t) => Promise.race([t, new Promise<TokenFee[]>((r) => setTimeout(() => r([]), 0))]))
+      );
+    } else {
+      throw err;
+    }
+  }
+
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
     if (result.status === 'fulfilled') {

@@ -7,6 +7,7 @@ import {
 } from '@solana/spl-token';
 import { isValidSolanaAddress, withRpcFallback, getRpcUrls } from '@/lib/chains/solana';
 import { fetchTokenClaimTotal } from '@/lib/helius/transactions';
+import { getCachedTokenAddresses } from './cached-tokens';
 import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -79,7 +80,11 @@ export const revshareAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
-      const mintAddresses = await findMintsByWithdrawAuthority(wallet);
+      // DB-first: use cached token addresses from cron to skip expensive GPA
+      let mintAddresses = await getCachedTokenAddresses(wallet, 'revshare', 'sol');
+      if (!mintAddresses) {
+        mintAddresses = await findMintsByWithdrawAuthority(wallet);
+      }
       return mintAddresses.map((addr) => ({
         tokenAddress: addr,
         chain: 'sol' as const,
@@ -107,14 +112,28 @@ export const revshareAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
-      const mintAddresses = await findMintsByWithdrawAuthority(wallet);
+      // DB-first: use cached token addresses from cron to skip expensive GPA
+      let mintAddresses = await getCachedTokenAddresses(wallet, 'revshare', 'sol');
+      if (!mintAddresses) {
+        // Fallback: full GPA scan (first visit or cron hasn't indexed yet)
+        mintAddresses = await findMintsByWithdrawAuthority(wallet);
+      }
       if (mintAddresses.length === 0) return [];
 
       const fees: TokenFee[] = [];
 
-      // Process mints in parallel (limited batch to avoid overwhelming RPC)
+      // Process mints in parallel (limited batch to avoid overwhelming RPC).
+      // Wallclock guard: break early if approaching route timeout to return
+      // partial results instead of being killed by Vercel's hard limit.
       const BATCH_SIZE = 10;
+      const BATCH_WALLCLOCK_MS = 7_000;
+      const batchStart = Date.now();
       for (let i = 0; i < mintAddresses.length; i += BATCH_SIZE) {
+        if (Date.now() - batchStart > BATCH_WALLCLOCK_MS) {
+          const remaining = mintAddresses.length - i;
+          console.warn(`[revshare] wallclock guard: skipping ${remaining} mints after ${BATCH_WALLCLOCK_MS}ms (${fees.length} collected)`);
+          break;
+        }
         const batch = mintAddresses.slice(i, i + BATCH_SIZE);
         const results = await Promise.allSettled(
           batch.map(async (mintAddr) => {

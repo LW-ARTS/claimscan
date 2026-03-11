@@ -3,6 +3,7 @@ import { PublicKey } from '@solana/web3.js';
 import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { getConnection, isValidSolanaAddress } from '@/lib/chains/solana';
 import { fetchVaultClaimTotal, fetchTokenClaimTotal } from '@/lib/helius/transactions';
+import { getCachedTokenAddresses } from './cached-tokens';
 import { enrichSolanaTokenSymbols } from './solana-metadata';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -107,6 +108,19 @@ export const believeAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
+      // DB-first: use cached token addresses from cron to skip expensive GPA
+      const cached = await getCachedTokenAddresses(wallet, 'believe', 'sol');
+      if (cached) {
+        return cached.map((addr) => ({
+          tokenAddress: addr,
+          chain: 'sol' as const,
+          platform: 'believe' as const,
+          symbol: null,
+          name: null,
+          imageUrl: null,
+        }));
+      }
+
       const pools = await getPoolsByCreatorCached(wallet);
       if (pools.length === 0) return [];
 

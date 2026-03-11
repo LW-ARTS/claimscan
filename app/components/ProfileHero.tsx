@@ -157,8 +157,78 @@ export function ProfileHero({
   useEffect(() => {
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout>;
-    let eventSource: EventSource | null = null;
+    let webhookSSE: EventSource | null = null;
 
+    // Accumulated fees from streaming partial results.
+    // Each adapter's results replace previous results for that platform.
+    const streamedFees = new Map<string, LiveFee[]>();
+
+    function flushStreamedFees() {
+      const all: LiveFee[] = [];
+      for (const fees of streamedFees.values()) all.push(...fees);
+      setLiveFees(all);
+    }
+
+    /**
+     * Primary: Stream live fees via SSE — each adapter pushes results
+     * as it completes, so fast adapters appear instantly.
+     */
+    async function streamLiveFees() {
+      try {
+        const res = await fetch('/api/fees/live-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wallets: JSON.parse(walletsKey) }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok || !res.body) {
+          console.warn(`[ProfileHero] live-stream returned HTTP ${res.status}`);
+          // Fallback to JSON endpoint
+          return pollLiveFees();
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          let currentEvent = '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              currentEvent = line.slice(7).trim();
+            } else if (line.startsWith('data: ') && currentEvent) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (currentEvent === 'partial-result' && data.fees) {
+                  streamedFees.set(data.platform, data.fees);
+                  flushStreamedFees();
+                  setLoading(false);
+                }
+              } catch {
+                // Ignore parse errors in stream
+              }
+              currentEvent = '';
+            }
+          }
+        }
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        console.warn('[ProfileHero] live-stream failed, falling back to JSON:', err instanceof Error ? err.message : err);
+        return pollLiveFees();
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /** Fallback: traditional JSON fetch (subject to 10s Vercel limit). */
     async function pollLiveFees() {
       try {
         const res = await fetch('/api/fees/live', {
@@ -182,61 +252,54 @@ export function ProfileHero({
       }
     }
 
-    async function pollAndSchedule() {
-      await pollLiveFees();
-      if (!controller.signal.aborted) {
-        timeoutId = setTimeout(pollAndSchedule, LIVE_POLL_INTERVAL_MS);
-      }
-    }
-
-    function connectSSE() {
+    function connectWebhookSSE() {
       try {
         const walletData = JSON.parse(walletsKey);
         const url = `/api/fees/stream?wallets=${encodeURIComponent(JSON.stringify(walletData))}`;
-        eventSource = new EventSource(url);
+        webhookSSE = new EventSource(url);
 
-        eventSource.onmessage = () => {
-          // Webhook triggered — refresh live fees
-          pollLiveFees();
+        webhookSSE.onmessage = () => {
+          // Webhook triggered — re-stream live fees
+          streamLiveFees();
         };
 
-        eventSource.onerror = () => {
-          // SSE failed — fall back to polling
-          eventSource?.close();
-          eventSource = null;
+        webhookSSE.onerror = () => {
+          webhookSSE?.close();
+          webhookSSE = null;
+          // Fall back to periodic polling for updates
           if (!controller.signal.aborted) {
-            timeoutId = setTimeout(pollAndSchedule, LIVE_POLL_INTERVAL_MS);
+            timeoutId = setTimeout(() => {
+              streamLiveFees().then(() => {
+                if (!controller.signal.aborted) {
+                  timeoutId = setTimeout(() => streamLiveFees(), LIVE_POLL_INTERVAL_MS);
+                }
+              });
+            }, LIVE_POLL_INTERVAL_MS);
           }
         };
       } catch {
-        // SSE not supported — use polling
         if (!controller.signal.aborted) {
-          timeoutId = setTimeout(pollAndSchedule, LIVE_POLL_INTERVAL_MS);
+          timeoutId = setTimeout(() => streamLiveFees(), LIVE_POLL_INTERVAL_MS);
         }
       }
     }
 
-    // Initial poll, then try SSE with polling fallback
-    pollLiveFees().then(() => {
+    // Initial streaming fetch, then connect webhook SSE for real-time updates
+    streamLiveFees().then(() => {
       if (!controller.signal.aborted) {
-        connectSSE();
+        connectWebhookSSE();
       }
     });
 
     function handleVisibility() {
       if (document.hidden) {
         clearTimeout(timeoutId);
-        // Keep SSE alive — it's low overhead when idle
-      } else if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
-        // No active SSE — poll and reconnect
-        pollLiveFees().then(() => {
-          if (!controller.signal.aborted) {
-            connectSSE();
-          }
+      } else if (!webhookSSE || webhookSSE.readyState === EventSource.CLOSED) {
+        streamLiveFees().then(() => {
+          if (!controller.signal.aborted) connectWebhookSSE();
         });
       } else {
-        // SSE active — just refresh data
-        pollLiveFees();
+        streamLiveFees();
       }
     }
     document.addEventListener('visibilitychange', handleVisibility);
@@ -244,7 +307,7 @@ export function ProfileHero({
     return () => {
       clearTimeout(timeoutId);
       controller.abort();
-      eventSource?.close();
+      webhookSSE?.close();
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [walletsKey]);

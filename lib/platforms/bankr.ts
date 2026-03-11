@@ -11,22 +11,25 @@ import type {
 } from './types';
 
 // ═══════════════════════════════════════════════
-// Bankr Agent API (primary — prompt-based)
+// Bankr Agent API (limited fallback)
+//
+// The Agent API is an LLM endpoint that takes 30s-2min and returns
+// natural language. It's kept ONLY as a last-resort fallback for
+// resolveIdentity and getFeesByHandle (where it runs in parallel
+// with other work, not inside Promise.allSettled with other adapters).
+//
+// Removed from getHistoricalFees — it never completed within the
+// 5s allSettled budget and blocked the pipeline.
 // ═══════════════════════════════════════════════
 
 const BANKR_API_URL = process.env.BANKR_API_URL || 'https://api.bankr.bot';
 const BANKR_AGENT_URL = `${BANKR_API_URL}/agent`;
 const BANKR_API_KEY = process.env.BANKR_API_KEY;
 
-/** Budget for Agent API calls running inside Promise.allSettled with other adapters.
- * Must be short — Promise.allSettled waits for ALL adapters, so a slow Bankr call
- * blocks every other adapter's results. 5s prevents starvation. */
+/** Budget for Agent API in resolveIdentity (runs in parallel, not inside allSettled). */
 const AGENT_SHORT_TIMEOUT_MS = 5_000;
 
-/** Budget for Agent API calls in getFeesByHandle, which runs in parallel (Promise.all)
- * with wallet resolution — NOT inside Promise.allSettled with other adapters.
- * A longer timeout here doesn't block other adapters from completing.
- * The pipeline has a 30s hard timeout; leaving 10s headroom for Step 2. */
+/** Budget for Agent API in getFeesByHandle (runs in parallel with wallet resolution). */
 const AGENT_LONG_TIMEOUT_MS = 20_000;
 
 const AGENT_POLL_INTERVAL_MS = 2_000;
@@ -39,19 +42,9 @@ interface AgentPromptResponse {
   response?: string;
 }
 
-/**
- * Submit a natural-language prompt to Bankr's Agent API and poll until complete.
- * Returns the text response or null on failure/timeout.
- *
- * The ENTIRE call is capped at `timeoutMs` because slow Bankr calls
- * can block the resolve pipeline. Use AGENT_SHORT_TIMEOUT_MS (5s) for
- * calls inside Promise.allSettled, AGENT_LONG_TIMEOUT_MS (20s) for
- * calls that run in parallel with the rest of the pipeline.
- */
 async function promptBankrAgent(prompt: string, timeoutMs = AGENT_SHORT_TIMEOUT_MS): Promise<string | null> {
   if (!BANKR_API_KEY) return null;
 
-  // Single AbortController for the entire call — submit + any polls
   const controller = new AbortController();
   const deadline = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -73,19 +66,15 @@ async function promptBankrAgent(prompt: string, timeoutMs = AGENT_SHORT_TIMEOUT_
 
     const data = (await submitRes.json()) as AgentPromptResponse & { success?: boolean };
 
-    // Check success field per Bankr API spec
     if (data.success === false) {
       console.warn('[bankr] agent prompt returned success=false');
       return null;
     }
 
-    // Some queries return result immediately
     if (data.result) return data.result;
     if (data.response) return data.response;
     if (!data.jobId) return null;
 
-    // Poll for async job completion (remaining budget from the 5s total)
-    // Agent API jobs typically take 30s–2min, so this rarely completes.
     // eslint-disable-next-line no-constant-condition
     while (true) {
       await new Promise((r) => setTimeout(r, AGENT_POLL_INTERVAL_MS));
@@ -103,11 +92,9 @@ async function promptBankrAgent(prompt: string, timeoutMs = AGENT_SHORT_TIMEOUT_
         console.warn(`[bankr] agent job ${data.jobId} ${job.status}`, (job as Record<string, unknown>).error || '');
         return null;
       }
-      // still pending/processing — loop will be killed by abort controller
     }
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      // Expected — 5s budget exhausted
       return null;
     }
     console.warn('[bankr] agent prompt failed:', err instanceof Error ? err.message : err);
@@ -129,12 +116,8 @@ interface ParsedAgentFee {
   unclaimedWeth: string;
 }
 
-/**
- * Parse the Agent API's natural-language response into structured fee data.
- * Tries JSON extraction first, then falls back to regex line-by-line parsing.
- */
 function parseAgentFeeResponse(response: string): ParsedAgentFee[] {
-  // Strategy 1: Try to extract a JSON array from the response
+  // Strategy 1: JSON array extraction
   const jsonMatch = response.match(/\[[\s\S]*?\]/);
   if (jsonMatch) {
     try {
@@ -154,13 +137,12 @@ function parseAgentFeeResponse(response: string): ParsedAgentFee[] {
         }
         if (fees.length > 0) return fees;
       }
-    } catch (err) {
-      console.warn('[bankr] JSON parse failed in agent response, falling back to regex:', err instanceof Error ? err.message : err);
+    } catch {
+      // Fall through to next strategy
     }
   }
 
-  // Strategy 2: Line-by-line regex parsing for pipe-delimited format
-  // Matches: 0xADDRESS|SYMBOL|0.005|0.002|0.003
+  // Strategy 2: Pipe-delimited format
   const pipeRegex = /^(0x[a-fA-F0-9]{40})\|([^|]+)\|([\d.]+)\|([\d.]+)\|([\d.]+)/;
   const lines = response.split('\n');
   const fees: ParsedAgentFee[] = [];
@@ -177,54 +159,12 @@ function parseAgentFeeResponse(response: string): ParsedAgentFee[] {
       });
     }
   }
-  if (fees.length > 0) return fees;
-
-  // Strategy 3: Extract individual token blocks from natural language
-  // Pattern: token address + WETH amounts nearby
-  const addrRegex = /0x[a-fA-F0-9]{40}/g;
-  const wethRegex = /([\d.]+)\s*WETH/gi;
-  const addresses = [...response.matchAll(addrRegex)].map((m) => m[0]);
-  const wethAmounts = [...response.matchAll(wethRegex)].map((m) => m[1]);
-
-  if (addresses.length > 0 && wethAmounts.length > 0) {
-    // If we have both addresses and WETH amounts, try to associate them
-    // Simple heuristic: each address gets the next available WETH amounts
-    const symbolRegex = /\b([A-Z$][A-Z0-9$]{1,9})\b/g;
-    const symbols = [...response.matchAll(symbolRegex)]
-      .map((m) => m[1])
-      .filter((s) => !['WETH', 'ETH', 'USD', 'TOKEN', 'TOTAL', 'NONE', 'JSON'].includes(s));
-
-    for (let i = 0; i < addresses.length; i++) {
-      const addr = addresses[i];
-      if (!isValidEvmAddress(addr)) continue;
-
-      // Try to find 2-3 WETH values near this address
-      const earnedIdx = i * 3;
-      const earned = wethAmounts[earnedIdx] || wethAmounts[i * 2] || '0';
-      const claimed = wethAmounts[earnedIdx + 1] || '0';
-      const unclaimed = wethAmounts[earnedIdx + 2] || wethAmounts[i * 2 + 1] || earned;
-
-      fees.push({
-        tokenAddress: addr,
-        tokenSymbol: symbols[i] || 'UNKNOWN',
-        earnedWeth: earned,
-        claimedWeth: claimed,
-        unclaimedWeth: unclaimed,
-      });
-    }
-  }
 
   return fees;
 }
 
-/**
- * Use the Agent API to fetch fees for a handle (Twitter/Farcaster username).
- * Asks for structured JSON output for reliable parsing.
- */
 async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_MS): Promise<TokenFee[]> {
-  // Sanitize handle before interpolation into prompt (prevent prompt injection)
   const safeHandle = handle.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 50);
-  // Ask for structured JSON output — the Bankr agent understands JSON requests well
   const prompt = [
     `List all Bankr tokens where @${safeHandle} is the fee recipient.`,
     'For each token, return ONLY a JSON array with this exact format, no explanation text:',
@@ -235,11 +175,8 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
   const response = await promptBankrAgent(prompt, timeoutMs);
   if (!response) return [];
 
-  console.debug(`[bankr] agent response for @${handle}:`, response.slice(0, 200));
-
   const parsed = parseAgentFeeResponse(response);
   if (parsed.length === 0) {
-    // Check if response explicitly says no tokens
     if (/no (token|fee|result)|not found|\[\s*\]|none|zero|empty/i.test(response)) {
       return [];
     }
@@ -251,7 +188,6 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
     .filter((p) => {
       const earned = wethToWei(p.earnedWeth);
       const unclaimed = wethToWei(p.unclaimedWeth);
-      // Skip zero-value entries
       return earned !== '0' || unclaimed !== '0';
     })
     .map((p) => {
@@ -259,13 +195,11 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
       const claimed = wethToWei(p.claimedWeth);
       const unclaimed = wethToWei(p.unclaimedWeth);
 
-      // Recalculate earned if needed
       let totalEarned = earned;
       if (earned === '0' && (claimed !== '0' || unclaimed !== '0')) {
         try {
           totalEarned = (BigInt(claimed) + BigInt(unclaimed)).toString();
-        } catch (err) {
-          console.warn('[bankr] BigInt add failed in fetchFeesByAgent:', err instanceof Error ? err.message : err);
+        } catch {
           totalEarned = unclaimed;
         }
       }
@@ -284,9 +218,6 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
     });
 }
 
-/**
- * Use the Agent API to resolve a handle's Base wallet address.
- */
 async function resolveWalletByAgent(handle: string): Promise<ResolvedWallet[]> {
   const prompt = `What is the Base/Ethereum wallet address associated with @${handle} on Bankr? Reply with ONLY the 0x address, nothing else.`;
   const response = await promptBankrAgent(prompt);
@@ -310,7 +241,7 @@ async function resolveWalletByAgent(handle: string): Promise<ResolvedWallet[]> {
 }
 
 // ═══════════════════════════════════════════════
-// Legacy: Search + Doppler API (fallback)
+// Search + Doppler API (primary — fast, structured)
 // ═══════════════════════════════════════════════
 
 const BANKR_LAUNCHES_API = 'https://api.bankr.bot/token-launches';
@@ -522,7 +453,7 @@ export const bankrAdapter: PlatformAdapter = {
   ): Promise<ResolvedWallet[]> {
     if (provider === 'wallet') return [];
 
-    // Primary: Search API (fast, ~2s) — works with bearer OR API key
+    // Primary: Search API (fast, ~2s)
     if (HAS_BANKR_AUTH) {
       const data = await searchLaunches(handle);
       const wallets: ResolvedWallet[] = [];
@@ -539,7 +470,7 @@ export const bankrAdapter: PlatformAdapter = {
       if (wallets.length > 0) return wallets;
     }
 
-    // Fallback: Agent API (slow, ~12s+)
+    // Fallback: Agent API (slow but catches edge cases Search misses)
     if (BANKR_API_KEY) {
       return resolveWalletByAgent(handle);
     }
@@ -553,16 +484,15 @@ export const bankrAdapter: PlatformAdapter = {
   ): Promise<TokenFee[]> {
     if (provider === 'wallet') return [];
 
-    // Primary: legacy search + Doppler (fast, ~5s)
+    // Primary: Search + Doppler (fast, ~5s)
     if (HAS_BANKR_AUTH) {
       const tokens = await searchLaunchesPaginated(handle);
       const fees = await fetchFeesForTokens(tokens);
       if (fees.length > 0) return fees;
     }
 
-    // Fallback: Agent API — use long timeout here because getFeesByHandle runs
-    // in parallel with resolveWallets (Promise.all), NOT inside Promise.allSettled
-    // with other adapters. A 20s timeout won't block pump/bags/clanker.
+    // Fallback: Agent API — uses long timeout because getFeesByHandle runs
+    // in parallel with resolveWallets, NOT inside Promise.allSettled
     if (BANKR_API_KEY) {
       return fetchFeesByAgent(handle, AGENT_LONG_TIMEOUT_MS);
     }
@@ -574,51 +504,14 @@ export const bankrAdapter: PlatformAdapter = {
     return [];
   },
 
+  // No Agent API fallback here — it never completed within the 5s
+  // Promise.allSettled budget and blocked the entire pipeline.
   async getHistoricalFees(wallet: string): Promise<TokenFee[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
-    // Primary: legacy search + Doppler (fast, ~5s)
     if (HAS_BANKR_AUTH) {
       const tokens = await searchLaunchesPaginated(wallet);
-      const fees = await fetchFeesForTokens(tokens);
-      if (fees.length > 0) return fees;
-    }
-
-    // Fallback: Agent API (slow, ~12s+ — only if legacy unavailable or empty)
-    if (BANKR_API_KEY) {
-      const prompt = [
-        `List all Bankr tokens where ${wallet} is the fee recipient.`,
-        'Return ONLY a JSON array: [{"a":"TOKEN_ADDRESS","s":"SYMBOL","e":"EARNED_WETH","c":"CLAIMED_WETH","u":"UNCLAIMED_WETH"}]',
-        'Use [] if none.',
-      ].join(' ');
-
-      const response = await promptBankrAgent(prompt);
-      if (response) {
-        const parsed = parseAgentFeeResponse(response);
-        const fees = parsed
-          .filter((p) => wethToWei(p.earnedWeth) !== '0' || wethToWei(p.unclaimedWeth) !== '0')
-          .map((p) => {
-            const earned = wethToWei(p.earnedWeth);
-            const claimed = wethToWei(p.claimedWeth);
-            const unclaimed = wethToWei(p.unclaimedWeth);
-            let totalEarned = earned;
-            if (earned === '0' && (claimed !== '0' || unclaimed !== '0')) {
-              try { totalEarned = (BigInt(claimed) + BigInt(unclaimed)).toString(); } catch (err) { console.warn('[bankr] BigInt add failed in getHistoricalFees:', err instanceof Error ? err.message : err); totalEarned = unclaimed; }
-            }
-            return {
-              tokenAddress: normalizeEvmAddress(p.tokenAddress),
-              tokenSymbol: sanitizeTokenSymbol(p.tokenSymbol),
-              chain: 'base' as const,
-              platform: 'bankr' as const,
-              totalEarned: totalEarned,
-              totalClaimed: claimed,
-              totalUnclaimed: unclaimed,
-              totalEarnedUsd: null,
-              royaltyBps: null,
-            };
-          });
-        if (fees.length > 0) return fees;
-      }
+      return fetchFeesForTokens(tokens);
     }
 
     return [];
@@ -627,7 +520,6 @@ export const bankrAdapter: PlatformAdapter = {
   async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
-    // Use getHistoricalFees and filter to unclaimed only
     const allFees = await bankrAdapter.getHistoricalFees(wallet);
     return allFees.filter((f) => {
       try {
