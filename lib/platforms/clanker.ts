@@ -133,17 +133,27 @@ export const clankerAdapter: PlatformAdapter = {
 
     // Use /search-creator which correctly returns tokens where wallet is admin.
     // The /tokens?deployer= endpoint is broken (ignores the deployer parameter).
-    const data = await clankerFetch<ClankerSearchCreatorResponse>(
-      `/search-creator?q=${encodeURIComponent(wallet)}`
-    );
-    if (!data?.tokens || data.tokens.length === 0) return [];
+    // Paginate: API returns ~20 tokens per page with hasMore flag.
+    const MAX_PAGES = 10; // 200 tokens max safety cap
+    const allTokens: ClankerToken[] = [];
+
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const data = await clankerFetch<ClankerSearchCreatorResponse>(
+        `/search-creator?q=${encodeURIComponent(wallet)}&page=${page}`
+      );
+      if (!data?.tokens || data.tokens.length === 0) break;
+      allTokens.push(...data.tokens);
+      if (!data.hasMore) break;
+    }
+
+    if (allTokens.length === 0) return [];
 
     const normalizedWallet = normalizeEvmAddress(wallet);
 
     // Deduplicate by contract address (API can return duplicates)
     const seen = new Set<string>();
     const unique: ClankerToken[] = [];
-    for (const t of data.tokens) {
+    for (const t of allTokens) {
       if (!t.contract_address) continue;
       const addr = normalizeEvmAddress(t.contract_address);
       if (seen.has(addr)) continue;
