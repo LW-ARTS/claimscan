@@ -203,15 +203,15 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
       ))}
 
       {/* Status filter */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5 rounded-xl bg-muted/50 p-1">
         {(['all', 'unclaimed', 'claimed', ...(totalPartial > 0 ? ['partial'] as const : [])] as const).map((status) => (
           <button
             key={status}
             onClick={() => setStatusFilter(status as typeof statusFilter)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors duration-150 ${
+            className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               statusFilter === status
-                ? 'bg-foreground text-background'
-                : 'border border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+                ? 'bg-foreground text-background shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {status}
