@@ -360,6 +360,13 @@ export function ProfileHero({
             <p className="mt-1 text-xs tracking-wide text-muted-foreground/50">
               Total Earned
             </p>
+            {totalEarnedUsd > 0 && (
+              <p className="mt-2 text-xs tabular-nums">
+                <span className="text-muted-foreground/50">{formatUsd(Math.max(0, totalEarnedUsd - displayUnclaimedUsd))} claimed</span>
+                <span className="mx-1.5 text-muted-foreground/30">&middot;</span>
+                <span className="text-foreground/70">{formatUsd(displayUnclaimedUsd)} unclaimed</span>
+              </p>
+            )}
           </div>
         </div>
 
