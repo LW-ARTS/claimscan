@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, startTransition } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Search, Loader2, ArrowRight } from 'lucide-react';
 import { ShimmerButton } from '@/components/ui/shimmer-button';
@@ -16,7 +16,7 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
 
   // Clear loading when the route actually changes
   useEffect(() => {
-    setLoading(false);
+    startTransition(() => setLoading(false));
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -107,7 +107,7 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             name="query"
             autoComplete="off"
             spellCheck={false}
-            placeholder="@handle or wallet"
+            placeholder="Search by handle, username, or wallet"
             aria-label="Search by Twitter handle, GitHub username, or wallet address"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

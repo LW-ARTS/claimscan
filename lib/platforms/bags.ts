@@ -118,7 +118,10 @@ function isRateLimited(): boolean {
   return keys.every((k) => (keyRateLimits.get(k) ?? 0) > now);
 }
 
-async function bagsFetch<T>(path: string): Promise<T | null> {
+async function bagsFetch<T>(path: string, attempt = 0): Promise<T | null> {
+  const keys = getApiKeys();
+  if (attempt >= keys.length) return null; // exhausted all keys
+
   const apiKey = getAvailableKey();
   if (!apiKey) return null; // all keys rate limited
 
@@ -142,10 +145,10 @@ async function bagsFetch<T>(path: string): Promise<T | null> {
         if (body.resetTime) resetAt = new Date(body.resetTime).getTime();
       } catch { /* use default */ }
       keyRateLimits.set(apiKey, resetAt);
-      const keysLeft = getApiKeys().filter((k) => (keyRateLimits.get(k) ?? 0) <= Date.now()).length;
+      const keysLeft = keys.filter((k) => (keyRateLimits.get(k) ?? 0) <= Date.now()).length;
       console.warn(`[bags] key ${apiKey.slice(-6)} rate limited until ${new Date(resetAt).toISOString()} (${keysLeft} keys remaining)`);
-      // Retry with next available key
-      if (keysLeft > 0) return bagsFetch<T>(path);
+      // Retry with next available key (bounded by attempt count)
+      if (keysLeft > 0) return bagsFetch<T>(path, attempt + 1);
       return null;
     }
     if (!res.ok) {
@@ -292,10 +295,16 @@ function findClaimerEntry(
  * `parseFloat(raw) * 1e9` would exceed Number.MAX_SAFE_INTEGER.
  */
 function solDecimalToLamports(raw: string): bigint {
-  const [whole, frac = ''] = raw.split('.');
+  const clean = raw.replace(/[^0-9.]/g, '');
+  if (!clean || clean === '.' || clean === '0') return 0n;
+  const [whole, frac = ''] = clean.split('.');
   // Pad or truncate fractional part to exactly 9 digits (lamports precision)
   const paddedFrac = frac.padEnd(9, '0').slice(0, 9);
-  return BigInt((whole || '0') + paddedFrac);
+  try {
+    return BigInt((whole || '0') + paddedFrac);
+  } catch {
+    return 0n;
+  }
 }
 
 /** Max mints for lifetime-fees primary method (positions with known BPS).

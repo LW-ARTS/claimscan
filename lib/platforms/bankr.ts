@@ -453,7 +453,8 @@ function wethToWei(val: string | null | undefined): string {
   if (!str || str === '0' || str === '0.000000') return '0';
 
   if (str.startsWith('<')) str = str.slice(1);
-  if (/^\d{15,}$/.test(str)) return str;
+  // Only treat as raw wei if 19+ digits (minimum ~1 ETH in wei = 1e18)
+  if (/^\d{19,}$/.test(str)) return str;
 
   const num = parseFloat(str);
   if (!Number.isFinite(num) || num <= 0) return '0';
