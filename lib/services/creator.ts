@@ -111,18 +111,24 @@ async function doResolve(
   if (handleColumn) {
     const { data } = await supabase
       .from('creators')
-      .select('*, wallets(*), fee_records(*)')
+      .select('*, wallets(*)')
       .eq(handleColumn, parsed.value)
       .single();
 
     if (data) {
-      // Check freshness using the most recent fee_records entry (not [0] blindly)
-      const feeRecords = (data.fee_records ?? []) as FeeRecord[];
-      const maxSyncedAt = feeRecords.reduce((max: number, r: FeeRecord) => {
+      // Fetch fee_records separately to avoid PostgREST's 1000-row embedded limit
+      const { data: feeRecords } = await supabase
+        .from('fee_records')
+        .select('*')
+        .eq('creator_id', data.id);
+      const allFeeRecords = (feeRecords ?? []) as FeeRecord[];
+
+      // Check freshness using the most recent fee_records entry
+      const maxSyncedAt = allFeeRecords.reduce((max: number, r: FeeRecord) => {
         const t = r.last_synced_at ? new Date(r.last_synced_at).getTime() : 0;
         return t > max ? t : max;
       }, 0);
-      const ttl = feeRecords.length > 500 ? CACHE_TTL_HEAVY_MS : CACHE_TTL_MS;
+      const ttl = allFeeRecords.length > 500 ? CACHE_TTL_HEAVY_MS : CACHE_TTL_MS;
       const isFresh = maxSyncedAt > 0 && Date.now() - maxSyncedAt < ttl;
 
       if (isFresh) {
@@ -135,9 +141,9 @@ async function doResolve(
           .limit(50);
 
         return {
-          creator: data,
+          creator: { ...data, fee_records: allFeeRecords },
           wallets: data.wallets ?? [],
-          fees: feeRecords,
+          fees: allFeeRecords,
           claimEvents: (claimEvents ?? []) as ClaimEventRow[],
           resolveMs: Date.now() - start,
           cached: true,
@@ -364,12 +370,17 @@ async function freshResolve(
       .gte('searched_at', fiveMinutesAgo);
 
     // Return fresh data + claim events
-    const [{ data: freshCreator }, { data: claimEvents }] = await Promise.all([
+    // Fetch fee_records separately to avoid PostgREST's 1000-row embedded limit
+    const [{ data: freshCreator }, { data: freshFees }, { data: claimEvents }] = await Promise.all([
       supabase
         .from('creators')
-        .select('*, wallets(*), fee_records(*)')
+        .select('*, wallets(*)')
         .eq('id', creatorId)
         .single(),
+      supabase
+        .from('fee_records')
+        .select('*')
+        .eq('creator_id', creatorId),
       supabase
         .from('claim_events')
         .select('*')
@@ -378,10 +389,11 @@ async function freshResolve(
         .limit(50),
     ]);
 
+    const returnedFees = (freshFees ?? []) as FeeRecord[];
     return {
-      creator: freshCreator,
+      creator: freshCreator ? { ...freshCreator, fee_records: returnedFees } : null,
       wallets: (freshCreator?.wallets ?? []) as Wallet[],
-      fees: (freshCreator?.fee_records ?? []) as FeeRecord[],
+      fees: returnedFees,
       claimEvents: (claimEvents ?? []) as ClaimEventRow[],
       resolveMs: Date.now() - start,
       cached: false,
@@ -391,17 +403,24 @@ async function freshResolve(
     // If we have an existing creator, try to return stale data rather than crashing
     if (existingCreatorId) {
       try {
-        const { data: staleCreator } = await supabase
-          .from('creators')
-          .select('*, wallets(*), fee_records(*)')
-          .eq('id', existingCreatorId)
-          .single();
+        const [{ data: staleCreator }, { data: staleFees }] = await Promise.all([
+          supabase
+            .from('creators')
+            .select('*, wallets(*)')
+            .eq('id', existingCreatorId)
+            .single(),
+          supabase
+            .from('fee_records')
+            .select('*')
+            .eq('creator_id', existingCreatorId),
+        ]);
 
         if (staleCreator) {
+          const staleFeeRecords = (staleFees ?? []) as FeeRecord[];
           return {
-            creator: staleCreator,
+            creator: { ...staleCreator, fee_records: staleFeeRecords },
             wallets: staleCreator.wallets ?? [],
-            fees: staleCreator.fee_records ?? [],
+            fees: staleFeeRecords,
             claimEvents: [],
             resolveMs: Date.now() - start,
             cached: true,

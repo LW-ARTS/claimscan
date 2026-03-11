@@ -537,6 +537,13 @@ export const bagsAdapter: PlatformAdapter = {
     // When rate limited, claimTotals will be empty — earned = unclaimed only.
     const claimTotals = await computeClaimedAmounts(positions, wallet, handle);
 
+    // Step 4: Build fee entries, filtering dust positions (< $MIN_UNCLAIMED_USD total earned).
+    // This prevents storing thousands of near-zero records for massive creators (e.g. finnbags 6k+).
+    const { sol: solPrice } = await getNativeTokenPrices(); // cached, near-zero overhead
+    const dustLamports = solPrice > 0
+      ? BigInt(Math.floor((MIN_UNCLAIMED_USD / solPrice) * 1e9))
+      : 0n;
+
     const fees: TokenFee[] = [];
     for (const p of positions) {
       if (!p.baseMint) continue;
@@ -544,12 +551,16 @@ export const bagsAdapter: PlatformAdapter = {
       const claimed = claimTotals.get(p.baseMint) ?? 0n;
       if (unclaimed <= 0n && claimed <= 0n) continue;
 
+      // Skip dust: totalEarned < threshold AND no claimed history
+      const totalEarned = unclaimed + claimed;
+      if (dustLamports > 0n && totalEarned < dustLamports && claimed === 0n) continue;
+
       fees.push({
         tokenAddress: p.baseMint,
         tokenSymbol: null,
         chain: 'sol',
         platform: 'bags',
-        totalEarned: (unclaimed + claimed).toString(),
+        totalEarned: totalEarned.toString(),
         totalClaimed: claimed.toString(),
         totalUnclaimed: unclaimed.toString(),
         totalEarnedUsd: null,
