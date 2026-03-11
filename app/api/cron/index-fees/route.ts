@@ -73,11 +73,13 @@ export async function GET(request: Request) {
           total_unclaimed: fee.totalUnclaimed,
           total_earned_usd: fee.totalEarnedUsd,
           claim_status:
-            safeBigInt(fee.totalUnclaimed) > 0n
-              ? 'unclaimed' as const
-              : safeBigInt(fee.totalEarned) > 0n
-                ? 'claimed' as const
-                : 'unclaimed' as const,
+            safeBigInt(fee.totalUnclaimed) > 0n && safeBigInt(fee.totalClaimed) > 0n
+              ? 'partially_claimed' as const
+              : safeBigInt(fee.totalUnclaimed) > 0n
+                ? 'unclaimed' as const
+                : safeBigInt(fee.totalEarned) > 0n
+                  ? 'claimed' as const
+                  : 'unclaimed' as const,
           royalty_bps: fee.royaltyBps,
           last_synced_at: new Date().toISOString(),
         }));
