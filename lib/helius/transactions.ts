@@ -61,7 +61,8 @@ const KNOWN_PROGRAM_IDS = new Map<string, Platform>([
  */
 export async function fetchClaimHistory(
   wallet: string,
-  options?: { beforeSignature?: string; limit?: number }
+  options?: { beforeSignature?: string; limit?: number },
+  signal?: AbortSignal
 ): Promise<ClaimEvent[]> {
   if (!isHeliusAvailable()) return [];
 
@@ -74,7 +75,8 @@ export async function fetchClaimHistory(
   const txns = await heliusRestApi<EnhancedTransaction[]>(
     path,
     { method: 'GET' },
-    'enhanced-txns'
+    'enhanced-txns',
+    signal
   );
 
   if (!txns || txns.length === 0) return [];
@@ -157,7 +159,8 @@ const PAGE_SIZE = 100;
  * Cost: 100 credits per page (up to MAX_PAGES pages).
  */
 export async function fetchVaultClaimTotal(
-  vaultAddress: string
+  vaultAddress: string,
+  signal?: AbortSignal
 ): Promise<bigint> {
   if (!isHeliusAvailable()) return 0n;
 
@@ -165,13 +168,16 @@ export async function fetchVaultClaimTotal(
   let beforeSig: string | undefined;
 
   for (let page = 0; page < MAX_PAGES; page++) {
+    if (signal?.aborted) break;
+
     let path = `/v0/addresses/${vaultAddress}/transactions?limit=${PAGE_SIZE}`;
     if (beforeSig) path += `&before=${beforeSig}`;
 
     const txns = await heliusRestApi<EnhancedTransaction[]>(
       path,
       { method: 'GET' },
-      `vault-claim-${page}`
+      `vault-claim-${page}`,
+      signal
     );
 
     if (!txns || txns.length === 0) break;
@@ -207,7 +213,8 @@ export async function fetchVaultClaimTotal(
 export async function fetchTokenClaimTotal(
   sourceAddress: string,
   recipient: string,
-  tokenMint: string
+  tokenMint: string,
+  signal?: AbortSignal
 ): Promise<bigint> {
   if (!isHeliusAvailable()) return 0n;
 
@@ -215,13 +222,16 @@ export async function fetchTokenClaimTotal(
   let beforeSig: string | undefined;
 
   for (let page = 0; page < MAX_PAGES; page++) {
+    if (signal?.aborted) break;
+
     let path = `/v0/addresses/${sourceAddress}/transactions?limit=${PAGE_SIZE}`;
     if (beforeSig) path += `&before=${beforeSig}`;
 
     const txns = await heliusRestApi<EnhancedTransaction[]>(
       path,
       { method: 'GET' },
-      `token-claim-${page}`
+      `token-claim-${page}`,
+      signal
     );
 
     if (!txns || txns.length === 0) break;

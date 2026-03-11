@@ -24,13 +24,17 @@ export function isHeliusAvailable(): boolean {
 export async function heliusDasRpc<T>(
   method: string,
   params: Record<string, unknown>,
-  label: string
+  label: string,
+  externalSignal?: AbortSignal
 ): Promise<T | null> {
   const apiKey = getHeliusApiKey();
   if (!apiKey) return null;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), HELIUS_TIMEOUT_MS);
+  const combinedSignal = externalSignal
+    ? AbortSignal.any([externalSignal, controller.signal])
+    : controller.signal;
 
   try {
     const res = await fetch(HELIUS_DAS_URL, {
@@ -45,7 +49,7 @@ export async function heliusDasRpc<T>(
         method,
         params,
       }),
-      signal: controller.signal,
+      signal: combinedSignal,
     });
     clearTimeout(timeout);
 
@@ -75,7 +79,8 @@ export async function heliusDasRpc<T>(
 export async function heliusRestApi<T>(
   path: string,
   options: RequestInit = {},
-  label: string
+  label: string,
+  externalSignal?: AbortSignal
 ): Promise<T | null> {
   const apiKey = getHeliusApiKey();
   if (!apiKey) return null;
@@ -84,11 +89,14 @@ export async function heliusRestApi<T>(
   const url = `${HELIUS_REST_URL}${path}${separator}api-key=${apiKey}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), HELIUS_TIMEOUT_MS);
+  const combinedSignal = externalSignal
+    ? AbortSignal.any([externalSignal, controller.signal])
+    : controller.signal;
 
   try {
     const res = await fetch(url, {
       ...options,
-      signal: controller.signal,
+      signal: combinedSignal,
     });
     clearTimeout(timeout);
 

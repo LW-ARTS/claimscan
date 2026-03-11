@@ -54,7 +54,7 @@ export const pumpAdapter: PlatformAdapter = {
     return [];
   },
 
-  async getLiveUnclaimedFees(wallet: string, _signal?: AbortSignal): Promise<TokenFee[]> {
+  async getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]> {
     if (!isValidSolanaAddress(wallet)) return [];
     try {
       const creator = new PublicKey(wallet);
@@ -65,8 +65,8 @@ export const pumpAdapter: PlatformAdapter = {
       const [pumpFees, pumpSwapFees, pumpClaimed, swapClaimed] = await Promise.allSettled([
         getUnclaimedPumpFees(creator),
         getUnclaimedPumpSwapFees(creator),
-        fetchVaultClaimTotal(pumpVault.toBase58()),
-        fetchVaultClaimTotal(swapVault.toBase58()),
+        fetchVaultClaimTotal(pumpVault.toBase58(), signal),
+        fetchVaultClaimTotal(swapVault.toBase58(), signal),
       ]);
 
       const fees: TokenFee[] = [];
