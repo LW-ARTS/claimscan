@@ -150,7 +150,7 @@ export const believeAdapter: PlatformAdapter = {
     return this.getLiveUnclaimedFees(wallet);
   },
 
-  async getLiveUnclaimedFees(wallet: string, _signal?: AbortSignal): Promise<TokenFee[]> {
+  async getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]> {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
@@ -186,11 +186,11 @@ export const believeAdapter: PlatformAdapter = {
 
       const [solClaimResults, baseClaimResults] = await Promise.all([
         Promise.allSettled(
-          poolsForSolClaim.map((p) => fetchVaultClaimTotal(p.poolAddress))
+          poolsForSolClaim.map((p) => fetchVaultClaimTotal(p.poolAddress, signal))
         ),
         Promise.allSettled(
           poolsForBaseClaim.map((p) =>
-            fetchTokenClaimTotal(p.poolAddress, wallet, p.baseMint)
+            fetchTokenClaimTotal(p.poolAddress, wallet, p.baseMint, signal)
           )
         ),
       ]);

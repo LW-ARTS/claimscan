@@ -74,7 +74,8 @@ const BONDING_CURVE_MAX_SIZE = 242;
  * This avoids two separate RPC round-trips for v1 (241) and v2 (242) accounts.
  */
 async function findBondingCurvesByCreator(
-  wallet: PublicKey
+  wallet: PublicKey,
+  signal?: AbortSignal
 ): Promise<{ tokenMint: PublicKey; accumulatedHolderRewards: bigint }[]> {
   const accounts = await raceTimeout(
     withRpcFallback(
@@ -88,7 +89,8 @@ async function findBondingCurvesByCreator(
           },
         ],
       }),
-      'coinbarrel-curves-gpa'
+      'coinbarrel-curves-gpa',
+      signal
     ),
     'coinbarrel-curves-gpa'
   );
@@ -117,7 +119,8 @@ async function findBondingCurvesByCreator(
  * Returns tokenMint and accumulated creator fees.
  */
 async function findPoolsByCreator(
-  wallet: PublicKey
+  wallet: PublicKey,
+  signal?: AbortSignal
 ): Promise<{ poolAddress: string; tokenMint: PublicKey; creatorFeesA: bigint; creatorFeesB: bigint }[]> {
   // Pool accounts have CREATOR_FEE_RECIPIENT at offset 245
   // Pool minimum size is 317 bytes (from getPoolState check of 269, plus reward fields)
@@ -133,7 +136,8 @@ async function findPoolsByCreator(
           },
         ],
       }),
-      'coinbarrel-pools-gpa'
+      'coinbarrel-pools-gpa',
+      signal
     ),
     'coinbarrel-pools-gpa'
   );
@@ -218,7 +222,7 @@ export const coinbarrelAdapter: PlatformAdapter = {
     return this.getLiveUnclaimedFees(wallet);
   },
 
-  async getLiveUnclaimedFees(wallet: string, _signal?: AbortSignal): Promise<TokenFee[]> {
+  async getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]> {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
@@ -227,8 +231,8 @@ export const coinbarrelAdapter: PlatformAdapter = {
 
       // Query bonding curves and pools in parallel
       const [curves, pools] = await Promise.allSettled([
-        findBondingCurvesByCreator(creatorPk),
-        findPoolsByCreator(creatorPk),
+        findBondingCurvesByCreator(creatorPk, signal),
+        findPoolsByCreator(creatorPk, signal),
       ]);
 
       // Track pool token mints to avoid double-counting
@@ -243,7 +247,7 @@ export const coinbarrelAdapter: PlatformAdapter = {
         : [];
 
       const claimResults = await Promise.allSettled(
-        poolsForClaim.map((p) => fetchVaultClaimTotal(p.poolAddress))
+        poolsForClaim.map((p) => fetchVaultClaimTotal(p.poolAddress, signal))
       );
 
       const claimMap = new Map<string, bigint>();

@@ -68,14 +68,18 @@ function deriveCreatorVault(creator: PublicKey): [PublicKey, number] {
  * Fetch tokens created by a wallet from Raydium LaunchLab API.
  */
 async function fetchCreatorTokens(
-  wallet: string
+  wallet: string,
+  externalSignal?: AbortSignal
 ): Promise<LaunchLabToken[]> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
+    const combinedSignal = externalSignal
+      ? AbortSignal.any([externalSignal, controller.signal])
+      : controller.signal;
     const res = await fetch(
       `${RAYDIUM_LAUNCHLAB_API}/get/by/user?wallet=${encodeURIComponent(wallet)}&size=100`,
-      { signal: controller.signal }
+      { signal: combinedSignal }
     );
     clearTimeout(timeout);
     if (!res.ok) {
@@ -139,7 +143,7 @@ export const raydiumAdapter: PlatformAdapter = {
     return this.getLiveUnclaimedFees(wallet);
   },
 
-  async getLiveUnclaimedFees(wallet: string, _signal?: AbortSignal): Promise<TokenFee[]> {
+  async getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]> {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
@@ -149,8 +153,8 @@ export const raydiumAdapter: PlatformAdapter = {
 
       // Fetch unclaimed balance + claimed total in parallel
       const [balanceResult, claimedResult] = await Promise.allSettled([
-        withRpcFallback((c) => c.getBalance(vault), 'raydium-vault-balance'),
-        fetchVaultClaimTotal(vaultAddr),
+        withRpcFallback((c) => c.getBalance(vault), 'raydium-vault-balance', signal),
+        fetchVaultClaimTotal(vaultAddr, signal),
       ]);
 
       const balance = balanceResult.status === 'fulfilled' ? BigInt(balanceResult.value) : 0n;

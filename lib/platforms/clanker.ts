@@ -52,12 +52,15 @@ interface ClankerSearchCreatorResponse {
 // Helpers
 // ═══════════════════════════════════════════════
 
-async function clankerFetch<T>(path: string): Promise<T | null> {
+async function clankerFetch<T>(path: string, externalSignal?: AbortSignal): Promise<T | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
+    const combinedSignal = externalSignal
+      ? AbortSignal.any([externalSignal, controller.signal])
+      : controller.signal;
     const res = await fetch(`${CLANKER_API_BASE}${path}`, {
-      signal: controller.signal,
+      signal: combinedSignal,
     });
     clearTimeout(timeout);
     if (!res.ok) {
@@ -216,7 +219,7 @@ export const clankerAdapter: PlatformAdapter = {
     return fees;
   },
 
-  async getLiveUnclaimedFees(wallet: string, _signal?: AbortSignal): Promise<TokenFee[]> {
+  async getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]> {
     // Delegate to getHistoricalFees to avoid fetching the token list twice
     const fees = await this.getHistoricalFees(wallet);
     return fees.filter((f) => safeBigInt(f.totalUnclaimed) > 0n);
