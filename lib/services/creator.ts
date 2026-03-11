@@ -308,20 +308,17 @@ async function freshResolve(
         let totalClaimed = fee.totalClaimed;
         let totalEarned = fee.totalEarned;
 
-        // Preserve existing claimed data when new resolve couldn't compute it.
-        // If DB has claimed > 0 but new data has claimed = 0, keep the DB values
-        // to avoid regressing due to rate limiting or API failures.
-        if (safeBigInt(totalClaimed) === 0n) {
-          const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
-          const existing = existingClaimedMap.get(key);
-          if (existing && safeBigInt(existing.claimed) > 0n) {
-            totalClaimed = existing.claimed;
-            // Recompute totalEarned = max(new unclaimed, existing unclaimed) + preserved claimed
-            // to maintain the invariant totalEarned = totalClaimed + totalUnclaimed
-            const claimed = safeBigInt(totalClaimed);
-            const unclaimed = safeBigInt(fee.totalUnclaimed);
-            totalEarned = (unclaimed + claimed).toString();
-          }
+        // Preserve higher claimed value from DB to prevent regressions from
+        // partial scans (reduced scan window) or RPC timeouts returning 0.
+        // Claimed is monotonically increasing — you cannot un-claim fees.
+        const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
+        const existing = existingClaimedMap.get(key);
+        if (existing && safeBigInt(existing.claimed) > safeBigInt(totalClaimed)) {
+          totalClaimed = existing.claimed;
+          // Recompute totalEarned to maintain the invariant: earned = claimed + unclaimed
+          const claimed = safeBigInt(totalClaimed);
+          const unclaimed = safeBigInt(fee.totalUnclaimed);
+          totalEarned = (unclaimed + claimed).toString();
         }
 
         return {

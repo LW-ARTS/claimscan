@@ -97,8 +97,9 @@ const ETH_LOGS_PARALLEL_CHUNKS = 5;
  * and multiple wallets scan concurrently. */
 const ETH_SCAN_WINDOW_BLOCKS = 10_000n;
 
-/** Timeout to prevent blocking resolve when RPCs are slow. */
-const ETH_CLAIM_LOGS_TIMEOUT_MS = 12_000;
+/** Timeout to prevent blocking resolve when RPCs are slow.
+ * 20s gives room for retries on slower ETH public RPCs. */
+const ETH_CLAIM_LOGS_TIMEOUT_MS = 20_000;
 
 /** Fetch logs for a single chunk range with retry + exponential backoff. */
 async function fetchLogsChunkEth(params: {
