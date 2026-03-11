@@ -32,6 +32,23 @@ export const ethClient = createPublicClient({
       ),
 });
 
+/**
+ * Dedicated client for eth_getLogs calls using free public RPCs.
+ * Alchemy free tier limits getLogs to ~10 blocks, making it useless for
+ * scanning withdraw history. Public RPCs support larger ranges.
+ */
+const ETH_PUBLIC_RPCS = [
+  'https://eth.llamarpc.com',
+  'https://eth.drpc.org',
+];
+const ethLogsClient = createPublicClient({
+  chain: mainnet,
+  transport: fallback(
+    ETH_PUBLIC_RPCS.map((url) => http(url, { timeout: 15_000 })),
+    { rank: true }
+  ),
+});
+
 // ═══════════════════════════════════════════════
 // ABIs
 // ═══════════════════════════════════════════════
@@ -66,6 +83,96 @@ export async function getZoraProtocolRewardsBalanceEth(
 }
 
 // ═══════════════════════════════════════════════
+// Chunked getLogs (works around RPC block limits)
+// ═══════════════════════════════════════════════
+
+/** Max blocks per getLogs query on ETH public RPCs. */
+const ETH_LOGS_CHUNK_SIZE = 10_000n;
+
+/** Concurrent chunk requests. */
+const ETH_LOGS_PARALLEL_CHUNKS = 5;
+
+/** Scan window: ~500K blocks ≈ ~69 days on ETH (~12s block time). */
+const ETH_SCAN_WINDOW_BLOCKS = 500_000n;
+
+/** Timeout to prevent blocking resolve when RPCs are slow. */
+const ETH_CLAIM_LOGS_TIMEOUT_MS = 12_000;
+
+/** Fetch logs for a single chunk range with retry + exponential backoff. */
+async function fetchLogsChunkEth(params: {
+  address: Address;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  event: any;
+  args: Record<string, Address>;
+  fromBlock: bigint;
+  toBlock: bigint;
+}): Promise<Array<{ address: string; args: Record<string, unknown> }>> {
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const logs = await (ethLogsClient as any).getLogs({
+        address: params.address,
+        event: params.event,
+        args: params.args,
+        fromBlock: params.fromBlock,
+        toBlock: params.toBlock,
+      });
+      return logs as Array<{ address: string; args: Record<string, unknown> }>;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isRetryable = msg.includes('429') || msg.includes('rate limit') || msg.includes('503') || msg.includes('no backend');
+      if (isRetryable && attempt < MAX_RETRIES) {
+        const delay = 1_000 * (attempt + 1);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+  return [];
+}
+
+async function chunkedGetLogsEth(params: {
+  address: Address;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  event: any;
+  args: Record<string, Address>;
+  fromBlock: bigint;
+  toBlock: bigint;
+}): Promise<Array<{ address: string; args: Record<string, unknown> }>> {
+  const { address, event, args, fromBlock, toBlock } = params;
+  if (fromBlock > toBlock) return [];
+
+  const chunks: Array<[bigint, bigint]> = [];
+  for (let start = fromBlock; start <= toBlock; start += ETH_LOGS_CHUNK_SIZE) {
+    const end = start + ETH_LOGS_CHUNK_SIZE - 1n > toBlock ? toBlock : start + ETH_LOGS_CHUNK_SIZE - 1n;
+    chunks.push([start, end]);
+  }
+
+  const allLogs: Array<{ address: string; args: Record<string, unknown> }> = [];
+
+  for (let i = 0; i < chunks.length; i += ETH_LOGS_PARALLEL_CHUNKS) {
+    const batch = chunks.slice(i, i + ETH_LOGS_PARALLEL_CHUNKS);
+    const results = await Promise.allSettled(
+      batch.map(([start, end]) =>
+        fetchLogsChunkEth({ address, event, args, fromBlock: start, toBlock: end })
+      )
+    );
+
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        allLogs.push(...r.value);
+      } else {
+        console.warn('[eth] chunkedGetLogsEth chunk failed:', r.reason instanceof Error ? r.reason.message : r.reason);
+      }
+    }
+  }
+
+  return allLogs;
+}
+
+// ═══════════════════════════════════════════════
 // Zora Withdraw Logs (ETH Mainnet)
 // ═══════════════════════════════════════════════
 
@@ -75,24 +182,42 @@ const zoraWithdrawEvent = parseAbiItem(
 
 /**
  * Get total withdrawn (claimed) ETH from Zora ProtocolRewards on ETH mainnet.
+ * Uses chunked getLogs via public RPCs to avoid Alchemy free tier 10-block limit.
  */
 export async function getZoraWithdrawLogsEth(
   account: Address
 ): Promise<bigint> {
-  try {
-    const logs = await ethClient.getLogs({
+  const scan = async (): Promise<bigint> => {
+    const latestBlock = await ethLogsClient.getBlockNumber();
+    const fromBlock = latestBlock > ETH_SCAN_WINDOW_BLOCKS
+      ? latestBlock - ETH_SCAN_WINDOW_BLOCKS
+      : ZORA_REWARDS_ETH_DEPLOY_BLOCK;
+
+    const logs = await chunkedGetLogsEth({
       address: ZORA_PROTOCOL_REWARDS,
       event: zoraWithdrawEvent,
       args: { from: account },
-      fromBlock: ZORA_REWARDS_ETH_DEPLOY_BLOCK,
-      toBlock: 'latest',
+      fromBlock,
+      toBlock: latestBlock,
     });
 
     let total = 0n;
     for (const log of logs) {
-      total += log.args.amount ?? 0n;
+      total += (log.args.amount as bigint) ?? 0n;
     }
     return total;
+  };
+
+  try {
+    return await Promise.race([
+      scan(),
+      new Promise<bigint>((resolve) =>
+        setTimeout(() => {
+          console.warn(`[eth] getZoraWithdrawLogsEth: timed out after ${ETH_CLAIM_LOGS_TIMEOUT_MS}ms`);
+          resolve(0n);
+        }, ETH_CLAIM_LOGS_TIMEOUT_MS)
+      ),
+    ]);
   } catch (err) {
     console.warn('[eth] getZoraWithdrawLogsEth failed:', err instanceof Error ? err.message : err);
     return 0n;

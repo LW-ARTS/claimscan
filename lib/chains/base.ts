@@ -32,6 +32,25 @@ export const baseClient = createPublicClient({
       ),
 });
 
+/**
+ * Dedicated client for eth_getLogs calls using free public RPCs.
+ * Alchemy free tier limits getLogs to ~10 blocks, making it useless for
+ * scanning claim history. Public RPCs support larger ranges.
+ * Uses fallback transport across multiple free RPCs for resilience.
+ * Only used for getLogs — multicall/readContract stay on baseClient (Alchemy).
+ */
+const BASE_PUBLIC_RPCS = [
+  'https://mainnet.base.org',    // 10K block limit
+  'https://base.drpc.org',       // ~10K block limit
+];
+export const baseLogsClient = createPublicClient({
+  chain: base,
+  transport: fallback(
+    BASE_PUBLIC_RPCS.map((url) => http(url, { timeout: 15_000 })),
+    { rank: true }
+  ),
+});
+
 // ═══════════════════════════════════════════════
 // ABIs (minimal — only the reads we need)
 // ═══════════════════════════════════════════════
@@ -179,60 +198,163 @@ const CLANKER_FEELOCKER_DEPLOY_BLOCK = 20_000_000n;
  * Conservative floor to avoid scanning from genesis while being safely before deployment. */
 const ZORA_REWARDS_BASE_DEPLOY_BLOCK = 1_000_000n;
 
-/** Max tokens per getClankerClaimLogs batch to avoid overwhelming RPCs with concurrent getLogs. */
-const CLAIM_LOGS_BATCH_SIZE = 5;
+/** Max blocks per getLogs query.
+ * mainnet.base.org and drpc.org both support ~10K blocks per getLogs. */
+const LOGS_CHUNK_SIZE = 10_000n;
+
+/** Concurrent chunk requests for chunkedGetLogs. */
+const LOGS_PARALLEL_CHUNKS = 5;
+
+/** Scan window: ~500K blocks ≈ ~11.5 days of Base blocks (2s block time).
+ * All tokens are scanned in a single pass (address array), so total chunks = 500K/10K = 50.
+ * At 5 parallel = 10 rounds × ~300ms = ~3s per scan. Fast enough for resolve. */
+const SCAN_WINDOW_BLOCKS = 500_000n;
+
+/** Timeout for getClankerClaimLogs — prevents blocking the resolve if RPCs are slow. */
+const CLAIM_LOGS_TIMEOUT_MS = 12_000;
+
+// ═══════════════════════════════════════════════
+// Chunked getLogs (works around RPC block limits)
+// ═══════════════════════════════════════════════
+
+/**
+ * Split a large getLogs range into 10K-block chunks processed in parallel batches.
+ * Uses baseLogsClient (public RPC) which supports 10K blocks per query.
+ */
+/** Fetch logs for a single chunk range with retry + exponential backoff on 429. */
+async function fetchLogsChunk(params: {
+  address: Address | Address[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  event: any;
+  args: Record<string, Address>;
+  fromBlock: bigint;
+  toBlock: bigint;
+}): Promise<Array<{ address: string; args: Record<string, unknown> }>> {
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const logs = await (baseLogsClient as any).getLogs({
+        address: params.address,
+        event: params.event,
+        args: params.args,
+        fromBlock: params.fromBlock,
+        toBlock: params.toBlock,
+      });
+      return logs as Array<{ address: string; args: Record<string, unknown> }>;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isRetryable = msg.includes('429') || msg.includes('rate limit') || msg.includes('503') || msg.includes('no backend');
+      if (isRetryable && attempt < MAX_RETRIES) {
+        const delay = 1_000 * (attempt + 1); // 1s, 2s, 3s
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+  return []; // unreachable but satisfies TS
+}
+
+async function chunkedGetLogs(params: {
+  address: Address | Address[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  event: any;
+  args: Record<string, Address>;
+  fromBlock: bigint;
+  toBlock: bigint;
+}): Promise<Array<{ address: string; args: Record<string, unknown> }>> {
+  const { address, event, args, fromBlock, toBlock } = params;
+  if (fromBlock > toBlock) return [];
+
+  // Build list of [start, end] chunk ranges
+  const chunks: Array<[bigint, bigint]> = [];
+  for (let start = fromBlock; start <= toBlock; start += LOGS_CHUNK_SIZE) {
+    const end = start + LOGS_CHUNK_SIZE - 1n > toBlock ? toBlock : start + LOGS_CHUNK_SIZE - 1n;
+    chunks.push([start, end]);
+  }
+
+  const allLogs: Array<{ address: string; args: Record<string, unknown> }> = [];
+
+  // Process in parallel batches — retry logic handles 429s
+  for (let i = 0; i < chunks.length; i += LOGS_PARALLEL_CHUNKS) {
+    const batch = chunks.slice(i, i + LOGS_PARALLEL_CHUNKS);
+    const results = await Promise.allSettled(
+      batch.map(([start, end]) =>
+        fetchLogsChunk({ address, event, args, fromBlock: start, toBlock: end })
+      )
+    );
+
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        allLogs.push(...r.value);
+      } else {
+        console.warn('[base] chunkedGetLogs chunk failed:', r.reason instanceof Error ? r.reason.message : r.reason);
+      }
+    }
+  }
+
+  return allLogs;
+}
 
 /**
  * Get total claimed fees per token by scanning Transfer events FROM the FeeLocker TO the owner.
+ * Scans ALL tokens in a single chunked pass using address array — O(chunks) not O(tokens×chunks).
  * Returns a Map of lowercase token address → total claimed wei.
  */
 export async function getClankerClaimLogs(
   owner: Address,
   tokens: Address[]
 ): Promise<Map<string, bigint>> {
-  const claimMap = new Map<string, bigint>();
-  if (tokens.length === 0) return claimMap;
+  if (tokens.length === 0) return new Map();
+
+  // Wrap in a timeout to prevent blocking the resolve when RPCs are slow.
+  // Returns empty map on timeout — tokens with available>0 still appear.
+  const scan = async (): Promise<Map<string, bigint>> => {
+    const claimMap = new Map<string, bigint>();
+    const t0 = Date.now();
+    const latestBlock = await baseLogsClient.getBlockNumber();
+    const fromBlock = latestBlock > SCAN_WINDOW_BLOCKS
+      ? latestBlock - SCAN_WINDOW_BLOCKS
+      : CLANKER_FEELOCKER_DEPLOY_BLOCK;
+
+    console.log(`[base] getClankerClaimLogs: scanning ${tokens.length} tokens, blocks ${fromBlock}..${latestBlock} (${latestBlock - fromBlock} blocks, ${(latestBlock - fromBlock) / LOGS_CHUNK_SIZE} chunks)`);
+
+    const logs = await chunkedGetLogs({
+      address: tokens,
+      event: erc20TransferEvent,
+      args: {
+        from: CLANKER_FEE_LOCKER,
+        to: owner,
+      },
+      fromBlock,
+      toBlock: latestBlock,
+    });
+
+    for (const log of logs) {
+      const token = log.address.toLowerCase();
+      const value = (log.args.value as bigint) ?? 0n;
+      claimMap.set(token, (claimMap.get(token) ?? 0n) + value);
+    }
+
+    console.log(`[base] getClankerClaimLogs: found ${claimMap.size} tokens with claims, ${logs.length} transfers in ${Date.now() - t0}ms`);
+    return claimMap;
+  };
 
   try {
-    // Scan Transfer events FROM FeeLocker TO owner across all token contracts.
-    // Process in batches of CLAIM_LOGS_BATCH_SIZE to avoid overwhelming RPCs
-    // with concurrent getLogs calls (each scans ~20M+ blocks).
-    for (let i = 0; i < tokens.length; i += CLAIM_LOGS_BATCH_SIZE) {
-      const batch = tokens.slice(i, i + CLAIM_LOGS_BATCH_SIZE);
-      const results = await Promise.allSettled(
-        batch.map(async (token) => {
-          const logs = await baseClient.getLogs({
-            address: token,
-            event: erc20TransferEvent,
-            args: {
-              from: CLANKER_FEE_LOCKER,
-              to: owner,
-            },
-            fromBlock: CLANKER_FEELOCKER_DEPLOY_BLOCK,
-            toBlock: 'latest',
-          });
-
-          let total = 0n;
-          for (const log of logs) {
-            total += log.args.value ?? 0n;
-          }
-          if (total > 0n) {
-            claimMap.set(token.toLowerCase(), total);
-          }
-        })
-      );
-
-      for (const r of results) {
-        if (r.status === 'rejected') {
-          console.warn('[base] getClankerClaimLogs failed for a token:', r.reason instanceof Error ? r.reason.message : r.reason);
-        }
-      }
-    }
+    return await Promise.race([
+      scan(),
+      new Promise<Map<string, bigint>>((resolve) =>
+        setTimeout(() => {
+          console.warn(`[base] getClankerClaimLogs: timed out after ${CLAIM_LOGS_TIMEOUT_MS}ms`);
+          resolve(new Map());
+        }, CLAIM_LOGS_TIMEOUT_MS)
+      ),
+    ]);
   } catch (err) {
     console.warn('[base] getClankerClaimLogs failed:', err instanceof Error ? err.message : err);
+    return new Map();
   }
-
-  return claimMap;
 }
 
 // ═══════════════════════════════════════════════
@@ -250,17 +372,22 @@ export async function getZoraWithdrawLogs(
   account: Address
 ): Promise<bigint> {
   try {
-    const logs = await baseClient.getLogs({
+    const latestBlock = await baseLogsClient.getBlockNumber();
+    const fromBlock = latestBlock > SCAN_WINDOW_BLOCKS
+      ? latestBlock - SCAN_WINDOW_BLOCKS
+      : ZORA_REWARDS_BASE_DEPLOY_BLOCK;
+
+    const logs = await chunkedGetLogs({
       address: ZORA_PROTOCOL_REWARDS,
       event: zoraWithdrawEvent,
       args: { from: account },
-      fromBlock: ZORA_REWARDS_BASE_DEPLOY_BLOCK,
-      toBlock: 'latest',
+      fromBlock,
+      toBlock: latestBlock,
     });
 
     let total = 0n;
     for (const log of logs) {
-      total += log.args.amount ?? 0n;
+      total += (log.args.amount as bigint) ?? 0n;
     }
     return total;
   } catch (err) {
