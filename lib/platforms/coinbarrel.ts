@@ -7,6 +7,7 @@ import {
 } from '@coinbarrel/sdk';
 import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
 import { fetchVaultClaimTotal } from '@/lib/helius/transactions';
+import { getCachedTokenAddresses } from './cached-tokens';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
   PlatformAdapter,
@@ -179,6 +180,19 @@ export const coinbarrelAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
+      // DB-first: use cached token addresses from cron to skip expensive GPA
+      const cached = await getCachedTokenAddresses(wallet, 'coinbarrel', 'sol');
+      if (cached) {
+        return cached.map((addr) => ({
+          tokenAddress: addr,
+          chain: 'sol' as const,
+          platform: 'coinbarrel' as const,
+          symbol: null,
+          name: null,
+          imageUrl: null,
+        }));
+      }
+
       const creatorPk = new PublicKey(wallet);
       const curves = await findBondingCurvesByCreator(creatorPk);
 
