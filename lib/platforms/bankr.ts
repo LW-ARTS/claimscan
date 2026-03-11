@@ -248,6 +248,34 @@ const BANKR_LAUNCHES_API = 'https://api.bankr.bot/token-launches';
 const BANKR_PUBLIC_API = 'https://api.bankr.bot/public/doppler';
 const BANKR_BEARER = process.env.BANKR_BEARER_TOKEN;
 
+// ── Doppler in-memory cache ──────────────────────────────
+// The Doppler API is public (no auth, rate-limited by IP).
+// Caching responses avoids redundant calls when multiple scans
+// hit overlapping tokens within the same serverless instance.
+const DOPPLER_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const DOPPLER_CACHE_MAX = 500;
+const dopplerCache = new Map<string, { data: BankrTokenFeeResponse; ts: number }>();
+
+function dopplerCacheGet(tokenAddress: string): BankrTokenFeeResponse | null {
+  const entry = dopplerCache.get(tokenAddress);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > DOPPLER_CACHE_TTL_MS) {
+    dopplerCache.delete(tokenAddress);
+    return null;
+  }
+  return entry.data;
+}
+
+function dopplerCacheSet(tokenAddress: string, data: BankrTokenFeeResponse): void {
+  // Lazy eviction: if at capacity, drop oldest half
+  if (dopplerCache.size >= DOPPLER_CACHE_MAX) {
+    const entries = [...dopplerCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+    const toDrop = Math.floor(entries.length / 2);
+    for (let i = 0; i < toDrop; i++) dopplerCache.delete(entries[i][0]);
+  }
+  dopplerCache.set(tokenAddress, { data, ts: Date.now() });
+}
+
 /** Build auth headers for Bankr Search API.
  * Prefers bearer token if available, falls back to API key (x-api-key). */
 function bankrAuthHeaders(): Record<string, string> {
@@ -366,6 +394,10 @@ async function searchLaunches(query: string): Promise<BankrSearchResponse> {
 }
 
 async function getTokenFees(tokenAddress: string, externalSignal?: AbortSignal): Promise<BankrTokenFeeResponse | null> {
+  // Check in-memory cache first
+  const cached = dopplerCacheGet(tokenAddress);
+  if (cached) return cached;
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -377,7 +409,9 @@ async function getTokenFees(tokenAddress: string, externalSignal?: AbortSignal):
     });
     clearTimeout(timeout);
     if (!res.ok) { console.warn(`[bankr] getTokenFees returned HTTP ${res.status} for ${tokenAddress}`); return null; }
-    return (await res.json()) as BankrTokenFeeResponse;
+    const data = (await res.json()) as BankrTokenFeeResponse;
+    dopplerCacheSet(tokenAddress, data);
+    return data;
   } catch (err) {
     console.warn('[bankr] getTokenFees failed:', err instanceof Error ? err.message : err);
     return null;
