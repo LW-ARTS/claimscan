@@ -131,43 +131,34 @@ export const clankerAdapter: PlatformAdapter = {
   async getCreatorTokens(wallet: string): Promise<CreatorToken[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
-    // Use /search-creator which correctly returns tokens where wallet is admin.
-    // The /tokens?deployer= endpoint is broken (ignores the deployer parameter).
-    // Paginate: API returns ~20 tokens per page with hasMore flag.
+    // Use /search-creator?q=<wallet> to find tokens deployed by this wallet.
+    // NOTE: The /tokens?feeRecipient= endpoint was tested but is broken —
+    // it ignores the feeRecipient parameter and returns the 10 most recent
+    // tokens platform-wide (verified 2026-03-11 with address 0x0...01).
     const MAX_PAGES = 10; // 200 tokens max safety cap
     const allTokens: ClankerToken[] = [];
+    const seen = new Set<string>();
 
     for (let page = 1; page <= MAX_PAGES; page++) {
       const data = await clankerFetch<ClankerSearchCreatorResponse>(
         `/search-creator?q=${encodeURIComponent(wallet)}&page=${page}`
       );
       if (!data?.tokens || data.tokens.length === 0) break;
-      allTokens.push(...data.tokens);
+
+      for (const t of data.tokens) {
+        if (!t.contract_address) continue;
+        const lower = t.contract_address.toLowerCase();
+        if (!seen.has(lower)) {
+          seen.add(lower);
+          allTokens.push(t);
+        }
+      }
       if (!data.hasMore) break;
     }
 
     if (allTokens.length === 0) return [];
 
-    const normalizedWallet = normalizeEvmAddress(wallet);
-
-    // Deduplicate by contract address (API can return duplicates)
-    const seen = new Set<string>();
-    const unique: ClankerToken[] = [];
-    for (const t of allTokens) {
-      if (!t.contract_address) continue;
-      const addr = normalizeEvmAddress(t.contract_address);
-      if (seen.has(addr)) continue;
-      seen.add(addr);
-
-      // Only include tokens where this wallet is the admin (fee recipient).
-      // The /search-creator endpoint returns tokens for both launcher AND admin,
-      // but fees accrue to the admin — skip tokens without admin or with a different admin.
-      if (!t.admin || normalizeEvmAddress(t.admin) !== normalizedWallet) continue;
-
-      unique.push(t);
-    }
-
-    return unique.map((t) => ({
+    return allTokens.map((t) => ({
       tokenAddress: t.contract_address,
       chain: 'base' as const,
       platform: 'clanker' as const,

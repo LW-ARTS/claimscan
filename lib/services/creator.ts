@@ -289,28 +289,64 @@ async function freshResolve(
 
     // Batch upsert fee records
     if (allFees.length > 0) {
-      const feeRows = allFees.map((fee) => ({
-        creator_id: creatorId!,
-        creator_token_id: null,
-        platform: fee.platform,
-        chain: fee.chain,
-        token_address: fee.tokenAddress,
-        token_symbol: fee.tokenSymbol,
-        total_earned: fee.totalEarned,
-        total_claimed: fee.totalClaimed,
-        total_unclaimed: fee.totalUnclaimed,
-        total_earned_usd: fee.totalEarnedUsd,
-        claim_status:
-          safeBigInt(fee.totalUnclaimed) > 0n && safeBigInt(fee.totalClaimed) > 0n
-            ? 'partially_claimed' as const // some claimed, some remaining
-            : safeBigInt(fee.totalUnclaimed) > 0n
-              ? 'unclaimed' as const       // nothing claimed yet
-              : safeBigInt(fee.totalEarned) > 0n
-                ? 'claimed' as const       // fully claimed
-                : 'unclaimed' as const,    // no fee data
-        royalty_bps: fee.royaltyBps,
-        last_synced_at: new Date().toISOString(),
-      }));
+      // Fetch existing claimed data to prevent regressions.
+      // When computeClaimedAmounts is rate-limited it returns 0 for all positions,
+      // which would overwrite previously-computed non-zero claimed values.
+      const { data: existingFees } = await supabase
+        .from('fee_records')
+        .select('platform, chain, token_address, total_claimed, total_earned')
+        .eq('creator_id', creatorId!);
+      const existingClaimedMap = new Map<string, { claimed: string; earned: string }>();
+      if (existingFees) {
+        for (const ef of existingFees) {
+          const key = `${ef.platform}:${ef.chain}:${ef.token_address}`;
+          existingClaimedMap.set(key, { claimed: ef.total_claimed, earned: ef.total_earned });
+        }
+      }
+
+      const feeRows = allFees.map((fee) => {
+        let totalClaimed = fee.totalClaimed;
+        let totalEarned = fee.totalEarned;
+
+        // Preserve existing claimed data when new resolve couldn't compute it.
+        // If DB has claimed > 0 but new data has claimed = 0, keep the DB values
+        // to avoid regressing due to rate limiting or API failures.
+        if (safeBigInt(totalClaimed) === 0n) {
+          const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
+          const existing = existingClaimedMap.get(key);
+          if (existing && safeBigInt(existing.claimed) > 0n) {
+            totalClaimed = existing.claimed;
+            // Recompute totalEarned = max(new unclaimed, existing unclaimed) + preserved claimed
+            // to maintain the invariant totalEarned = totalClaimed + totalUnclaimed
+            const claimed = safeBigInt(totalClaimed);
+            const unclaimed = safeBigInt(fee.totalUnclaimed);
+            totalEarned = (unclaimed + claimed).toString();
+          }
+        }
+
+        return {
+          creator_id: creatorId!,
+          creator_token_id: null,
+          platform: fee.platform,
+          chain: fee.chain,
+          token_address: fee.tokenAddress,
+          token_symbol: fee.tokenSymbol,
+          total_earned: totalEarned,
+          total_claimed: totalClaimed,
+          total_unclaimed: fee.totalUnclaimed,
+          total_earned_usd: fee.totalEarnedUsd,
+          claim_status:
+            safeBigInt(fee.totalUnclaimed) > 0n && safeBigInt(totalClaimed) > 0n
+              ? 'partially_claimed' as const
+              : safeBigInt(fee.totalUnclaimed) > 0n
+                ? 'unclaimed' as const
+                : safeBigInt(totalEarned) > 0n
+                  ? 'claimed' as const
+                  : 'unclaimed' as const,
+          royalty_bps: fee.royaltyBps,
+          last_synced_at: new Date().toISOString(),
+        };
+      });
       const { error: feeError } = await supabase
         .from('fee_records')
         .upsert(feeRows, { onConflict: 'creator_id,platform,chain,token_address' });
