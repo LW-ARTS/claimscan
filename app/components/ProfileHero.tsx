@@ -432,48 +432,48 @@ export function ProfileHero({
 
           {/* Right: hero total (desktop) / centered (mobile) */}
           <div className="text-center sm:text-right sm:shrink-0">
-            <p className="text-4xl font-black tabular-nums tracking-tighter sm:text-6xl">
-              {formatUsd(totalEarnedUsd)}
-            </p>
-            <p className="mt-1 text-xs tracking-wide text-muted-foreground/50">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
               Total Earned
             </p>
+            <p className="mt-1 text-4xl font-black tabular-nums tracking-tighter sm:text-6xl">
+              {formatUsd(totalEarnedUsd)}
+            </p>
             {totalEarnedUsd > 0 && (
-              <p className="mt-2 text-xs tabular-nums">
-                <span className="text-muted-foreground/50">{formatUsd(displayClaimedUsd)} claimed</span>
-                <span className="mx-1.5 text-muted-foreground/30">&middot;</span>
-                <span className="text-foreground/70">{formatUsd(displayUnclaimedUsd)} unclaimed</span>
-              </p>
+              <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-1.5">
+                <span className="text-xs tabular-nums font-medium text-muted-foreground">
+                  {formatUsd(displayClaimedUsd)} claimed
+                </span>
+                <span className="h-3 w-px bg-border" aria-hidden="true" />
+                <span className="text-xs tabular-nums font-semibold text-foreground">
+                  {formatUsd(displayUnclaimedUsd)} unclaimed
+                </span>
+              </div>
             )}
           </div>
         </div>
 
         {/* Stats row */}
-        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground/50 text-xs">Unclaimed</span>
-            <span className="font-semibold tabular-nums" aria-live="polite" aria-atomic>
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
+          <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 sm:min-w-[120px]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Unclaimed</p>
+            <p className="mt-0.5 text-lg font-bold tabular-nums tracking-tight" aria-live="polite" aria-atomic>
               {formatUsd(displayUnclaimedUsd)}
-            </span>
-            {loading && <PulsingDot className="h-1.5 w-1.5 text-foreground" />}
+              {loading && <PulsingDot className="ml-1.5 inline-flex h-1.5 w-1.5 text-foreground" />}
+            </p>
           </div>
-          <span className="h-3.5 w-px bg-border/60" aria-hidden="true" />
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground/50 text-xs">Platforms</span>
-            <span className="font-semibold tabular-nums">
+          <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 sm:min-w-[100px]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Platforms</p>
+            <p className="mt-0.5 text-lg font-bold tabular-nums tracking-tight">
               {platformCount > 0 ? platformCount : '—'}
-            </span>
+            </p>
           </div>
           {resolveMs > 0 && (
-            <>
-              <span className="h-3.5 w-px bg-border/60" aria-hidden="true" />
-              <div className="flex items-center gap-1.5">
-                <span className="text-muted-foreground/50 text-xs">Scanned in</span>
-                <span className="font-semibold tabular-nums">
-                  {(resolveMs / 1000).toFixed(1)}s
-                </span>
-              </div>
-            </>
+            <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 sm:min-w-[110px]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Scanned in</p>
+              <p className="mt-0.5 text-lg font-bold tabular-nums tracking-tight">
+                {(resolveMs / 1000).toFixed(1)}s
+              </p>
+            </div>
           )}
         </div>
 

@@ -109,10 +109,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
           {totalUnclaimed > 0 && (
             <>
               <span className="h-3.5 w-px bg-border/50" aria-hidden="true" />
-              <span className="flex items-center gap-1.5 text-xs text-foreground/70">
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs font-semibold text-foreground">
                 <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
-                  <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-current opacity-75" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
+                  <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-foreground opacity-40" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-foreground" />
                 </span>
                 {totalUnclaimed} unclaimed
               </span>
@@ -195,15 +195,15 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
       ))}
 
       {/* Status filter */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
         {(['all', 'unclaimed', 'claimed'] as const).map((status) => (
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
-            className={`rounded-full px-2.5 py-1 text-[11px] font-medium capitalize transition-all ${
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors duration-150 ${
               statusFilter === status
-                ? 'bg-foreground/10 text-foreground'
-                : 'text-muted-foreground/50 hover:text-muted-foreground'
+                ? 'bg-foreground text-background'
+                : 'border border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
             }`}
           >
             {status}

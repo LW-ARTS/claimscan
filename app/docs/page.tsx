@@ -516,12 +516,18 @@ resolution   addresses     & USD values`}
                 <h3 className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Key Architecture Decisions</h3>
                 <div className="space-y-2">
                   {[
+                    { title: 'SSE streaming', desc: 'Real-time scan progress via Server-Sent Events. Each platform result streams to the client as it completes — no waiting for the full scan.' },
+                    { title: 'AbortSignal propagation', desc: 'Every HTTP and RPC call carries an AbortSignal. When a user navigates away mid-scan, all in-flight requests cancel immediately — zero orphaned connections.' },
+                    { title: 'Wallclock guards', desc: 'Hard wallclock budgets on every resolve path prevent serverless timeouts. Functions return partial results instead of dying at the edge.' },
                     { title: 'In-flight deduplication', desc: 'Prevents duplicate API calls for concurrent requests to the same creator.' },
-                    { title: '30-second timeout', desc: 'All resolve operations timeout gracefully for serverless environments.' },
-                    { title: '40-minute cache TTL', desc: 'Creator and fee data cached in Supabase. Fresh scans only trigger after TTL expires.' },
-                    { title: 'Dynamic dust filter', desc: 'Positions below $15 in unclaimed fees are skipped during claimed-amount computation. The threshold uses live SOL price from CoinGecko, adjusting automatically as prices change.' },
-                    { title: 'Multi-key API rotation', desc: '10 API keys from separate accounts enable 10,000 requests/hour with round-robin rotation and per-key rate limit tracking.' },
-                    { title: 'Batched concurrency', desc: 'API requests processed in batches of 40 to avoid connection overload on both bags.fm and Vercel.' },
+                    { title: '40-minute DB cache', desc: 'Creator and fee data cached in Supabase. Fresh scans only trigger after TTL expires.' },
+                    { title: 'Doppler in-memory cache', desc: '10-minute TTL in-memory cache for Bankr token fee lookups. Eliminates redundant calls to the IP-rate-limited Doppler API, increasing effective throughput ~2-3x.' },
+                    { title: 'GPA caching', desc: 'Expensive getProgramAccounts calls skipped when the cron indexer has already discovered the creator\'s tokens in the database.' },
+                    { title: 'Cron token indexer', desc: 'Background job indexes creator tokens with a dedicated sync column and wallclock budget. Keeps the DB warm so live scans hit cache instead of chain.' },
+                    { title: 'Dynamic dust filter', desc: 'Positions below $15 in unclaimed fees are skipped during claimed-amount computation. Threshold uses live SOL price, adjusting automatically.' },
+                    { title: 'Multi-key API rotation', desc: '10 API keys with round-robin rotation and per-key rate limit tracking. 10,000 requests/hour for Bags.fm.' },
+                    { title: 'Batched concurrency', desc: 'API requests processed in batches of 40 with chunked EVM getLogs to avoid connection overload on both platforms and Vercel.' },
+                    { title: 'Helius V2 pagination', desc: 'Cursor-based pagination for RevShare token discovery via Helius DAS API. Handles creators with 100+ assets without missing tokens.' },
                     { title: 'Visibility-aware polling', desc: 'Live polling stops when the browser tab is hidden, resuming on focus.' },
                     { title: 'Privacy-first logging', desc: 'All search queries SHA256-hashed before storage. No raw PII stored.' },
                   ].map((item) => (
@@ -587,12 +593,18 @@ resolution   addresses     & USD values`}
                 <div className="rounded-lg bg-foreground p-4">
                   <div className="flex items-center gap-2">
                     <span className="text-base font-bold text-background">V1</span>
-                    <span className="text-[10px] uppercase tracking-wider text-background/40">Current &middot; March 2025</span>
+                    <span className="text-[10px] uppercase tracking-wider text-background/40">Current &middot; March 2026</span>
                   </div>
                   <ul className="mt-3 space-y-1">
                     {[
                       '9 platform support (Solana + Base)',
                       'Multi-identity search (Twitter, GitHub, Farcaster, Wallet)',
+                      'SSE streaming — real-time scan progress as each platform completes',
+                      'AbortSignal propagation — clean cancellation across all adapters',
+                      'Wallclock guards — partial results instead of serverless timeouts',
+                      'In-memory Doppler cache — 2-3x throughput for Bankr scans',
+                      'Cron token indexer — background indexing for faster repeat scans',
+                      'Chunked EVM getLogs + Helius V2 cursor pagination',
                       'Real-time fee polling with 30s intervals',
                       'USD conversion with live price feeds',
                       'Dynamic dust filtering ($15 threshold)',
