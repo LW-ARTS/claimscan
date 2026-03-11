@@ -281,12 +281,6 @@ function findClaimerEntry(
 }
 
 /**
- * Get totalClaimed (lamports) for a wallet across multiple token mints.
- * Caps at MAX_CLAIM_STATS_MINTS to avoid excessive API calls; logs a warning when truncated.
- * When `handle` is provided (handle-based lookup), uses it as a fallback
- * matching strategy if the wallet address doesn't match claim-stats entries.
- */
-/**
  * Convert a decimal SOL string (e.g. "1.234567890") to lamports using
  * string manipulation instead of floating-point arithmetic.
  * This avoids precision loss for amounts > ~9 SOL where

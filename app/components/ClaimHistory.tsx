@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { PlatformIcon } from './PlatformIcon';
-import { PLATFORM_CONFIG } from '@/lib/constants';
-import type { Database } from '@/lib/supabase/types';
+import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
+import { formatTokenAmount } from '@/lib/utils';
+import type { Database, Chain } from '@/lib/supabase/types';
 
 type ClaimEvent = Database['public']['Tables']['claim_events']['Row'];
 
@@ -25,22 +26,22 @@ function timeAgo(dateStr: string): string {
   return `${months}mo ago`;
 }
 
-function formatAmount(amount: string, chain: string): string {
-  const decimals = chain === 'sol' ? 9 : 18;
-  try {
-    const raw = BigInt(amount);
-    const whole = raw / BigInt(10 ** decimals);
-    const frac = raw % BigInt(10 ** decimals);
-    const fracStr = frac.toString().padStart(decimals, '0').slice(0, 4).replace(/0+$/, '');
-    if (!fracStr) return whole.toString();
-    return `${whole}.${fracStr}`;
-  } catch {
-    return amount;
+/** Chain-aware block explorer URL for transaction hashes. */
+function getExplorerTxUrl(txHash: string, chain: Chain): string {
+  switch (chain) {
+    case 'base': return `https://basescan.org/tx/${txHash}`;
+    case 'eth': return `https://etherscan.io/tx/${txHash}`;
+    default: return `https://solscan.io/tx/${txHash}`;
   }
 }
 
-function getSolscanUrl(txHash: string): string {
-  return `https://solscan.io/tx/${txHash}`;
+/** Human-readable explorer name for aria-labels. */
+function getExplorerName(chain: Chain): string {
+  switch (chain) {
+    case 'base': return 'Basescan';
+    case 'eth': return 'Etherscan';
+    default: return 'Solscan';
+  }
 }
 
 interface ClaimHistoryProps {
@@ -100,7 +101,7 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
               </div>
               <div className="shrink-0 text-right">
                 <span className="font-semibold tabular-nums">
-                  {formatAmount(event.amount, event.chain)} {nativeSymbol}
+                  {formatTokenAmount(event.amount, CHAIN_CONFIG[event.chain]?.nativeDecimals ?? 9)} {nativeSymbol}
                 </span>
                 {event.amount_usd != null && event.amount_usd > 0 && (
                   <span className="ml-1 text-xs text-muted-foreground/50">
@@ -114,12 +115,12 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
                 </span>
                 {event.tx_hash && (
                   <a
-                    href={getSolscanUrl(event.tx_hash)}
+                    href={getExplorerTxUrl(event.tx_hash, event.chain)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted-foreground/40 transition-colors hover:text-foreground"
-                    aria-label="View on Solscan"
-                    title="View on Solscan"
+                    aria-label={`View on ${getExplorerName(event.chain)}`}
+                    title={`View on ${getExplorerName(event.chain)}`}
                   >
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
