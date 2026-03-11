@@ -299,6 +299,7 @@ interface BankrTokenFeeResponse {
     claimedWeth: string;
     claimCount: number;
   };
+  dailyEarnings?: Array<{ date: string; weth: string }>;
 }
 
 async function searchLaunchesPaginated(
@@ -371,7 +372,7 @@ async function getTokenFees(tokenAddress: string, externalSignal?: AbortSignal):
     const combinedSignal = externalSignal
       ? AbortSignal.any([externalSignal, controller.signal])
       : controller.signal;
-    const res = await fetch(`${BANKR_PUBLIC_API}/token-fees/${tokenAddress}`, {
+    const res = await fetch(`${BANKR_PUBLIC_API}/token-fees/${tokenAddress}?days=90`, {
       signal: combinedSignal,
     });
     clearTimeout(timeout);
@@ -404,6 +405,22 @@ function wethToWei(val: string | null | undefined): string {
   return (whole + frac).replace(/^0+/, '') || '0';
 }
 
+/**
+ * Sum the dailyEarnings array (reliable) to get total earned in wei.
+ * The Bankr Doppler API's `totals.claimedWeth` is unreliable — it often
+ * returns "0" even when substantial amounts were claimed on-chain.
+ * `dailyEarnings[].weth` is consistent and accurate.
+ */
+function sumDailyEarningsWei(dailyEarnings: Array<{ date: string; weth: string }> | undefined): string {
+  if (!dailyEarnings || dailyEarnings.length === 0) return '0';
+  let total = BigInt(0);
+  for (const day of dailyEarnings) {
+    const wei = wethToWei(day.weth);
+    if (wei !== '0') total += BigInt(wei);
+  }
+  return total.toString();
+}
+
 async function fetchFeesForTokens(tokens: BankrTokenLaunch[], signal?: AbortSignal): Promise<TokenFee[]> {
   if (tokens.length === 0) return [];
   const batch = tokens.slice(0, 30);
@@ -415,19 +432,27 @@ async function fetchFeesForTokens(tokens: BankrTokenLaunch[], signal?: AbortSign
     const token = batch[i];
     if (result.status !== 'fulfilled' || !result.value) continue;
 
-    const totals = result.value.totals;
+    const { totals, dailyEarnings } = result.value;
     const claimableWei = wethToWei(totals?.claimableWeth);
-    const claimedWei = wethToWei(totals?.claimedWeth);
 
-    let totalEarnedWei: string;
-    try {
-      totalEarnedWei = (BigInt(claimableWei) + BigInt(claimedWei)).toString();
-    } catch (err) {
-      console.warn('[bankr] BigInt add failed in fetchFeesForTokens:', err instanceof Error ? err.message : err);
-      totalEarnedWei = claimableWei;
-    }
+    // Primary: sum dailyEarnings (reliable source of truth).
+    // Fallback: claimable + claimed from totals (only if no dailyEarnings).
+    const dailyEarnedWei = sumDailyEarningsWei(dailyEarnings);
+    const claimedWeiFromTotals = wethToWei(totals?.claimedWeth);
+    const totalsEarnedWei = (BigInt(claimableWei) + BigInt(claimedWeiFromTotals)).toString();
 
-    if (totalEarnedWei === '0' && claimableWei === '0' && claimedWei === '0') continue;
+    // Use whichever is higher — dailyEarnings covers 90 days of actual
+    // on-chain activity while totals.claimedWeth is sometimes zero.
+    const totalEarnedWei = BigInt(dailyEarnedWei) > BigInt(totalsEarnedWei)
+      ? dailyEarnedWei
+      : totalsEarnedWei;
+
+    // Derive claimed = earned - unclaimed (more reliable than totals.claimedWeth)
+    const totalClaimedWei = BigInt(totalEarnedWei) > BigInt(claimableWei)
+      ? (BigInt(totalEarnedWei) - BigInt(claimableWei)).toString()
+      : '0';
+
+    if (totalEarnedWei === '0' && claimableWei === '0') continue;
 
     fees.push({
       tokenAddress: normalizeEvmAddress(token.tokenAddress),
@@ -435,7 +460,7 @@ async function fetchFeesForTokens(tokens: BankrTokenLaunch[], signal?: AbortSign
       chain: 'base' as const,
       platform: 'bankr' as const,
       totalEarned: totalEarnedWei,
-      totalClaimed: claimedWei,
+      totalClaimed: totalClaimedWei,
       totalUnclaimed: claimableWei,
       totalEarnedUsd: null,
       royaltyBps: null,
