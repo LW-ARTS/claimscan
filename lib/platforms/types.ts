@@ -103,8 +103,10 @@ export interface PlatformAdapter {
   /**
    * Get live unclaimed fees (real-time onchain query).
    * Only available if supportsLiveFees is true.
+   * @param signal - Optional AbortSignal to cancel in-flight RPC/HTTP requests
+   *                 when the caller's wallclock budget expires.
    */
-  getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]>;
+  getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]>;
 
   /**
    * Get claim history (individual claim transactions).

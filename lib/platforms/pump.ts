@@ -54,7 +54,7 @@ export const pumpAdapter: PlatformAdapter = {
     return [];
   },
 
-  async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
+  async getLiveUnclaimedFees(wallet: string, _signal?: AbortSignal): Promise<TokenFee[]> {
     if (!isValidSolanaAddress(wallet)) return [];
     try {
       const creator = new PublicKey(wallet);

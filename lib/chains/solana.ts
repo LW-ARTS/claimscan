@@ -66,12 +66,15 @@ function raceTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
  * Each attempt has its own timeout so a single slow RPC doesn't block the
  * entire fallback chain. Tries RPCs in order of fewest recent failures.
  *
- * @param fn   - Async function that takes a Connection and returns a result.
- * @param label - Human-readable label for logging (e.g. 'getBalance').
+ * @param fn     - Async function that takes a Connection and returns a result.
+ * @param label  - Human-readable label for logging (e.g. 'getBalance').
+ * @param signal - Optional AbortSignal from the route-level timeout.
+ *                 When aborted, skips remaining RPC attempts immediately.
  */
 export async function withRpcFallback<T>(
   fn: (conn: Connection) => Promise<T>,
-  label = 'rpc-call'
+  label = 'rpc-call',
+  signal?: AbortSignal
 ): Promise<T> {
   const order = connections
     .map((_, i) => i)
@@ -80,6 +83,10 @@ export async function withRpcFallback<T>(
   let lastError: Error | undefined;
 
   for (const idx of order) {
+    // Bail immediately if the caller's budget expired
+    if (signal?.aborted) {
+      throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+    }
     try {
       const result = await raceTimeout(fn(connections[idx]), PER_ATTEMPT_TIMEOUT_MS, label);
       rpcFailures[idx] = Math.floor(rpcFailures[idx] * 0.5);

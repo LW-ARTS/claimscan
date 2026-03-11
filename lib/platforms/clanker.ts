@@ -216,7 +216,7 @@ export const clankerAdapter: PlatformAdapter = {
     return fees;
   },
 
-  async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
+  async getLiveUnclaimedFees(wallet: string, _signal?: AbortSignal): Promise<TokenFee[]> {
     // Delegate to getHistoricalFees to avoid fetching the token list twice
     const fees = await this.getHistoricalFees(wallet);
     return fees.filter((f) => safeBigInt(f.totalUnclaimed) > 0n);
