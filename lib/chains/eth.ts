@@ -38,8 +38,8 @@ export const ethClient = createPublicClient({
  * scanning withdraw history. Public RPCs support larger ranges.
  */
 const ETH_PUBLIC_RPCS = [
-  'https://eth.llamarpc.com',
-  'https://eth.drpc.org',
+  'https://rpc.ankr.com/eth',
+  'https://ethereum-rpc.publicnode.com',
 ];
 const ethLogsClient = createPublicClient({
   chain: mainnet,
@@ -92,8 +92,10 @@ const ETH_LOGS_CHUNK_SIZE = 10_000n;
 /** Concurrent chunk requests. */
 const ETH_LOGS_PARALLEL_CHUNKS = 5;
 
-/** Scan window: ~500K blocks ≈ ~69 days on ETH (~12s block time). */
-const ETH_SCAN_WINDOW_BLOCKS = 500_000n;
+/** Scan window: ~10K blocks ≈ ~33 hours on ETH (~12s block time).
+ * Much smaller than Base (500K) because ETH public RPCs are significantly slower
+ * and multiple wallets scan concurrently. */
+const ETH_SCAN_WINDOW_BLOCKS = 10_000n;
 
 /** Timeout to prevent blocking resolve when RPCs are slow. */
 const ETH_CLAIM_LOGS_TIMEOUT_MS = 12_000;
@@ -188,7 +190,8 @@ export async function getZoraWithdrawLogsEth(
   account: Address
 ): Promise<bigint> {
   const scan = async (): Promise<bigint> => {
-    const latestBlock = await ethLogsClient.getBlockNumber();
+    // Use ethClient (Alchemy) for fast getBlockNumber, ethLogsClient for getLogs
+    const latestBlock = await ethClient.getBlockNumber();
     const fromBlock = latestBlock > ETH_SCAN_WINDOW_BLOCKS
       ? latestBlock - ETH_SCAN_WINDOW_BLOCKS
       : ZORA_REWARDS_ETH_DEPLOY_BLOCK;
