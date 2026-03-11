@@ -46,7 +46,7 @@ export const zoraAdapter: PlatformAdapter = {
     return [];
   },
 
-  async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
+  async getLiveUnclaimedFees(wallet: string, _signal?: AbortSignal): Promise<TokenFee[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
     const checksummed = getAddress(wallet);

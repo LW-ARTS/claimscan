@@ -108,7 +108,7 @@ export const revshareAdapter: PlatformAdapter = {
     return [];
   },
 
-  async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
+  async getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]> {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
@@ -116,7 +116,7 @@ export const revshareAdapter: PlatformAdapter = {
       let mintAddresses = await getCachedTokenAddresses(wallet, 'revshare', 'sol');
       if (!mintAddresses) {
         // Fallback: full GPA scan (first visit or cron hasn't indexed yet)
-        mintAddresses = await findMintsByWithdrawAuthority(wallet);
+        mintAddresses = await findMintsByWithdrawAuthority(wallet, signal);
       }
       if (mintAddresses.length === 0) return [];
 
@@ -129,6 +129,7 @@ export const revshareAdapter: PlatformAdapter = {
       const BATCH_WALLCLOCK_MS = 7_000;
       const batchStart = Date.now();
       for (let i = 0; i < mintAddresses.length; i += BATCH_SIZE) {
+        if (signal?.aborted) break;
         if (Date.now() - batchStart > BATCH_WALLCLOCK_MS) {
           const remaining = mintAddresses.length - i;
           console.warn(`[revshare] wallclock guard: skipping ${remaining} mints after ${BATCH_WALLCLOCK_MS}ms (${fees.length} collected)`);
@@ -140,7 +141,8 @@ export const revshareAdapter: PlatformAdapter = {
             const mintPubkey = new PublicKey(mintAddr);
             const mintAccount = await withRpcFallback(
               (c) => getMint(c, mintPubkey, 'confirmed', TOKEN_2022_PROGRAM_ID),
-              'revshare-get-mint'
+              'revshare-get-mint',
+              signal
             );
 
             const feeConfig = getTransferFeeConfig(mintAccount);
@@ -206,7 +208,7 @@ export const revshareAdapter: PlatformAdapter = {
  * majority of Token-2022 mints with transfer fees. Mints with
  * a different extension ordering will be missed (acceptable for MVP).
  */
-async function findMintsByWithdrawAuthority(wallet: string): Promise<string[]> {
+async function findMintsByWithdrawAuthority(wallet: string, signal?: AbortSignal): Promise<string[]> {
   const walletPubkey = new PublicKey(wallet);
   const rpcUrls = getRpcUrls();
 
@@ -227,17 +229,18 @@ async function findMintsByWithdrawAuthority(wallet: string): Promise<string[]> {
 
   // Try each RPC with fallback
   for (let rpcIdx = 0; rpcIdx < rpcUrls.length; rpcIdx++) {
+    if (signal?.aborted) return [];
     const rpcUrl = rpcUrls[rpcIdx];
     try {
       // Attempt getProgramAccountsV2 (Helius) with cursor pagination
-      const accounts = await fetchGpaV2(rpcUrl, filters);
+      const accounts = await fetchGpaV2(rpcUrl, filters, signal);
       return accounts;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       // If method not found, this RPC doesn't support V2 — try standard GPA
       if (msg.includes('Method not found') || msg.includes('not found')) {
         try {
-          return await fetchGpaStandard(rpcUrl, filters);
+          return await fetchGpaStandard(rpcUrl, filters, signal);
         } catch (fallbackErr) {
           console.warn(
             `[revshare] findMintsByWithdrawAuthority standard GPA failed on RPC #${rpcIdx + 1}:`,
@@ -259,13 +262,16 @@ async function findMintsByWithdrawAuthority(wallet: string): Promise<string[]> {
 /** Helius getProgramAccountsV2 with cursor-based pagination. */
 async function fetchGpaV2(
   rpcUrl: string,
-  filters: Array<{ memcmp: { offset: number; bytes: string } }>
+  filters: Array<{ memcmp: { offset: number; bytes: string } }>,
+  externalSignal?: AbortSignal
 ): Promise<string[]> {
   const accounts: string[] = [];
   let paginationKey: string | null = null;
   const MAX_PAGES = 20; // safety cap
 
   for (let page = 0; page < MAX_PAGES; page++) {
+    if (externalSignal?.aborted) break;
+
     const params: Record<string, unknown> = {
       encoding: 'base64',
       commitment: 'confirmed',
@@ -276,30 +282,38 @@ async function fetchGpaV2(
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), GPA_TIMEOUT_MS);
+    // Link external signal so route-level abort cancels this fetch
+    const onAbort = () => controller.abort();
+    externalSignal?.addEventListener('abort', onAbort, { once: true });
 
-    const res = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'getProgramAccountsV2',
-        params: [TOKEN_2022_PROGRAM_ID.toBase58(), params],
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
+    try {
+      const res = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getProgramAccountsV2',
+          params: [TOKEN_2022_PROGRAM_ID.toBase58(), params],
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
 
-    const json = await res.json();
-    if (json.error) throw new Error(json.error.message);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message);
 
-    const result = json.result;
-    for (const item of result.accounts ?? []) {
-      accounts.push(item.pubkey);
+      const result = json.result;
+      for (const item of result.accounts ?? []) {
+        accounts.push(item.pubkey);
+      }
+
+      paginationKey = result.paginationKey ?? null;
+      if (!paginationKey || (result.accounts ?? []).length === 0) break;
+    } finally {
+      clearTimeout(timeout);
+      externalSignal?.removeEventListener('abort', onAbort);
     }
-
-    paginationKey = result.paginationKey ?? null;
-    if (!paginationKey || (result.accounts ?? []).length === 0) break;
   }
 
   return accounts;
@@ -308,34 +322,43 @@ async function fetchGpaV2(
 /** Standard getProgramAccounts via raw HTTP (fallback for non-Helius RPCs). */
 async function fetchGpaStandard(
   rpcUrl: string,
-  filters: Array<{ memcmp: { offset: number; bytes: string } }>
+  filters: Array<{ memcmp: { offset: number; bytes: string } }>,
+  externalSignal?: AbortSignal
 ): Promise<string[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GPA_TIMEOUT_MS);
+  // Link external signal so route-level abort cancels this fetch
+  const onAbort = () => controller.abort();
+  externalSignal?.addEventListener('abort', onAbort, { once: true });
 
-  const res = await fetch(rpcUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'getProgramAccounts',
-      params: [
-        TOKEN_2022_PROGRAM_ID.toBase58(),
-        {
-          encoding: 'base64',
-          commitment: 'confirmed',
-          dataSlice: { offset: 0, length: 0 },
-          filters,
-        },
-      ],
-    }),
-    signal: controller.signal,
-  });
-  clearTimeout(timeout);
+  try {
+    const res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getProgramAccounts',
+        params: [
+          TOKEN_2022_PROGRAM_ID.toBase58(),
+          {
+            encoding: 'base64',
+            commitment: 'confirmed',
+            dataSlice: { offset: 0, length: 0 },
+            filters,
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
 
-  const json = await res.json();
-  if (json.error) throw new Error(json.error.message);
+    const json = await res.json();
+    if (json.error) throw new Error(json.error.message);
 
-  return (json.result ?? []).map((item: { pubkey: string }) => item.pubkey);
+    return (json.result ?? []).map((item: { pubkey: string }) => item.pubkey);
+  } finally {
+    clearTimeout(timeout);
+    externalSignal?.removeEventListener('abort', onAbort);
+  }
 }

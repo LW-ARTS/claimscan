@@ -517,7 +517,7 @@ export const bankrAdapter: PlatformAdapter = {
     return [];
   },
 
-  async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
+  async getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
     const allFees = await bankrAdapter.getHistoricalFees(wallet);

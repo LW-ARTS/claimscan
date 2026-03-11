@@ -150,7 +150,7 @@ export const believeAdapter: PlatformAdapter = {
     return this.getLiveUnclaimedFees(wallet);
   },
 
-  async getLiveUnclaimedFees(wallet: string): Promise<TokenFee[]> {
+  async getLiveUnclaimedFees(wallet: string, _signal?: AbortSignal): Promise<TokenFee[]> {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {

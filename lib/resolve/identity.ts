@@ -310,18 +310,23 @@ export async function fetchLiveUnclaimedFees(
 ): Promise<TokenFee[]> {
   const adapters = getAllAdapters().filter((a) => a.supportsLiveFees);
 
+  // AbortController to cancel in-flight adapter requests when the
+  // wallclock budget expires. Prevents orphaned HTTP/RPC connections
+  // from lingering after the response is sent.
+  const controller = new AbortController();
+
   const taskMeta: Array<{ platform: string; wallet: string }> = [];
   const tasks = wallets.flatMap((wallet) =>
     adapters
       .filter((a) => a.chain === wallet.chain)
       .map((adapter) => {
         taskMeta.push({ platform: adapter.platform, wallet: wallet.address });
-        return adapter.getLiveUnclaimedFees(wallet.address);
+        return adapter.getLiveUnclaimedFees(wallet.address, controller.signal);
       })
   );
 
   // Race the aggregation against a wallclock timeout.
-  // On timeout we collect whatever results are already settled.
+  // On timeout we abort pending adapters and collect settled results.
   const allFees: TokenFee[] = [];
   let results: PromiseSettledResult<TokenFee[]>[];
 
@@ -337,7 +342,8 @@ export async function fetchLiveUnclaimedFees(
     ]);
   } catch (err) {
     if (err instanceof Error && err.message === 'LIVE_AGGREGATION_TIMEOUT') {
-      console.warn(`[fees] live aggregation timed out after ${LIVE_AGGREGATION_TIMEOUT_MS}ms — collecting partial results`);
+      console.warn(`[fees] live aggregation timed out after ${LIVE_AGGREGATION_TIMEOUT_MS}ms — aborting pending adapters`);
+      controller.abort();
       // Collect results from tasks that already settled
       results = await Promise.allSettled(
         tasks.map((t) => Promise.race([t, new Promise<TokenFee[]>((r) => setTimeout(() => r([]), 0))]))
@@ -353,7 +359,10 @@ export async function fetchLiveUnclaimedFees(
       allFees.push(...result.value);
     } else {
       const meta = taskMeta[i];
-      console.warn(`[fees] ${meta?.platform} getLiveUnclaimedFees failed:`, result.reason);
+      // Don't log abort errors — they're expected on timeout
+      if (result.reason?.name !== 'AbortError') {
+        console.warn(`[fees] ${meta?.platform} getLiveUnclaimedFees failed:`, result.reason);
+      }
     }
   }
 

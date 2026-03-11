@@ -60,13 +60,15 @@ export async function POST(request: Request) {
         }
       };
 
-      // Fire each adapter independently — push results as they arrive
+      // Fire each adapter independently — push results as they arrive.
+      // Pass request.signal so adapters abort when the client disconnects.
+      const { signal } = request;
       const tasks = wallets.flatMap((wallet) =>
         adapters
           .filter((a) => a.chain === wallet.chain)
           .map(async (adapter) => {
             try {
-              const fees = await adapter.getLiveUnclaimedFees(wallet.address);
+              const fees = await adapter.getLiveUnclaimedFees(wallet.address, signal);
               if (fees.length > 0) {
                 send('partial-result', {
                   platform: adapter.platform,
