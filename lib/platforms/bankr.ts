@@ -29,8 +29,9 @@ const BANKR_API_KEY = process.env.BANKR_API_KEY;
 /** Budget for Agent API in resolveIdentity (runs in parallel, not inside allSettled). */
 const AGENT_SHORT_TIMEOUT_MS = 5_000;
 
-/** Budget for Agent API in getFeesByHandle (runs in parallel with wallet resolution). */
-const AGENT_LONG_TIMEOUT_MS = 20_000;
+/** Budget for Agent API in getFeesByHandle (runs in parallel with wallet resolution).
+ * Reduced from 20s to 10s — Agent is a fallback; Search API is primary. */
+const AGENT_LONG_TIMEOUT_MS = 10_000;
 
 const AGENT_POLL_INTERVAL_MS = 2_000;
 
@@ -372,7 +373,25 @@ async function searchLaunchesPaginated(
       break;
     }
   }
-  return all;
+
+  // Post-filter: the paginated endpoint may return tokens where the query
+  // matched the deployer, not the fee recipient. Only keep tokens where the
+  // query actually matches the fee recipient (handle OR wallet address).
+  const queryLower = query.toLowerCase();
+  const isWalletQuery = /^0x[a-fA-F0-9]{40}$/i.test(query);
+
+  const filtered = all.filter((token) => {
+    if (isWalletQuery) {
+      return token.feeRecipient?.walletAddress?.toLowerCase() === queryLower;
+    }
+    return token.feeRecipient?.xUsername?.toLowerCase() === queryLower;
+  });
+
+  if (filtered.length < all.length) {
+    console.info(`[bankr] Post-filter: ${all.length} → ${filtered.length} tokens (query="${query}")`);
+  }
+
+  return filtered;
 }
 
 async function searchLaunches(query: string): Promise<BankrSearchResponse> {
@@ -525,7 +544,10 @@ export const bankrAdapter: PlatformAdapter = {
       const data = await searchLaunches(handle);
       const wallets: ResolvedWallet[] = [];
       const seen = new Set<string>();
+      const handleLower = handle.toLowerCase();
       for (const token of data.groups?.byFeeRecipient?.results ?? []) {
+        // Safety: verify the fee recipient's xUsername actually matches
+        if (token.feeRecipient?.xUsername?.toLowerCase() !== handleLower) continue;
         const addr = token.feeRecipient?.walletAddress;
         if (!addr || !isValidEvmAddress(addr)) continue;
         const normalized = normalizeEvmAddress(addr);

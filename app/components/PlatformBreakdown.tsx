@@ -95,6 +95,24 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
       : statusFilter === 'claimed'
         ? platformFiltered.filter((f) => f.claim_status === 'claimed' || f.claim_status === 'partially_claimed')
         : platformFiltered.filter((f) => f.claim_status === 'partially_claimed');
+
+  // Status counts for the active platform tab
+  const statusCounts = useMemo(() => {
+    let unclaimed = 0;
+    let claimed = 0;
+    let partial = 0;
+    for (const f of platformFiltered) {
+      if (f.claim_status === 'unclaimed') unclaimed++;
+      else if (f.claim_status === 'claimed') claimed++;
+      else if (f.claim_status === 'partially_claimed') partial++;
+    }
+    return {
+      all: platformFiltered.length,
+      unclaimed: unclaimed + partial,
+      claimed: claimed + partial,
+      partial,
+    };
+  }, [platformFiltered]);
   const tabKeys = ['all', ...platformsWithData];
 
   const totalUnclaimed = chainSummaries.reduce((sum, c) => sum + c.unclaimedCount, 0);
@@ -204,19 +222,28 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
 
       {/* Status filter */}
       <div className="flex items-center gap-0.5 rounded-xl bg-muted/50 p-1">
-        {(['all', 'unclaimed', 'claimed', ...(totalPartial > 0 ? ['partial'] as const : [])] as const).map((status) => (
-          <button
-            key={status}
-            onClick={() => setStatusFilter(status as typeof statusFilter)}
-            className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-              statusFilter === status
-                ? 'bg-foreground text-background shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {status}
-          </button>
-        ))}
+        {(['all', 'unclaimed', 'claimed', ...(totalPartial > 0 ? ['partial'] as const : [])] as const).map((status) => {
+          const count = statusCounts[status as keyof typeof statusCounts] ?? 0;
+          const isActive = statusFilter === status;
+          return (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status as typeof statusFilter)}
+              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                isActive
+                  ? 'bg-foreground text-background shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {status}
+              <span className={`tabular-nums text-[10px] ${
+                isActive ? 'text-background/60' : 'text-muted-foreground/50'
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab panel */}
