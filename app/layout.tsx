@@ -118,6 +118,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <meta name="base:app_id" content="69b2e7675600c39dcfa4fe7b" />
         <JsonLd />
       </head>
       <body
