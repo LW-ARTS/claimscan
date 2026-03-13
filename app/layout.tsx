@@ -3,6 +3,7 @@ import { Exo_2, JetBrains_Mono } from 'next/font/google';
 import dynamic from 'next/dynamic';
 import './globals.css';
 import { JsonLd } from './components/JsonLd';
+import { Analytics } from '@vercel/analytics/next';
 import { SiteFooter } from './components/SiteFooter';
 import Link from 'next/link';
 
@@ -164,6 +165,7 @@ export default function RootLayout({
           {/* Footer */}
           <SiteFooter />
         </div>
+        <Analytics />
       </body>
     </html>
   );
