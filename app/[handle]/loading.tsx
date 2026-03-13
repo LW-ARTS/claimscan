@@ -1,84 +1,102 @@
+'use client';
+
+import { usePathname } from 'next/navigation';
+
+const PLATFORMS = [
+  'bags.fm', 'pump.fun', 'zora', 'clanker', 'believe',
+  'meteora', 'bankr', 'boop', 'virtuals',
+];
+
 export default function Loading() {
+  const pathname = usePathname();
+  const handle = pathname?.split('/').filter(Boolean)[0]?.replace(/^@/, '') || '';
+
   return (
-    <div className="space-y-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500">
-      {/* Search bar placeholder */}
-      <div className="h-12 w-full animate-pulse rounded-xl bg-muted" />
+    <div className="signal-stage flex items-center justify-center">
+      <div className="signal-glass-card flex flex-col items-center">
 
-      {/* Profile header skeleton */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-start gap-5">
-          <div className="h-16 w-16 animate-pulse rounded-full bg-muted sm:h-20 sm:w-20" />
-          <div className="flex-1 space-y-3">
-            <div className="h-8 w-48 animate-pulse rounded-lg bg-muted" />
-            <div className="flex gap-2">
-              <div className="h-6 w-24 animate-pulse rounded-full bg-muted" />
-              <div className="h-6 w-16 animate-pulse rounded-full bg-muted" />
+        {/* Handle */}
+        <div className="signal-fade-up signal-handle mb-1.5 flex items-baseline gap-0.5">
+          <span className="font-sans font-bold tracking-tight text-[#0a0a0a]">@</span>
+          <span className="font-sans font-bold tracking-tight text-[#0a0a0a]">{handle}</span>
+        </div>
+
+        {/* SCANNING label */}
+        <div
+          className="signal-fade-up signal-scan-label font-mono font-medium uppercase text-black/28"
+          style={{ animationDelay: '0.1s' }}
+        >
+          Scanning
+        </div>
+
+        {/* Radar */}
+        <div className="signal-radar relative flex items-center justify-center">
+          {/* Sonar pings */}
+          <div className="signal-sonar-ping" style={{ animationDelay: '0s' }} />
+          <div className="signal-sonar-ping" style={{ animationDelay: '1s' }} />
+          <div className="signal-sonar-ping" style={{ animationDelay: '2s' }} />
+
+          {/* Outer SVG ring */}
+          <svg className="signal-ring-outer signal-ring-outer-svg absolute" viewBox="0 0 220 220">
+            <circle
+              cx="110" cy="110" r="108"
+              fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth="1.5"
+            />
+            <circle
+              cx="110" cy="110" r="108"
+              fill="none" stroke="rgba(0,0,0,0.45)" strokeWidth="1.5"
+              strokeLinecap="round" strokeDasharray="80 614"
+              transform="rotate(-90 110 110)"
+            />
+          </svg>
+
+          {/* Mid dashed ring */}
+          <div className="signal-ring-mid" />
+
+          {/* Inner ring */}
+          <div className="signal-ring-inner" />
+
+          {/* Center */}
+          <div className="absolute flex flex-col items-center gap-2.5">
+            <div className="relative flex h-8 w-8 items-center justify-center">
+              <svg className="signal-reticle absolute inset-0 h-full w-full" viewBox="0 0 32 32">
+                <circle
+                  cx="16" cy="16" r="14"
+                  stroke="rgba(0,0,0,0.18)" strokeWidth="1"
+                  fill="none" strokeDasharray="3 5"
+                />
+              </svg>
+              <div className="signal-dot" />
             </div>
-            <div className="h-4 w-64 animate-pulse rounded bg-muted" />
           </div>
         </div>
-      </div>
 
-      {/* Summary cards skeleton */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="overflow-hidden rounded-xl border border-border bg-card p-5"
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 animate-pulse rounded-lg bg-muted" />
-              <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-            </div>
-            <div className="mt-4 space-y-2">
-              <div className="h-8 w-28 animate-pulse rounded-lg bg-muted" />
-              <div className="h-3 w-32 animate-pulse rounded bg-muted" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Chain breakdown skeleton */}
-      <div className="space-y-3">
-        <div className="h-5 w-24 animate-pulse rounded bg-muted" />
-        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
-          {[1, 2].map((i) => (
-            <div
-              key={i}
-              className="rounded-xl border border-border bg-card p-5"
+        {/* Platforms */}
+        <div
+          className="signal-fade-up signal-platforms-wrap flex flex-wrap justify-center font-mono"
+          style={{ animationDelay: '0.9s' }}
+        >
+          {PLATFORMS.map((name, i) => (
+            <span
+              key={name}
+              className="signal-platform"
+              style={{ '--scan-delay': `${i * 1.2}s` } as React.CSSProperties}
             >
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
-                <div className="h-4 w-16 animate-pulse rounded bg-muted" />
-              </div>
-              <div className="mt-4 space-y-2">
-                <div className="h-7 w-24 animate-pulse rounded-lg bg-muted" />
-                <div className="h-3 w-36 animate-pulse rounded bg-muted" />
-              </div>
-            </div>
+              {name}
+            </span>
           ))}
         </div>
-      </div>
 
-      {/* Table skeleton */}
-      <div className="space-y-3">
-        <div className="h-5 w-28 animate-pulse rounded bg-muted" />
-        <div className="flex gap-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-8 w-20 animate-pulse rounded-full bg-muted" />
-          ))}
+        {/* Loading dots */}
+        <div
+          className="signal-fade-up signal-dots flex"
+          style={{ animationDelay: '1.1s' }}
+        >
+          <span className="signal-bounce-dot" style={{ animationDelay: '0s' }} />
+          <span className="signal-bounce-dot" style={{ animationDelay: '0.2s' }} />
+          <span className="signal-bounce-dot" style={{ animationDelay: '0.4s' }} />
         </div>
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="flex items-center gap-4 border-b border-border px-4 py-3">
-              <div className="h-6 w-6 animate-pulse rounded-full bg-muted" />
-              <div className="h-4 w-16 animate-pulse rounded bg-muted" />
-              <div className="flex-1" />
-              <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-              <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />
-            </div>
-          ))}
-        </div>
+
       </div>
     </div>
   );
