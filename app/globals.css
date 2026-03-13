@@ -367,8 +367,6 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@layer components {
-
 /* Stage */
 .signal-stage {
   min-height: 60vh;
@@ -581,5 +579,3 @@
   .signal-platforms-wrap { max-width: 200px; gap: 3px 6px; }
   .signal-platform { font-size: 8px; }
 }
-
-} /* end @layer components (Signal Lock) */
