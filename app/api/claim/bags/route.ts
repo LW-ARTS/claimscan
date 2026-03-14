@@ -93,12 +93,17 @@ export async function POST(request: Request) {
   const skippedMints: Array<{ tokenMint: string; error: string }> = [];
 
   // Step 1: Find which mints already have active claims (1 SELECT)
-  const { data: activeClaims } = await supabase
+  const { data: activeClaims, error: activeError } = await supabase
     .from('claim_attempts')
     .select('token_address')
     .eq('wallet_address', wallet)
     .in('status', ['pending', 'signing', 'submitted'])
     .in('token_address', tokenMints);
+
+  if (activeError) {
+    console.error('[claim/bags] Active claims check failed:', activeError.message);
+    return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 503 });
+  }
 
   const alreadyLocked = new Set((activeClaims ?? []).map((c) => c.token_address));
   const mintsToInsert = tokenMints.filter((mint) => {
@@ -230,11 +235,14 @@ export async function POST(request: Request) {
   let feeLamports = '0';
   if (successMints.length > 0) {
     // Find creator(s) associated with this wallet
-    const { data: walletRows } = await supabase
+    const { data: walletRows, error: walletErr } = await supabase
       .from('wallets')
       .select('creator_id')
       .eq('address', wallet)
       .limit(1);
+    if (walletErr) {
+      console.error('[claim/bags] Wallet lookup failed:', walletErr.message);
+    }
     const creatorId = walletRows?.[0]?.creator_id;
 
     // If wallet has no associated creator, skip fee calculation entirely
@@ -252,12 +260,15 @@ export async function POST(request: Request) {
       });
     }
 
-    const { data: feeRecords } = await supabase
+    const { data: feeRecords, error: feeQueryErr } = await supabase
       .from('fee_records')
       .select('total_unclaimed')
       .in('token_address', successMints)
       .eq('platform', 'bags')
       .eq('creator_id', creatorId);
+    if (feeQueryErr) {
+      console.error('[claim/bags] Fee records query failed:', feeQueryErr.message, { wallet, creatorId });
+    }
 
     if (feeRecords && feeRecords.length > 0) {
       let totalUnclaimed = 0n;

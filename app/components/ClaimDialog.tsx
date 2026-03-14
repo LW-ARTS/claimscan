@@ -13,6 +13,7 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { useClaimBags } from '@/lib/hooks/useClaimBags';
 import { formatTokenAmount, formatUsd, safeBigInt, toUsdValue } from '@/lib/utils';
+import { CLAIMSCAN_FEE_BPS, MIN_FEE_LAMPORTS } from '@/lib/constants';
 import type { Database } from '@/lib/supabase/types';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
@@ -54,14 +55,17 @@ export function ClaimDialog({
   // Fetch SOL balance for gas check — use CONNECTED wallet, not profile wallet
   useEffect(() => {
     if (!open || !connectedWallet) return;
+    let cancelled = false;
     setBalanceError(false);
     connection
       .getBalance(new PublicKey(connectedWallet))
-      .then((bal) => setSolBalance(bal / 1e9))
+      .then((bal) => { if (!cancelled) setSolBalance(bal / 1e9); })
       .catch(() => {
+        if (cancelled) return;
         setSolBalance(null);
         setBalanceError(true);
       });
+    return () => { cancelled = true; };
   }, [open, connectedWallet, connection]);
 
   // Total unclaimed in USD
@@ -76,8 +80,21 @@ export function ClaimDialog({
     return total;
   }, [fees, solPrice]);
 
-  // Estimated gas (~0.005 SOL per tx, rough estimate)
-  const estimatedGas = fees.length * 0.005;
+  // Total unclaimed in lamports (for fee calculation)
+  const totalUnclaimedLamports = useMemo(() => {
+    let total = 0n;
+    for (const fee of fees) total += safeBigInt(fee.total_unclaimed);
+    return total;
+  }, [fees]);
+
+  // ClaimScan service fee (0.85%)
+  const feeLamports = totalUnclaimedLamports * BigInt(CLAIMSCAN_FEE_BPS) / 10_000n;
+  const feeApplied = feeLamports >= MIN_FEE_LAMPORTS;
+  const feeSol = Number(feeLamports) / 1e9;
+  const feeUsd = feeSol * solPrice;
+
+  // Estimated gas (~0.005 SOL per tx + fee tx if applicable)
+  const estimatedGas = (fees.length + (feeApplied ? 1 : 0)) * 0.005;
   const hasInsufficientSol = solBalance !== null && solBalance < estimatedGas;
 
   // Trigger onClaimComplete exactly once when claim finishes
@@ -171,6 +188,15 @@ export function ClaimDialog({
                   <span className="text-muted-foreground">Total unclaimed</span>
                   <span className="font-semibold">{formatUsd(totalUnclaimedUsd)}</span>
                 </div>
+                {feeApplied && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ClaimScan fee (0.85%)</span>
+                    <span className="font-mono tabular-nums">
+                      {feeSol.toFixed(4)} SOL
+                      <span className="ml-1 text-muted-foreground/60">{formatUsd(feeUsd)}</span>
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Estimated gas</span>
                   <span className="font-mono tabular-nums">~{estimatedGas.toFixed(4)} SOL</span>

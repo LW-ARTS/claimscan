@@ -55,9 +55,15 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Guard against oversized payloads (max 1MB)
+    const contentLength = request.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > 1_048_576) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
+
     const payload = (await request.json()) as HeliusWebhookEvent[];
 
-    if (!Array.isArray(payload)) {
+    if (!Array.isArray(payload) || payload.length > 500) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
 

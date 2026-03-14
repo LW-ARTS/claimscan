@@ -83,7 +83,7 @@ export async function POST(request: Request) {
               );
               send('adapter-error', {
                 platform: adapter.platform,
-                error: err instanceof Error ? err.message : 'Unknown error',
+                error: 'Adapter temporarily unavailable',
               });
             }
           })

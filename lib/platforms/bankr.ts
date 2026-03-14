@@ -76,8 +76,8 @@ async function promptBankrAgent(prompt: string, timeoutMs = AGENT_SHORT_TIMEOUT_
     if (data.response) return data.response;
     if (!data.jobId) return null;
 
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
+    const MAX_POLL_ATTEMPTS = 30; // ~30s with 1s interval — prevent infinite polling
+    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
       await new Promise((r) => setTimeout(r, AGENT_POLL_INTERVAL_MS));
 
       const pollRes = await fetch(`${BANKR_AGENT_URL}/job/${data.jobId}`, {
@@ -94,6 +94,9 @@ async function promptBankrAgent(prompt: string, timeoutMs = AGENT_SHORT_TIMEOUT_
         return null;
       }
     }
+
+    console.warn(`[bankr] agent job ${data.jobId} timed out after ${MAX_POLL_ATTEMPTS} polls`);
+    return null;
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       return null;

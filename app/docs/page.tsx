@@ -22,71 +22,13 @@ export const metadata: Metadata = {
   },
 };
 
-/* ── Data ── */
+/* ── Helpers ── */
 
-const solanaPlatforms = [
-  { name: 'Pump.fun', desc: 'Largest Solana memecoin launchpad', color: '#00D4AA' },
-  { name: 'Bags.fm', desc: 'Social token trading with creator fees', color: '#FF6B35' },
-  { name: 'Believe', desc: 'Community token launches with fee splits', color: '#E91E63' },
-  { name: 'RevShare', desc: 'On-chain revenue sharing for token creators', color: '#4CAF50' },
-  { name: 'Coinbarrel', desc: 'Fast token launches with built-in fees', color: '#FF8C00' },
-  { name: 'Raydium', desc: 'Solana DEX, LP fee tracking', color: '#6C5CE7' },
-];
-
-const basePlatforms = [
-  { name: 'Clanker', desc: 'Base-native memecoin launcher via Farcaster', color: '#0052FF' },
-  { name: 'Zora', desc: 'Creator token minting with protocol rewards', color: '#5B5BD6' },
-  { name: 'Bankr', desc: 'AI-powered trading with creator fee splits', color: '#1DA1F2' },
-];
-
-const techStack = [
-  { category: 'FRONTEND', tech: 'Next.js 16 + React 19 + Tailwind CSS v4' },
-  { category: 'BLOCKCHAIN', tech: '@solana/web3.js + viem (EVM/Base)' },
-  { category: 'DATABASE', tech: 'Supabase (PostgreSQL)' },
-  { category: 'PRICE FEEDS', tech: 'CoinGecko, DexScreener, Jupiter API' },
-  { category: 'IDENTITY', tech: 'Neynar API (Farcaster), Twitter API' },
-  { category: 'MONITORING', tech: 'Sentry error tracking' },
-  { category: 'DEPLOYMENT', tech: 'Vercel Edge Network' },
-  { category: 'TYPOGRAPHY', tech: 'Exo 2 (headings) + JetBrains Mono' },
-];
-
-const toc = [
-  { id: 'v2', label: 'V2 Roadmap' },
-  { id: 'bot', label: 'Telegram Bot' },
-  { id: 'intro', label: 'Introduction' },
-  { id: 'problem', label: 'The Problem' },
-  { id: 'solution', label: 'The Solution' },
-  { id: 'how', label: 'How It Works' },
-  { id: 'platforms', label: 'Platforms' },
-  { id: 'architecture', label: 'Architecture' },
-  { id: 'security', label: 'Security' },
-  { id: 'roadmap', label: 'Roadmap' },
-  { id: 'team', label: 'Team' },
-];
-
-/* ── Components ── */
-
-function SectionNum({ n }: { n: string }) {
+function Label({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-foreground text-[10px] font-bold text-background">
-      {n}
+    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/50">
+      {children}
     </span>
-  );
-}
-
-function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-xl border border-black/8 bg-white/[0.97] p-5 shadow-sm sm:p-6 ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-function InvertedCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-xl bg-foreground p-5 sm:p-6 ${className}`}>
-      {children}
-    </div>
   );
 }
 
@@ -94,666 +36,542 @@ function InvertedCard({ children, className = '' }: { children: React.ReactNode;
 
 export default function DocsPage() {
   return (
-    <div className="flex flex-col items-center gap-8 pb-16">
-      {/* Header */}
-      <div className="animate-fade-in w-full max-w-3xl text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-          V1 Documentation
-        </div>
-        <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-          Documentation
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Architecture, roadmap, and what&apos;s coming next.
-        </p>
-      </div>
+    <article className="mx-auto w-full max-w-[720px] px-5 pb-24">
 
-      {/* Table of Contents */}
-      <ScrollReveal className="w-full max-w-3xl" delay={0.05}>
-        <Card>
-          <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Contents
+      {/* ═══ HEADER ═══ */}
+      <ScrollReveal>
+        <header className="pb-16 pt-8 text-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-foreground/[0.03] px-3.5 py-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-foreground/30" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-foreground/60" />
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70">
+              V1.5 &middot; Live
+            </span>
+          </div>
+          <h1 className="mt-6 text-[clamp(2rem,5vw,2.75rem)] font-bold leading-[1.1] tracking-tight">
+            How ClaimScan Works
+          </h1>
+          <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground">
+            Architecture, security model, and roadmap for the cross-chain creator fee tracker.
           </p>
-          <div className="flex flex-wrap gap-2">
-            {toc.map((item, i) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5 text-xs font-medium transition-colors hover:border-foreground/30 hover:bg-muted/50"
-              >
-                <span className="text-[10px] text-muted-foreground/60">{String(i + 1).padStart(2, '0')}</span>
-                {item.label}
-              </a>
+          <div className="mx-auto mt-8 h-px w-12 bg-foreground/15" />
+        </header>
+      </ScrollReveal>
+
+      {/* ═══ OVERVIEW ═══ */}
+      <ScrollReveal>
+        <section className="glass rounded-2xl p-6 sm:p-8">
+          <Label>Overview</Label>
+          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
+            One search. 9 launchpads. 2 chains.
+          </h2>
+          <p className="mt-4 text-[15px] leading-[1.75] text-foreground/70">
+            You launched tokens. Platforms collected fees for you. But nobody told you where the money is.
+            ClaimScan scans 9 launchpads across Solana and Base in real time, showing what you&apos;ve
+            earned, what you&apos;ve claimed, and what&apos;s still sitting uncollected on-chain.
+          </p>
+
+          <div className="mt-8 grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3">
+            {[
+              { v: '9', l: 'Platforms' },
+              { v: '2', l: 'Chains' },
+              { v: '~40%', l: 'Unclaimed' },
+              { v: '<30s', l: 'Scan' },
+              { v: '$0', l: 'Cost' },
+              { v: '24/7', l: 'Uptime' },
+            ].map((s) => (
+              <div key={s.l} className="flex flex-col items-center rounded-xl bg-foreground py-3.5 text-background transition-transform duration-200 hover:scale-105">
+                <span className="text-xl font-bold tracking-tight">{s.v}</span>
+                <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wider text-background/50">{s.l}</span>
+              </div>
             ))}
           </div>
-        </Card>
+        </section>
       </ScrollReveal>
 
-      {/* ─── V2 ROADMAP ─── */}
-      <ScrollReveal className="w-full max-w-3xl" delay={0.1}>
-        <div id="v2">
-          <InvertedCard>
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center rounded-md bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-foreground">
-                V2
-              </span>
-              <h2 className="text-lg font-bold tracking-tight text-background sm:text-xl">
-                Token Fee Scanner
-              </h2>
-              <span className="rounded-md border border-background/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-background/50">
-                Coming Soon
-              </span>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-background/60">
-              Someone is collecting fees on every token you trade. Drop any Solana or Base contract address and find out who, how much, and whether the money has been claimed.
-            </p>
+      {/* ═══ PLATFORMS ═══ */}
+      <ScrollReveal>
+        <section className="mt-12">
+          <Label>Supported Platforms</Label>
+          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
+            9 platforms across Solana and Base
+          </h2>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Every major creator fee launchpad. More chains coming in V2.
+          </p>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="mt-8 grid gap-5 sm:grid-cols-2">
+            {/* Solana */}
+            <div className="rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.08)]">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="rounded-md bg-foreground px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-background">Solana</span>
+                <span className="text-[10px] font-medium text-muted-foreground">6 platforms</span>
+              </div>
+              <div className="space-y-0 divide-y divide-foreground/[0.06]">
+                {[
+                  { name: 'Pump.fun', desc: 'Largest memecoin launchpad' },
+                  { name: 'Bags.fm', desc: 'Social token trading' },
+                  { name: 'Believe', desc: 'Community token launches' },
+                  { name: 'RevShare', desc: 'Revenue sharing' },
+                  { name: 'Coinbarrel', desc: 'Fast token launches' },
+                  { name: 'Raydium', desc: 'DEX LP fee tracking' },
+                ].map((p) => (
+                  <div key={p.name} className="flex items-center justify-between py-2.5">
+                    <span className="text-[13px] font-semibold">{p.name}</span>
+                    <span className="text-[11px] text-muted-foreground">{p.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Base */}
+            <div className="rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.08)]">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="rounded-md bg-foreground px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-background">Base</span>
+                <span className="text-[10px] font-medium text-muted-foreground">3 platforms</span>
+              </div>
+              <div className="space-y-0 divide-y divide-foreground/[0.06]">
+                {[
+                  { name: 'Clanker', desc: 'Farcaster launcher' },
+                  { name: 'Zora', desc: 'Protocol rewards' },
+                  { name: 'Bankr', desc: 'AI trading fee splits' },
+                ].map((p) => (
+                  <div key={p.name} className="flex items-center justify-between py-2.5">
+                    <span className="text-[13px] font-semibold">{p.name}</span>
+                    <span className="text-[11px] text-muted-foreground">{p.desc}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 rounded-lg bg-foreground/[0.03] px-3 py-2 text-[10px] text-muted-foreground">
+                + Ethereum L1, Arbitrum coming in V2
+              </div>
+            </div>
+          </div>
+        </section>
+      </ScrollReveal>
+
+      {/* ═══ HOW IT WORKS ═══ */}
+      <ScrollReveal>
+        <section className="mt-16">
+          <Label>How it works</Label>
+          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
+            From @handle to full breakdown in 30 seconds
+          </h2>
+
+          <ol className="relative mt-8 ml-3.5 border-l border-foreground/10 pl-0">
+            {[
+              { step: 'Enter a handle', desc: 'Twitter, Farcaster, GitHub username, or raw wallet address.' },
+              { step: 'Identity resolution', desc: 'Social identity mapped to wallet addresses across both chains via Neynar and Twitter APIs.' },
+              { step: 'Parallel platform scan', desc: 'All 9 platforms queried simultaneously. Results stream via SSE as each completes.' },
+              { step: 'Fee aggregation', desc: 'Earned, claimed, partially claimed, and unclaimed fees pulled per token. Duplicates filtered.' },
+              { step: 'USD conversion', desc: 'Live prices from CoinGecko, DexScreener, and Jupiter. Updated every 5 minutes.' },
+              { step: 'Live dashboard', desc: 'Platform breakdown, chain breakdown, token-level details. Auto-refreshes every 30 seconds.' },
+            ].map((s, i) => (
+              <li key={i} className="relative mb-8 last:mb-0 pl-7">
+                <span className="absolute -left-3.5 top-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-foreground text-[11px] font-bold tabular-nums text-background">
+                  {i + 1}
+                </span>
+                <div className="pt-0.5">
+                  <h3 className="text-[13px] font-bold">{s.step}</h3>
+                  <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{s.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <div className="mt-6 rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] px-4 py-3 text-[12px] text-foreground/60">
+            All scanning is read-only. No wallet connection required. No signatures. No transaction risk.
+          </div>
+        </section>
+      </ScrollReveal>
+
+      {/* ═══ CLAIMING ═══ */}
+      <ScrollReveal>
+        <section className="mt-16">
+          <Label>Claim Flow</Label>
+          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
+            Claim directly from ClaimScan
+          </h2>
+          <p className="mt-4 text-[15px] leading-[1.75] text-foreground/70">
+            Connect your wallet and claim uncollected fees without leaving the app. Fully zero-custody:
+            transactions are built server-side, simulated before signing, and submitted to the chain.
+            We never have access to your private keys.
+          </p>
+
+          <div className="relative mt-8 glass rounded-xl p-5">
+            <div className="absolute left-[29px] top-[30px] bottom-[30px] w-px bg-foreground/10 sm:left-[33px]" />
+            <div className="space-y-4">
               {[
-                { title: 'Who Gets Paid', desc: 'Paste a contract address. See which wallet collects the creator fees and trace their on-chain identity.' },
-                { title: 'How Much', desc: 'Earned, claimed, and unclaimed. Every number in native tokens with live USD conversion.' },
-                { title: 'Claim Status', desc: 'Three states: Claimed (fully collected), Partial (some collected, some remaining), and Unclaimed (nothing claimed yet).' },
-              ].map((item) => (
-                <div key={item.title} className="rounded-lg border border-background/10 bg-background/5 p-3.5">
-                  <h3 className="text-xs font-bold text-background">{item.title}</h3>
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-background/50">{item.desc}</p>
+                'API fetches your claimable positions from the platform',
+                'Transaction built server-side and simulated on RPC',
+                'You sign in your wallet (Phantom, Solflare, Backpack, etc.)',
+                'Transaction submitted and confirmed via Helius webhook',
+              ].map((text, i) => (
+                <div key={i} className="relative flex items-start gap-3.5 text-[13px]">
+                  <span className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-[9px] font-bold text-background">{i + 1}</span>
+                  <span className="pt-[3px] text-foreground/80">{text}</span>
                 </div>
               ))}
             </div>
+          </div>
 
-            <div className="mt-5 rounded-lg border border-background/10 bg-background/5 p-3.5">
-              <h3 className="text-xs font-bold text-background">Claim From Here</h3>
-              <p className="mt-1.5 text-[11px] leading-relaxed text-background/50">
-                Connect your wallet and claim all your uncollected fees in one place. No more jumping between 10 different platforms.
-              </p>
-            </div>
-
-            <div className="mt-4 flex items-center gap-2 text-[11px] text-background/40">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-background/30" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-background/50" />
+          <div className="mt-5 flex flex-wrap gap-2">
+            {['Bags.fm · Live', 'Clanker · Coming', 'Zora · Coming'].map((s) => (
+              <span
+                key={s}
+                className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition-colors duration-150 ${
+                  s.includes('Live')
+                    ? 'border-foreground/20 bg-foreground text-background'
+                    : 'border-foreground/10 text-muted-foreground hover:border-foreground/20'
+                }`}
+              >
+                {s}
               </span>
-              In development. Solana and Base.
-            </div>
-          </InvertedCard>
-        </div>
+            ))}
+          </div>
+        </section>
       </ScrollReveal>
 
-      {/* ─── TELEGRAM BOT ─── */}
-      <ScrollReveal className="w-full max-w-3xl" delay={0.15}>
-        <div id="bot">
-          <InvertedCard>
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center rounded-md bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-foreground">
-                Telegram Bot
-              </span>
-              <h2 className="text-lg font-bold tracking-tight text-background sm:text-xl">
-                ClaimScan Bot
-              </h2>
-              <span className="rounded-md border border-background/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-background/50">
-                In Development
-              </span>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-background/60">
-              Your group chat just became a fee scanner. Paste any Solana or Base contract address and ClaimScan Bot replies with earned, claimed, and unclaimed fees instantly.
-            </p>
+      {/* ═══ ARCHITECTURE ═══ */}
+      <ScrollReveal>
+        <section className="mt-16">
+          <Label>Architecture</Label>
+          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
+            Tech Stack
+          </h2>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              {[
-                { title: 'Paste a CA', desc: 'Drop any Solana or Base contract address in the chat. The bot detects it automatically and replies with full fee data. No commands, no prefixes.' },
-                { title: 'Handles & Wallets', desc: 'Works with Twitter handles, GitHub usernames, and raw wallet addresses too. Drop it in, get the breakdown.' },
-                { title: 'Full Breakdown', desc: 'Earned, claimed, and unclaimed in native tokens plus USD. Claim status for every position. Inline buttons to view on ClaimScan or share on X.' },
-              ].map((item) => (
-                <div key={item.title} className="rounded-lg border border-background/10 bg-background/5 p-3.5">
-                  <h3 className="text-xs font-bold text-background">{item.title}</h3>
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-background/50">{item.desc}</p>
-                </div>
-              ))}
-            </div>
+          <div className="mt-6 overflow-hidden rounded-xl border border-foreground/[0.06]">
+            {[
+              ['Frontend', 'Next.js 16 + React 19 + Tailwind CSS v4'],
+              ['Blockchain', '@solana/web3.js + viem (EVM/Base)'],
+              ['Database', 'Supabase (PostgreSQL)'],
+              ['Price Feeds', 'CoinGecko, DexScreener, Jupiter API'],
+              ['Identity', 'Neynar API (Farcaster), Twitter API'],
+              ['Monitoring', 'Sentry + Vercel Analytics'],
+              ['Deployment', 'Vercel Edge Network (Hobby-optimized)'],
+              ['Typography', 'Exo 2 (headings) + JetBrains Mono'],
+            ].map(([cat, tech], i) => (
+              <div
+                key={cat}
+                className={`flex items-center gap-4 px-4 py-2.5 ${
+                  i % 2 === 0 ? 'bg-foreground/[0.03]' : ''
+                } ${i > 0 ? 'border-t border-foreground/[0.04]' : ''}`}
+              >
+                <span className="w-24 shrink-0 text-[10px] font-bold uppercase tracking-wider text-foreground/40">
+                  {cat}
+                </span>
+                <span className="font-mono text-[12px] text-foreground/80">{tech}</span>
+              </div>
+            ))}
+          </div>
 
-            <div className="mt-4 flex items-center gap-2 text-[11px] text-background/40">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-background/30" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-background/50" />
-              </span>
-              In development. Groups and DMs. Solana and Base.
-            </div>
-          </InvertedCard>
-        </div>
-      </ScrollReveal>
-
-      {/* ─── WHITEPAPER DOWNLOAD ─── */}
-      <ScrollReveal className="w-full max-w-3xl">
-        <Card className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center rounded-md border border-border/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              V1
+          <div className="mt-6 rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/40">
+              Database Schema
             </span>
-            <span className="text-sm font-bold">Whitepaper</span>
-          </div>
-          <a
-            href="/ClaimScan-Whitepaper-V1.pdf"
-            download
-            className="inline-flex items-center gap-2 rounded-lg bg-foreground px-3.5 py-2 text-xs font-semibold text-background transition-opacity hover:opacity-90"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-            </svg>
-            Download PDF
-          </a>
-        </Card>
-      </ScrollReveal>
-
-      {/* Content sections */}
-      <div className="w-full max-w-3xl space-y-8">
-
-        {/* ── 01: Introduction ── */}
-        <ScrollReveal>
-          <Card>
-            <div id="intro" className="space-y-5">
-              <div className="flex items-center gap-3">
-                <SectionNum n="01" />
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">What is ClaimScan?</h2>
-              </div>
-
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                You launched tokens. Platforms collected fees for you. But nobody told you where the money went. ClaimScan scans 9 launchpads across Solana and Base in real time, showing you exactly how much you&apos;ve earned, what you&apos;ve claimed, and what&apos;s still sitting uncollected on-chain.
-              </p>
-
-              <div className="rounded-lg border-l-[3px] border-foreground bg-muted/40 px-4 py-3 text-sm italic text-muted-foreground">
-                &ldquo;Your money is already on-chain. ClaimScan tells you where.&rdquo;
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                {[
-                  { value: '9', label: 'Platforms' },
-                  { value: '2', label: 'Chains' },
-                  { value: '~40%', label: 'Go Unclaimed' },
-                  { value: '<30s', label: 'Scan Time' },
-                  { value: '$0', label: 'Always Free' },
-                  { value: '24/7', label: 'Always Live' },
-                ].map((stat, i) => (
-                  <div
-                    key={stat.label}
-                    className={`flex flex-col items-center justify-center rounded-lg py-3.5 text-center ${
-                      i < 3 ? 'bg-foreground text-background' : 'border border-border/60'
-                    }`}
-                  >
-                    <span className="text-lg font-bold tracking-tight sm:text-xl">{stat.value}</span>
-                    <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider opacity-50">{stat.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Whether you launched on Pump.fun last week or Clanker six months ago. Enter your handle or wallet address and see exactly what&apos;s waiting for you. No signups. No wallet connection. Just answers.
-              </p>
-            </div>
-          </Card>
-        </ScrollReveal>
-
-        {/* ── 02: The Problem ── */}
-        <ScrollReveal>
-          <Card>
-            <div id="problem" className="space-y-5">
-              <div className="flex items-center gap-3">
-                <SectionNum n="02" />
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">The Creator Fee Problem</h2>
-              </div>
-
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                You launched a token on Pump.fun. A few on Clanker. Maybe one on Believe. Each platform deposited creator fees into different wallets, on different chains. You claimed some. You forgot about others. Some you never knew existed.
-              </p>
-
-              <div className="space-y-2">
-                {[
-                  { title: 'Fragmented Dashboards', desc: '9 platforms. 9 different dashboards. 9 different login flows. No creator checks all of them.' },
-                  { title: 'Cross-Chain Complexity', desc: 'Solana and Base use different wallets, explorers, and token standards. Two separate workflows just to see what you\'re owed.' },
-                  { title: 'Identity Sprawl', desc: 'Your Twitter handle, Farcaster account, 0x wallet, Solana address. All disconnected. No tool connects the dots.' },
-                ].map((item) => (
-                  <div key={item.title} className="rounded-lg border border-border/40 border-l-[3px] border-l-foreground p-3.5">
-                    <h3 className="text-xs font-bold">{item.title}</h3>
-                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="rounded-lg bg-foreground px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-background">
-                Result: creator fees sitting unclaimed across DeFi. Yours included.
-              </div>
-            </div>
-          </Card>
-        </ScrollReveal>
-
-        {/* ── Inline CTA ── */}
-        <ScrollReveal>
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-black/8 bg-white/[0.97] py-6 text-center shadow-sm">
-            <p className="text-sm font-semibold">Think you might have unclaimed fees?</p>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-lg bg-foreground px-5 py-2.5 text-sm font-bold text-background transition-opacity hover:opacity-90"
-            >
-              Scan Your Handle <span aria-hidden="true">&rarr;</span>
-            </Link>
-            <p className="text-[11px] text-muted-foreground/50">Free. No signup. Takes 30 seconds.</p>
-          </div>
-        </ScrollReveal>
-
-        {/* ── 03: The Solution ── */}
-        <ScrollReveal>
-          <Card>
-            <div id="solution" className="space-y-5">
-              <div className="flex items-center gap-3">
-                <SectionNum n="03" />
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">How ClaimScan Solves It</h2>
-              </div>
-
-              <div className="space-y-2">
-                {[
-                  { title: 'One Search, All Platforms', desc: 'Type your @handle. ClaimScan queries all 9 platforms simultaneously in seconds.', dark: true },
-                  { title: 'Cross-Chain Aggregation', desc: 'Solana and Base in one view. No chain switching, no separate dashboards.', dark: false },
-                  { title: 'Real-Time Tracking', desc: 'Live polling every 30 seconds. Leave the tab open. Numbers update automatically.', dark: true },
-                  { title: 'Identity Resolution', desc: 'Enter a Twitter handle → wallets found. Farcaster name → all chains mapped.', dark: false },
-                  { title: 'USD Valuation', desc: 'Live prices from CoinGecko, DexScreener, and Jupiter. Updated every 5 minutes.', dark: true },
-                  { title: 'Zero Cost', desc: 'Free. Not freemium. We built ClaimScan as an internal tool and opened it up.', dark: false },
-                ].map((item) => (
-                  <div
-                    key={item.title}
-                    className={`rounded-lg p-3.5 ${
-                      item.dark ? 'bg-foreground' : 'border border-border/50'
-                    }`}
-                  >
-                    <h3 className={`text-xs font-bold ${item.dark ? 'text-background' : ''}`}>{item.title}</h3>
-                    <p className={`mt-1 text-[11px] leading-relaxed ${item.dark ? 'text-background/60' : 'text-muted-foreground'}`}>
-                      {item.desc}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-        </ScrollReveal>
-
-        {/* ── 04: How It Works ── */}
-        <ScrollReveal>
-          <Card>
-            <div id="how" className="space-y-5">
-              <div className="flex items-center gap-3">
-                <SectionNum n="04" />
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">How It Works</h2>
-              </div>
-
-              <p className="text-sm text-muted-foreground">
-                From @handle to full fee breakdown in under 30 seconds.
-              </p>
-
-              <div className="relative space-y-0 pl-10">
-                <div className="absolute left-[15px] top-3 bottom-3 w-px border-l border-dashed border-border" />
-
-                {[
-                  { title: 'You Enter a Handle', desc: 'Twitter handle, Farcaster name, GitHub username, or raw wallet address.' },
-                  { title: 'We Find Your Wallets', desc: 'Your social identity gets resolved to wallet addresses across both chains.' },
-                  { title: 'All 9 Platforms Scanned', desc: 'Every supported launchpad queried simultaneously. No manual checking.' },
-                  { title: 'Fees Collected & Organized', desc: 'Earned, claimed, partially claimed, and unclaimed fees pulled for every token. Duplicates filtered.' },
-                  { title: 'Converted to USD', desc: 'Live price feeds turn raw token amounts into real dollar figures.' },
-                  { title: 'Live Dashboard Ready', desc: 'Platform breakdown, chain breakdown, token-level details, updating every 30s.' },
-                ].map((step, i) => (
-                  <div key={i} className="relative flex gap-4 pb-5 last:pb-0">
-                    <div className="absolute -left-10 flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background">
-                      {i + 1}
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-bold">{step.title}</h3>
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{step.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="rounded-lg border-l-2 border-foreground bg-muted/40 px-4 py-2.5 text-[11px] text-muted-foreground">
-                All scanning is read-only. No wallet connection. No signatures. No transaction risk.
-              </div>
-            </div>
-          </Card>
-        </ScrollReveal>
-
-        {/* ── 05: Supported Platforms ── */}
-        <ScrollReveal>
-          <Card>
-            <div id="platforms" className="space-y-5">
-              <div className="flex items-center gap-3">
-                <SectionNum n="05" />
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Supported Platforms</h2>
-              </div>
-
-              <p className="text-sm text-muted-foreground">
-                9 platforms across 2 blockchains. More coming in V2.
-              </p>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                {/* Solana */}
-                <div>
-                  <div className="mb-2 flex items-center justify-between rounded-lg bg-foreground px-3 py-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-background">Solana</span>
-                    <span className="text-[10px] font-medium text-background/50">6 Platforms</span>
-                  </div>
-                  <div className="divide-y divide-border/30">
-                    {solanaPlatforms.map((p) => (
-                      <div key={p.name} className="flex items-center gap-3 py-2">
-                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
-                        <div>
-                          <span className="text-xs font-semibold">{p.name}</span>
-                          <span className="ml-2 text-[10px] text-muted-foreground">{p.desc}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Base */}
-                <div>
-                  <div className="mb-2 flex items-center justify-between rounded-lg bg-foreground px-3 py-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-background">Base</span>
-                    <span className="text-[10px] font-medium text-background/50">3 Platforms</span>
-                  </div>
-                  <div className="divide-y divide-border/30">
-                    {basePlatforms.map((p) => (
-                      <div key={p.name} className="flex items-center gap-3 py-2">
-                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
-                        <div>
-                          <span className="text-xs font-semibold">{p.name}</span>
-                          <span className="ml-2 text-[10px] text-muted-foreground">{p.desc}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-2 rounded-lg bg-muted/40 p-2.5 text-[10px] text-muted-foreground">
-                    + More platforms coming in V2. Ethereum L1, Arbitrum, and more.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </ScrollReveal>
-
-        {/* ── 06: Architecture ── */}
-        <ScrollReveal>
-          <Card>
-            <div id="architecture" className="space-y-5">
-              <div className="flex items-center gap-3">
-                <SectionNum n="06" />
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Architecture & Tech Stack</h2>
-              </div>
-
-              <div className="overflow-hidden rounded-lg border border-border/40">
-                {techStack.map((row, i) => (
-                  <div
-                    key={row.category}
-                    className={`flex items-center gap-4 px-4 py-2.5 ${
-                      i % 2 === 0 ? 'bg-muted/30' : ''
-                    } ${i < techStack.length - 1 ? 'border-b border-border/20' : ''}`}
-                  >
-                    <span className="w-24 shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      {row.category}
-                    </span>
-                    <span className="font-mono text-xs text-foreground/80">{row.tech}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="rounded-lg bg-muted/30 p-4">
-                <h3 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Database Schema</h3>
-                <pre className="font-mono text-[11px] leading-relaxed text-foreground/70">
+            <pre className="mt-3 font-mono text-[12px] leading-relaxed text-foreground/60">
 {`creators  →  wallets  →  fee_records
     |            |            |
 identity     blockchain    per-token fees
 resolution   addresses     & USD values`}
-                </pre>
-              </div>
-
-              <div>
-                <h3 className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Key Architecture Decisions</h3>
-                <div className="space-y-2">
-                  {[
-                    { title: 'SSE streaming', desc: 'Real-time scan progress via Server-Sent Events. Each platform result streams to the client as it completes — no waiting for the full scan.' },
-                    { title: 'AbortSignal propagation', desc: 'Every HTTP and RPC call carries an AbortSignal. When a user navigates away mid-scan, all in-flight requests cancel immediately — zero orphaned connections.' },
-                    { title: 'Wallclock guards', desc: 'Hard wallclock budgets on every resolve path prevent serverless timeouts. Functions return partial results instead of dying at the edge.' },
-                    { title: 'In-flight deduplication', desc: 'Prevents duplicate API calls for concurrent requests to the same creator.' },
-                    { title: '40-minute DB cache', desc: 'Creator and fee data cached in Supabase. Fresh scans only trigger after TTL expires.' },
-                    { title: 'Doppler in-memory cache', desc: '10-minute TTL in-memory cache for Bankr token fee lookups. Eliminates redundant calls to the IP-rate-limited Doppler API, increasing effective throughput ~2-3x.' },
-                    { title: 'GPA caching', desc: 'Expensive getProgramAccounts calls skipped when the cron indexer has already discovered the creator\'s tokens in the database.' },
-                    { title: 'Cron token indexer', desc: 'Background job indexes creator tokens with a dedicated sync column and wallclock budget. Keeps the DB warm so live scans hit cache instead of chain.' },
-                    { title: 'Dynamic dust filter', desc: 'Positions below $15 in unclaimed fees are skipped during claimed-amount computation. Threshold uses live SOL price, adjusting automatically.' },
-                    { title: 'Multi-key API rotation', desc: '10 API keys with round-robin rotation and per-key rate limit tracking. 10,000 requests/hour for Bags.fm.' },
-                    { title: 'Batched concurrency', desc: 'API requests processed in batches of 40 with chunked EVM getLogs to avoid connection overload on both platforms and Vercel.' },
-                    { title: 'Helius V2 pagination', desc: 'Cursor-based pagination for RevShare token discovery via Helius DAS API. Handles creators with 100+ assets without missing tokens.' },
-                    { title: 'Visibility-aware polling', desc: 'Live polling stops when the browser tab is hidden, resuming on focus.' },
-                    { title: 'Privacy-first logging', desc: 'All search queries SHA256-hashed before storage. No raw PII stored.' },
-                  ].map((item) => (
-                    <div key={item.title} className="flex gap-2 text-xs">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-foreground/40" />
-                      <span className="leading-relaxed text-muted-foreground">
-                        <strong className="text-foreground">{item.title}</strong> &mdash; {item.desc}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </Card>
-        </ScrollReveal>
-
-        {/* ── 07: Security & Privacy ── */}
-        <ScrollReveal>
-          <div id="security">
-            <InvertedCard>
-              <div className="space-y-5">
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-background text-[10px] font-bold text-foreground">
-                    07
-                  </span>
-                  <h2 className="text-xl font-bold tracking-tight text-background sm:text-2xl">Security & Privacy</h2>
-                </div>
-
-                <p className="text-sm italic text-background/50">
-                  We don&apos;t touch your wallet. We don&apos;t store your data. That&apos;s not a promise. It&apos;s the architecture.
-                </p>
-
-                <div className="space-y-2">
-                  {[
-                    { title: 'Your Searches Stay Private', desc: 'All search queries are SHA256 hashed before logging. Nobody can see who you looked up.' },
-                    { title: 'Nothing Runs in Your Browser', desc: 'All sensitive operations run server-side. API keys never touch the client.' },
-                    { title: 'No Wallet Connection', desc: '100% read-only. No signatures. No approvals. Zero transaction risk.' },
-                    { title: 'No Data Collected', desc: 'No personal data. No cookies. No tracking pixels. Just anonymized, hashed analytics.' },
-                    { title: 'Verify On-Chain', desc: 'Every fee record can be independently verified on the blockchain. Nothing is fabricated.' },
-                  ].map((item) => (
-                    <div key={item.title} className="rounded-lg border border-background/10 border-l-[3px] border-l-background/30 p-3.5">
-                      <h3 className="text-xs font-bold text-background">{item.title}</h3>
-                      <p className="mt-1 text-[11px] leading-relaxed text-background/45">{item.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </InvertedCard>
+            </pre>
           </div>
-        </ScrollReveal>
 
-        {/* ── 08: Roadmap ── */}
-        <ScrollReveal>
-          <Card>
-            <div id="roadmap" className="space-y-5">
-              <div className="flex items-center gap-3">
-                <SectionNum n="08" />
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">What&apos;s Next</h2>
+          {/* ── Key decisions ── */}
+          <div className="mt-12 flex items-center gap-3">
+            <h3 className="text-sm font-bold">Key Architecture Decisions</h3>
+            <div className="h-px flex-1 bg-foreground/[0.06]" />
+          </div>
+
+          <div className="mt-6 space-y-4">
+            {[
+              { area: 'Streaming', items: [
+                ['SSE streaming', 'Each platform result streams to the client as it completes. No waiting for the full scan.'],
+                ['AbortSignal propagation', 'Every HTTP/RPC call carries an AbortSignal. Navigate away mid-scan and all in-flight requests cancel instantly.'],
+              ]},
+              { area: 'Performance', items: [
+                ['Vercel Hobby optimization', 'All routes tuned for the 10-second serverless limit. Parallel fetching, aggressive early returns, wallclock guards.'],
+                ['Wallclock guards', 'Hard budgets on every resolve path. Functions return partial results instead of dying at the edge.'],
+                ['In-flight deduplication', 'Prevents duplicate API calls for concurrent requests to the same creator.'],
+                ['Batched concurrency', 'API requests in batches of 40. Chunked EVM getLogs to avoid connection overload.'],
+              ]},
+              { area: 'Caching', items: [
+                ['40-min DB cache', 'Creator and fee data cached in Supabase. Fresh scans only trigger after TTL expires.'],
+                ['Doppler in-memory cache', '10-min TTL for Bankr lookups. Eliminates redundant calls to the IP-rate-limited API. ~2-3x throughput.'],
+                ['GPA caching', 'Expensive getProgramAccounts calls skipped when the cron indexer has already discovered tokens.'],
+                ['Cron token indexer', 'Background job indexes creator tokens. Keeps DB warm so live scans hit cache instead of chain.'],
+              ]},
+              { area: 'Data', items: [
+                ['Dynamic dust filter', 'Positions below $15 unclaimed are skipped. Threshold uses live SOL price, adjusts automatically.'],
+                ['Multi-key API rotation', '10 API keys with round-robin rotation and per-key rate tracking. 10,000 req/hr for Bags.fm.'],
+                ['Helius V2 pagination', 'Cursor-based pagination for RevShare token discovery. Handles creators with 100+ assets.'],
+              ]},
+              { area: 'Claim System', items: [
+                ['Zero-custody flow', 'Server builds unsigned transactions. User signs in-browser, submits to Solana RPC. No private keys leave the wallet.'],
+                ['Pre-sign simulation', 'Every transaction simulated before wallet prompt. Catches insufficient funds, pool migrations, malformed txs.'],
+                ['HMAC verification', 'Claims signed with HMAC-SHA256 using dedicated secret. Constant-time comparison via timingSafeEqual.'],
+                ['Forward-only state machine', 'Claim status: pending → signing → submitted → confirmed/failed/expired. Terminal states locked.'],
+                ['Optimistic locking', 'Partial unique index prevents duplicate active claims. Bulk insert with race condition fallback. Inline stale cleanup.'],
+                ['Chunked RPC submission', 'Signed transactions submitted in chunks of 5 via Promise.allSettled.'],
+                ['Wallet Standard discovery', 'Auto-discovers all compatible wallets (Phantom, Solflare, Backpack) without hardcoded adapters.'],
+                ['Helius webhook', 'Real-time transaction confirmation with fail-closed authentication.'],
+              ]},
+              { area: 'Infrastructure', items: [
+                ['Rate-limited middleware', 'Per-route IP-based throttling + DB-based per-wallet claim limits (30 active).'],
+                ['Signal Lock animation', 'Custom loading UX with radar-style rings and platform scan sequence. Responsive 375px to 4K. Reduced-motion support.'],
+                ['Visibility-aware polling', 'Live polling stops when tab is hidden, resumes on focus.'],
+                ['Privacy-first logging', 'All search queries SHA256-hashed before storage. No raw PII.'],
+              ]},
+            ].map((group) => (
+              <div key={group.area} className="rounded-xl border border-foreground/[0.06] border-l-2 border-l-foreground/20 p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.06)]">
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/40">
+                  {group.area}
+                </span>
+                <div className="mt-3 space-y-2.5">
+                  {group.items.map(([title, desc]) => (
+                    <div key={title} className="text-[13px] leading-relaxed">
+                      <strong className="font-semibold">{title}</strong>
+                      <span className="text-muted-foreground"> · {desc}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
+            ))}
+          </div>
+        </section>
+      </ScrollReveal>
 
-              <div className="space-y-3">
-                {/* V1 */}
-                <div className="rounded-lg bg-foreground p-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-bold text-background">V1</span>
-                    <span className="text-[10px] uppercase tracking-wider text-background/40">Current &middot; March 2026</span>
+      {/* ═══ SECURITY ═══ */}
+      <ScrollReveal>
+        <section className="mt-16">
+          <div className="rounded-2xl bg-foreground p-6 sm:p-8">
+            <Label><span className="text-background/40">Security &amp; Privacy</span></Label>
+            <h2 className="mt-3 text-xl font-bold tracking-tight text-background sm:text-2xl">
+              Trust model
+            </h2>
+            <p className="mt-4 text-[15px] leading-[1.75] text-background/55">
+              We don&apos;t touch your wallet. We don&apos;t store your data.
+              That&apos;s not a promise. It&apos;s the architecture.
+            </p>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              {[
+                { t: 'Private searches', d: 'All queries SHA256-hashed before logging. Nobody can see who you looked up.' },
+                { t: 'Server-side only', d: 'All sensitive operations run server-side. API keys never touch the client.' },
+                { t: 'Zero-custody claims', d: 'Transactions built server-side, simulated before signing, submitted by your wallet.' },
+                { t: 'HMAC-signed requests', d: 'Every claim request cryptographically signed. Timing-safe comparison prevents attacks.' },
+                { t: 'Claim state machine', d: 'Forward-only status transitions enforced server-side. Terminal states locked.' },
+                { t: 'On-chain verifiable', d: 'Every fee record and claim transaction independently verifiable. Full audit trail.' },
+              ].map((item) => (
+                <div key={item.t} className="rounded-lg border border-background/10 bg-background/[0.05] p-4 transition-colors duration-200 hover:bg-background/[0.08]">
+                  <h3 className="text-[13px] font-bold text-background">{item.t}</h3>
+                  <p className="mt-1.5 text-[12px] leading-relaxed text-background/45">{item.d}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </ScrollReveal>
+
+      {/* ═══ ROADMAP ═══ */}
+      <ScrollReveal>
+        <section className="mt-16">
+          <Label>Roadmap</Label>
+          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
+            What&apos;s shipped &amp; what&apos;s next
+          </h2>
+
+          <div className="relative mt-8">
+            {/* Timeline spine */}
+            <div className="absolute left-[17px] top-0 bottom-0 w-px bg-foreground/10" />
+
+            <div className="space-y-10">
+              {/* V1 */}
+              <div className="relative pl-12">
+                <div className="absolute left-[9px] top-1 h-[18px] w-[18px] rounded-full border-2 border-background bg-foreground" />
+                <div className="rounded-xl border border-foreground/[0.06] p-5">
+                  <div className="flex items-center gap-3">
+                    <span className="rounded-md bg-foreground px-2.5 py-1 text-[10px] font-bold text-background">V1.5</span>
+                    <span className="text-[11px] font-medium text-muted-foreground">Current &middot; March 2026</span>
                   </div>
-                  <ul className="mt-3 space-y-1">
+                  <div className="ml-1 mt-5 columns-1 gap-x-6 space-y-1.5 sm:columns-2">
                     {[
                       '9 platform support (Solana + Base)',
                       'Multi-identity search (Twitter, GitHub, Farcaster, Wallet)',
-                      'SSE streaming — real-time scan progress as each platform completes',
-                      'AbortSignal propagation — clean cancellation across all adapters',
-                      'Wallclock guards — partial results instead of serverless timeouts',
-                      'In-memory Doppler cache — 2-3x throughput for Bankr scans',
-                      'Cron token indexer — background indexing for faster repeat scans',
+                      'SSE streaming with per-platform progress',
+                      'Signal Lock loading animation with radar-style scan UX',
+                      'Vercel Hobby optimization (10s serverless limit)',
+                      'AbortSignal propagation across all adapters',
+                      'Wallclock guards with partial result returns',
+                      'Doppler in-memory cache (2-3x Bankr throughput)',
+                      'Cron token indexer for background warm-up',
                       'Chunked EVM getLogs + Helius V2 cursor pagination',
-                      'Real-time fee polling with 30s intervals',
-                      'USD conversion with live price feeds',
+                      'Real-time fee polling (30s intervals)',
+                      'Live USD conversion (CoinGecko, DexScreener, Jupiter)',
                       'Dynamic dust filtering ($15 threshold)',
                       'Multi-key API rotation (10,000 req/hr)',
+                      'Bags.fm direct claim (zero-custody, server-built txs)',
+                      'Pre-sign transaction simulation',
+                      'HMAC-SHA256 claim verification',
+                      'Forward-only claim state machine with hardware wallet recovery',
+                      'Wallet Standard auto-discovery',
+                      'Helius webhook for real-time claim confirmation',
+                      'Claim audit trail in Supabase',
+                      'Rate-limited middleware (IP + per-wallet)',
+                      'Base app verification for Coinbase ecosystem',
+                      'Vercel Analytics',
                       'Privacy-preserving analytics (SHA256 hashed)',
                     ].map((item) => (
-                      <li key={item} className="flex items-center gap-2 text-[11px] text-background/60">
-                        <span className="text-[#00D4AA]">&gt;</span>
+                      <div key={item} className="flex items-start gap-2.5 break-inside-avoid text-[12px] text-foreground/70">
+                        <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
                         {item}
-                      </li>
+                      </div>
                     ))}
-                  </ul>
-                </div>
-
-                {/* V2 */}
-                <div className="rounded-lg border-2 border-foreground p-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-bold">V2</span>
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Coming Soon</span>
                   </div>
-                  <ul className="mt-3 space-y-1">
+                </div>
+              </div>
+
+              {/* V2 */}
+              <div className="relative pl-12">
+                <div className="absolute left-[9px] top-1 h-[18px] w-[18px] rounded-full border-2 border-foreground/20 bg-background" />
+                <div className="rounded-xl border border-dashed border-foreground/10 p-5">
+                  <div className="flex items-center gap-3">
+                    <span className="rounded-md border border-foreground/20 px-2.5 py-1 text-[10px] font-bold">V2</span>
+                    <span className="text-[11px] font-medium text-muted-foreground">Coming Soon</span>
+                  </div>
+                  <div className="ml-1 mt-5 space-y-1.5">
                     {[
                       'Token Fee Scanner (paste any contract address)',
                       'Fee recipient discovery (who gets paid)',
                       'Earnings breakdown (earned, claimed, unclaimed in USD)',
                       'Tri-state claim status (claimed, partial, unclaimed)',
                       'Telegram Bot (paste CA in groups/DMs for instant fee data)',
-                      'One-click claim across all platforms',
+                      'One-click claim expansion (Bags.fm live, Clanker & Zora next)',
                       'Additional chain support (Ethereum L1, Arbitrum)',
                     ].map((item) => (
-                      <li key={item} className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                        <span className="text-muted-foreground/40">&rarr;</span>
+                      <div key={item} className="flex items-start gap-2.5 text-[12px] text-muted-foreground">
+                        <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/15" />
                         {item}
-                      </li>
+                      </div>
                     ))}
-                  </ul>
-                </div>
-
-                {/* V3 */}
-                <div className="rounded-lg bg-muted/30 p-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-bold text-muted-foreground/50">V3</span>
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground/40">2026+</span>
                   </div>
-                  <ul className="mt-3 space-y-1">
+                </div>
+              </div>
+
+              {/* V3 */}
+              <div className="relative pl-12">
+                <div className="absolute left-[9px] top-1 h-[18px] w-[18px] rounded-full border-2 border-foreground/10 bg-background" />
+                <div className="rounded-xl border border-dashed border-foreground/[0.06] p-5">
+                  <div className="flex items-center gap-3">
+                    <span className="rounded-md border border-foreground/10 px-2.5 py-1 text-[10px] font-bold text-muted-foreground">V3</span>
+                    <span className="text-[11px] text-foreground/25">2026+</span>
+                  </div>
+                  <div className="ml-1 mt-5 space-y-1.5">
                     {[
                       'Automated claim scheduling',
                       'Creator analytics & insights dashboard',
                       'Portfolio dashboard for multi-creator agencies',
                       'SDK for platform integrations',
                     ].map((item) => (
-                      <li key={item} className="flex items-center gap-2 text-[11px] text-muted-foreground/50">
-                        <span className="text-muted-foreground/30">&rarr;</span>
+                      <div key={item} className="flex items-start gap-2.5 text-[12px] text-foreground/30">
+                        <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/10" />
                         {item}
-                      </li>
+                      </div>
                     ))}
-                  </ul>
-                </div>
-              </div>
-
-              <p className="text-center text-sm font-bold">This is V1. We&apos;re just getting started.</p>
-            </div>
-          </Card>
-        </ScrollReveal>
-
-        {/* ── 09: Team ── */}
-        <ScrollReveal>
-          <Card>
-            <div id="team" className="space-y-5">
-              <div className="flex items-center gap-3">
-                <SectionNum n="09" />
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Built by LW</h2>
-              </div>
-
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                4-person Web3 studio. 408+ projects shipped. Every build handled by the same team you talk to on Telegram. No layers, no outsourcing.
-              </p>
-
-              <div className="rounded-lg border-l-[3px] border-foreground bg-muted/40 px-4 py-3 text-sm italic text-muted-foreground">
-                &ldquo;We built ClaimScan because we needed it. Then we opened it to everyone.&rdquo;
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex flex-col items-center justify-center rounded-lg bg-foreground py-3.5 text-center">
-                  <span className="text-lg font-bold text-background">408+</span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider text-background/50">Projects Delivered</span>
-                </div>
-                <div className="flex flex-col items-center justify-center rounded-lg bg-foreground py-3.5 text-center">
-                  <span className="text-lg font-bold text-background">$1.6B+</span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider text-background/50">Market Cap Generated</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { code: 'LW-2201', role: 'Branding Specialist', desc: 'Brand psychology, logos, visual identity' },
-                  { code: 'LW-2202', role: 'Frontend Developer', desc: 'Websites, dApps, bots, dashboards' },
-                  { code: 'LW-2203', role: 'Backend Engineer', desc: 'APIs, databases, contract integrations' },
-                  { code: 'LW-2204', role: 'Motion Designer', desc: 'Promo videos, animated logos, TGS stickers' },
-                ].map((m) => (
-                  <div key={m.code} className="rounded-lg border border-border/40 p-3">
-                    <span className="inline-block rounded bg-foreground px-1.5 py-0.5 font-mono text-[9px] font-bold text-background">
-                      {m.code}
-                    </span>
-                    <h3 className="mt-1.5 text-xs font-bold">{m.role}</h3>
-                    <p className="mt-0.5 text-[10px] text-muted-foreground">{m.desc}</p>
                   </div>
-                ))}
-              </div>
-
-              <div className="h-px w-full bg-border" />
-
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <a href="https://x.com/lwartss" target="_blank" rel="noopener noreferrer" className="group">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">X / Twitter</span>
-                  <p className="mt-0.5 text-xs font-semibold group-hover:underline">@lwartss</p>
-                </a>
-                <a href="https://t.me/lwarts" target="_blank" rel="noopener noreferrer" className="group">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Telegram</span>
-                  <p className="mt-0.5 text-xs font-semibold group-hover:underline">t.me/lwarts</p>
-                </a>
-                <a href="https://lwdesigns.art" target="_blank" rel="noopener noreferrer" className="group">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Website</span>
-                  <p className="mt-0.5 text-xs font-semibold group-hover:underline">lwdesigns.art</p>
-                </a>
+                </div>
               </div>
             </div>
-          </Card>
-        </ScrollReveal>
+          </div>
+        </section>
+      </ScrollReveal>
 
-        {/* ── Final CTA ── */}
-        <ScrollReveal>
-          <InvertedCard className="flex flex-col items-center gap-4 py-10 text-center">
-            <h2 className="text-xl font-bold tracking-tight text-background sm:text-2xl">
-              Ready to find your money?
-            </h2>
-            <p className="max-w-md text-sm text-background/50">
-              Enter your handle. See what you&apos;re owed. Takes 30 seconds.
-            </p>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-lg bg-background px-6 py-3 text-sm font-bold text-foreground transition-opacity hover:opacity-90"
-            >
-              Scan Now <span aria-hidden="true">&rarr;</span>
-            </Link>
-            <p className="text-[11px] text-background/25">Free forever. No wallet connection needed.</p>
-          </InvertedCard>
-        </ScrollReveal>
-      </div>
-    </div>
+      {/* ═══ WHITEPAPER ═══ */}
+      <ScrollReveal>
+        <section className="mt-16 flex items-center justify-between rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.06)]">
+          <div>
+            <Label>Reference</Label>
+            <h3 className="mt-1.5 text-sm font-bold">V1.5 Whitepaper</h3>
+          </div>
+          <a
+            href="/ClaimScan-Whitepaper-V1.pdf"
+            download
+            className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-xs font-bold text-background transition-opacity hover:opacity-80"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Download PDF
+          </a>
+        </section>
+      </ScrollReveal>
+
+      {/* ═══ TEAM ═══ */}
+      <ScrollReveal>
+        <section className="mt-16">
+          <Label>Team</Label>
+          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
+            Built by LW
+          </h2>
+          <p className="mt-4 text-[15px] leading-[1.75] text-foreground/70">
+            4-person Web3 studio. 408+ projects shipped. $1.6B+ market cap generated.
+            Every build handled by the same team you talk to on Telegram.
+          </p>
+
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { code: '2201', role: 'Brand' },
+              { code: '2202', role: 'Frontend' },
+              { code: '2203', role: 'Backend' },
+              { code: '2204', role: 'Motion' },
+            ].map((m) => (
+              <div key={m.code} className="flex flex-col items-center rounded-xl border border-foreground/[0.06] py-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)]">
+                <span className="font-mono text-[10px] font-bold text-muted-foreground">LW-{m.code}</span>
+                <span className="mt-1 text-xs font-bold">{m.role}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 flex items-center justify-center gap-8">
+            {[
+              { label: 'X', href: 'https://x.com/lwartss', text: '@lwartss' },
+              { label: 'Telegram', href: 'https://t.me/lwarts', text: 't.me/lwarts' },
+              { label: 'Website', href: 'https://lwdesigns.art', text: 'lwdesigns.art' },
+            ].map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-center transition-opacity hover:opacity-70"
+              >
+                <span className="block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">{link.label}</span>
+                <span className="mt-0.5 text-xs font-bold">{link.text}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      </ScrollReveal>
+
+      {/* ═══ CTA ═══ */}
+      <ScrollReveal>
+        <section className="mt-20 rounded-2xl bg-foreground py-14 text-center">
+          <h2 className="text-xl font-bold tracking-tight text-background sm:text-2xl">
+            Ready to find your money?
+          </h2>
+          <p className="mx-auto mt-3 max-w-sm text-sm text-background/50">
+            Enter your handle. See what you&apos;re owed. 30 seconds. Free forever.
+          </p>
+          <Link
+            href="/"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-background px-6 py-3 text-sm font-bold text-foreground transition-all duration-200 hover:opacity-90 hover:shadow-[0_4px_20px_-4px_rgba(255,255,255,0.15)]"
+          >
+            Scan Now <span aria-hidden="true">&rarr;</span>
+          </Link>
+        </section>
+      </ScrollReveal>
+    </article>
   );
 }

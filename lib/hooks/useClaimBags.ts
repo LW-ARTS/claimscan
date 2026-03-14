@@ -396,21 +396,28 @@ export function useClaimBags(): UseClaimBagsReturn {
           }
         }
 
-        if (simValidTxs.length === 0) continue;
+        const isLastBatch = i + batchSize >= allTxEntries.length;
+
+        // If no valid claim txs in this batch but it's the last and we have a fee tx,
+        // we still need to sign the fee tx (earlier batches may have confirmed claims)
+        if (simValidTxs.length === 0 && !(isLastBatch && unsignedFeeTx)) continue;
 
         // Await signing status update BEFORE calling signAllTransactions
-        await Promise.allSettled(
-          simValidBatch.map((entry) =>
-            confirmClaimStatus(entry.claimAttemptId, walletAddress, entry.confirmToken, undefined, 'signing')
-          )
-        );
+        if (simValidBatch.length > 0) {
+          await Promise.allSettled(
+            simValidBatch.map((entry) =>
+              confirmClaimStatus(entry.claimAttemptId, walletAddress, entry.confirmToken, undefined, 'signing')
+            )
+          );
+        }
 
-        // If this is the LAST batch and we have a fee tx, append it to get signed together
-        const isLastBatch = i + batchSize >= allTxEntries.length;
+        // Bundle fee tx into last batch for single wallet popup
         const txsForWallet = [...simValidTxs];
         if (isLastBatch && unsignedFeeTx) {
           txsForWallet.push(unsignedFeeTx);
         }
+
+        if (txsForWallet.length === 0) continue;
 
         let signed: VersionedTransaction[];
         let signTimeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -554,6 +561,10 @@ export function useClaimBags(): UseClaimBagsReturn {
             }
             completed++;
             await confirmClaimStatus(entry.claimAttemptId, walletAddress, entry.confirmToken, entry.sig, 'confirmed');
+            // Remove from activeEntries so cancel() doesn't re-fail confirmed claims
+            activeEntriesRef.current = activeEntriesRef.current.filter(
+              (e) => e.claimAttemptId !== entry.claimAttemptId
+            );
             safeSetResults((prev) =>
               prev.map((r) =>
                 r.claimAttemptId === entry.claimAttemptId
@@ -565,6 +576,9 @@ export function useClaimBags(): UseClaimBagsReturn {
             failed++;
             const reason = confirmErr instanceof Error ? confirmErr.message : 'Confirmation failed';
             await confirmClaimStatus(entry.claimAttemptId, walletAddress, entry.confirmToken, entry.sig, 'failed', reason);
+            activeEntriesRef.current = activeEntriesRef.current.filter(
+              (e) => e.claimAttemptId !== entry.claimAttemptId
+            );
             safeSetResults((prev) =>
               prev.map((r) =>
                 r.claimAttemptId === entry.claimAttemptId
@@ -652,7 +666,13 @@ export function useClaimBags(): UseClaimBagsReturn {
               wallet: walletAddress,
               feeLamports: feeLamports.toString(),
             }),
-          }).catch(() => {});
+          })
+            .then((res) => {
+              if (!res.ok) console.warn(`[useClaimBags] Fee log failed: HTTP ${res.status} (sig: ${feeSig})`);
+            })
+            .catch((err) => {
+              console.warn('[useClaimBags] Fee log network error (sig:', feeSig, '):', err instanceof Error ? err.message : err);
+            });
 
           connection.confirmTransaction(
             { signature: feeSig, ...activeFeeBlockhash },

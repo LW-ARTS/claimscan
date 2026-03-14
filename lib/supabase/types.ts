@@ -1,4 +1,4 @@
-export type Platform = 'bags' | 'clanker' | 'pump' | 'zora' | 'bankr' | 'believe' | 'revshare' | 'coinbarrel' | 'raydium';
+export type Platform = 'bags' | 'clanker' | 'pump' | 'zora' | 'heaven' | 'bankr' | 'believe' | 'revshare' | 'coinbarrel' | 'raydium';
 export type Chain = 'sol' | 'base' | 'eth';
 export type IdentityProvider = 'twitter' | 'github' | 'farcaster' | 'wallet';
 export type ClaimStatus = 'claimed' | 'unclaimed' | 'partially_claimed' | 'auto_distributed';
@@ -235,7 +235,6 @@ export interface Database {
       claim_attempts: {
         Row: {
           id: string;
-          creator_id: string | null;
           wallet_address: string;
           platform: Platform;
           chain: Chain;
@@ -249,7 +248,6 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          creator_id?: string | null;
           wallet_address: string;
           platform?: Platform;
           chain?: Chain;
@@ -263,7 +261,6 @@ export interface Database {
         };
         Update: {
           id?: string;
-          creator_id?: string | null;
           wallet_address?: string;
           platform?: Platform;
           chain?: Chain;
@@ -275,7 +272,34 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
-        Relationships: [{ foreignKeyName: 'claim_attempts_creator_id_fkey'; columns: ['creator_id']; referencedRelation: 'creators'; referencedColumns: ['id'] }];
+        Relationships: [];
+      };
+      claim_fees: {
+        Row: {
+          id: string;
+          wallet_address: string;
+          tx_signature: string;
+          fee_lamports: string;
+          verified: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          wallet_address: string;
+          tx_signature: string;
+          fee_lamports: string;
+          verified?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          wallet_address?: string;
+          tx_signature?: string;
+          fee_lamports?: string;
+          verified?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
       };
       search_log: {
         Row: {
