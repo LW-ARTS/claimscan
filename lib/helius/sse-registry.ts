@@ -8,6 +8,9 @@
 /** Map of wallet address → set of SSE stream controllers */
 const sseClients = new Map<string, Set<ReadableStreamDefaultController>>();
 
+/** Max SSE connections per wallet to prevent memory exhaustion from connection flooding. */
+const MAX_SSE_PER_WALLET = 10;
+
 export function registerSSEClient(
   wallet: string,
   controller: ReadableStreamDefaultController
@@ -15,7 +18,9 @@ export function registerSSEClient(
   if (!sseClients.has(wallet)) {
     sseClients.set(wallet, new Set());
   }
-  sseClients.get(wallet)!.add(controller);
+  const set = sseClients.get(wallet)!;
+  if (set.size >= MAX_SSE_PER_WALLET) return; // Drop excess connections
+  set.add(controller);
 }
 
 export function unregisterSSEClient(

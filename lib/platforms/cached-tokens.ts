@@ -40,8 +40,9 @@ export async function getCachedTokenAddresses(
     if (!tokens || tokens.length === 0) return null;
 
     return tokens.map((t) => t.token_address);
-  } catch {
-    // Any DB error → fall back to GPA silently
+  } catch (err) {
+    // DB error → fall back to GPA. Log so operators can detect broken cache layer.
+    console.warn('[cached-tokens] DB query failed, falling back to GPA:', err instanceof Error ? err.message : err);
     return null;
   }
 }

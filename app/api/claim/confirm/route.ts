@@ -37,8 +37,8 @@ export async function POST(request: Request) {
 
   // Handle fee tx logging (separate from claim status updates)
   if (body.feeTx === true) {
-    const { txSignature: feeSig, wallet: feeWallet, feeLamports: rawFeeLamports } = body as {
-      txSignature?: string; wallet?: string; feeLamports?: string;
+    const { txSignature: feeSig, wallet: feeWallet, feeLamports: rawFeeLamports, confirmToken: feeConfirmToken, claimAttemptId: feeAttemptId } = body as {
+      txSignature?: string; wallet?: string; feeLamports?: string; confirmToken?: string; claimAttemptId?: string;
     };
     // Validate inputs to prevent DB pollution from unauthenticated requests
     if (
@@ -47,6 +47,23 @@ export async function POST(request: Request) {
       !rawFeeLamports || typeof rawFeeLamports !== 'string' || !/^\d+$/.test(rawFeeLamports)
     ) {
       return NextResponse.json({ ok: true }); // Silent ignore invalid data
+    }
+    // Require HMAC authentication — fee branch must be called with a valid
+    // confirmToken tied to a claimAttemptId+wallet to prevent unauthorized
+    // fee log injection from on-chain observers.
+    if (
+      !feeConfirmToken || typeof feeConfirmToken !== 'string' ||
+      !feeAttemptId || typeof feeAttemptId !== 'string' || !UUID_RE.test(feeAttemptId)
+    ) {
+      return NextResponse.json({ ok: true }); // Silent ignore unauthenticated
+    }
+    try {
+      const expectedFeeToken = generateConfirmToken(feeAttemptId, feeWallet);
+      if (!verifyConfirmToken(feeConfirmToken, expectedFeeToken)) {
+        return NextResponse.json({ ok: true }); // Silent ignore invalid token
+      }
+    } catch {
+      return NextResponse.json({ ok: true }); // HMAC not configured
     }
     let feeLamports: string = rawFeeLamports;
     const parsedFee = BigInt(feeLamports);
@@ -81,8 +98,10 @@ export async function POST(request: Request) {
       }
       verified = actualDelta > 0n;
     } catch (rpcErr) {
-      // RPC failure — insert as unverified. Revenue dashboard reconciles later.
-      console.warn(`[claim/confirm] Fee verification RPC failed for sig=${feeSig} wallet=${feeWallet}:`, rpcErr instanceof Error ? rpcErr.message : rpcErr);
+      // RPC failure — skip insert entirely rather than trusting client-supplied amount.
+      // The fee can be reconciled later via cron or manual verification.
+      console.warn(`[claim/confirm] Fee verification RPC failed, skipping insert for sig=${feeSig}:`, rpcErr instanceof Error ? rpcErr.message : rpcErr);
+      return NextResponse.json({ ok: true });
     }
 
     // Skip insert if on-chain verification found zero transfer (avoids CHECK constraint violation)

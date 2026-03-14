@@ -260,6 +260,9 @@ export async function POST(request: Request) {
       });
     }
 
+    // NOTE: Fee is computed from DB-cached total_unclaimed which can be up to 40 min stale.
+    // This is an accepted tradeoff: the user sees the exact fee before signing, and
+    // on-chain verification in /api/claim/confirm caps the stored fee to the actual delta.
     const { data: feeRecords, error: feeQueryErr } = await supabase
       .from('fee_records')
       .select('total_unclaimed')

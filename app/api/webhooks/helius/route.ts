@@ -44,8 +44,8 @@ interface HeliusWebhookEvent {
 }
 
 export async function POST(request: Request) {
-  // Verify webhook secret — fail closed if not configured
-  if (!WEBHOOK_SECRET) {
+  // Verify webhook secret — fail closed if not configured or empty
+  if (!WEBHOOK_SECRET || WEBHOOK_SECRET.trim().length === 0) {
     console.error('[webhook] HELIUS_WEBHOOK_SECRET is not configured — rejecting request');
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
   }
@@ -55,9 +55,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Guard against oversized payloads (max 1MB)
+    // Guard against oversized payloads (max 1MB).
+    // Require Content-Length to prevent chunked transfer encoding bypass.
     const contentLength = request.headers.get('content-length');
-    if (contentLength && parseInt(contentLength, 10) > 1_048_576) {
+    if (!contentLength) {
+      return NextResponse.json({ error: 'Content-Length required' }, { status: 411 });
+    }
+    if (parseInt(contentLength, 10) > 1_048_576) {
       return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
     }
 

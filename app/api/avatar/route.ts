@@ -33,7 +33,10 @@ export async function GET(req: NextRequest) {
       return new NextResponse(null, { status: 502 });
     }
 
-    const ct = res.headers.get('content-type') || 'image/jpeg';
+    // Allowlist content types to prevent proxying HTML/JS from upstream
+    const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/avif']);
+    const rawCt = res.headers.get('content-type') ?? 'image/jpeg';
+    const ct = ALLOWED_IMAGE_TYPES.has(rawCt.split(';')[0].trim()) ? rawCt : 'image/jpeg';
 
     return new NextResponse(buf, {
       status: 200,
