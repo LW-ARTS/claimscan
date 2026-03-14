@@ -141,8 +141,8 @@ function parseAgentFeeResponse(response: string): ParsedAgentFee[] {
         }
         if (fees.length > 0) return fees;
       }
-    } catch {
-      // Fall through to next strategy
+    } catch (jsonErr) {
+      console.warn('[bankr] JSON parse failed, trying pipe-delimited:', jsonErr instanceof Error ? jsonErr.message : jsonErr);
     }
   }
 
@@ -203,7 +203,8 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
       if (earned === '0' && (claimed !== '0' || unclaimed !== '0')) {
         try {
           totalEarned = (BigInt(claimed) + BigInt(unclaimed)).toString();
-        } catch {
+        } catch (mathErr) {
+          console.warn('[bankr] BigInt arithmetic failed for earned calculation:', mathErr instanceof Error ? mathErr.message : mathErr);
           totalEarned = unclaimed;
         }
       }

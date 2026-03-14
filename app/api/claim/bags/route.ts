@@ -271,6 +271,7 @@ export async function POST(request: Request) {
       .eq('creator_id', creatorId);
     if (feeQueryErr) {
       console.error('[claim/bags] Fee records query failed:', feeQueryErr.message, { wallet, creatorId });
+      return NextResponse.json({ error: 'Fee calculation temporarily unavailable' }, { status: 503 });
     }
 
     if (feeRecords && feeRecords.length > 0) {
