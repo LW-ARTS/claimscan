@@ -14,6 +14,7 @@ function truncateAddress(addr: string): string {
 }
 
 function timeAgo(dateStr: string): string {
+  if (!dateStr || isNaN(new Date(dateStr).getTime())) return 'unknown';
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) return 'just now';
@@ -26,12 +27,14 @@ function timeAgo(dateStr: string): string {
   return `${months}mo ago`;
 }
 
-/** Chain-aware block explorer URL for transaction hashes. */
-function getExplorerTxUrl(txHash: string, chain: Chain): string {
+/** Chain-aware block explorer URL for transaction hashes. Returns null for invalid hashes. */
+const SOL_TX_RE = /^[1-9A-HJ-NP-Za-km-z]{86,88}$/;
+const EVM_TX_RE = /^0x[a-fA-F0-9]{64}$/;
+function getExplorerTxUrl(txHash: string, chain: Chain): string | null {
   switch (chain) {
-    case 'base': return `https://basescan.org/tx/${txHash}`;
-    case 'eth': return `https://etherscan.io/tx/${txHash}`;
-    default: return `https://solscan.io/tx/${txHash}`;
+    case 'base': return EVM_TX_RE.test(txHash) ? `https://basescan.org/tx/${txHash}` : null;
+    case 'eth': return EVM_TX_RE.test(txHash) ? `https://etherscan.io/tx/${txHash}` : null;
+    default: return SOL_TX_RE.test(txHash) ? `https://solscan.io/tx/${txHash}` : null;
   }
 }
 
@@ -113,9 +116,9 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
                 <span className="text-xs text-muted-foreground/40 tabular-nums">
                   {timeAgo(event.claimed_at)}
                 </span>
-                {event.tx_hash && (
+                {event.tx_hash && getExplorerTxUrl(event.tx_hash, event.chain) && (
                   <a
-                    href={getExplorerTxUrl(event.tx_hash, event.chain)}
+                    href={getExplorerTxUrl(event.tx_hash, event.chain)!}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted-foreground/40 transition-colors hover:text-foreground"
