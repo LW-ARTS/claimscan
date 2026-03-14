@@ -331,15 +331,20 @@ export async function fetchLiveUnclaimedFees(
   let results: PromiseSettledResult<TokenFee[]>[];
 
   try {
-    results = await Promise.race([
-      Promise.allSettled(tasks),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error('LIVE_AGGREGATION_TIMEOUT')),
-          LIVE_AGGREGATION_TIMEOUT_MS
-        )
-      ),
-    ]);
+    let liveTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      results = await Promise.race([
+        Promise.allSettled(tasks),
+        new Promise<never>((_, reject) => {
+          liveTimeoutId = setTimeout(
+            () => reject(new Error('LIVE_AGGREGATION_TIMEOUT')),
+            LIVE_AGGREGATION_TIMEOUT_MS
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(liveTimeoutId);
+    }
   } catch (err) {
     if (err instanceof Error && err.message === 'LIVE_AGGREGATION_TIMEOUT') {
       console.warn(`[fees] live aggregation timed out after ${LIVE_AGGREGATION_TIMEOUT_MS}ms — aborting pending adapters`);

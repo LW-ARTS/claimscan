@@ -80,8 +80,9 @@ export async function POST(request: Request) {
         feeLamports = actualDelta > 0n ? actualDelta.toString() : '0';
       }
       verified = actualDelta > 0n;
-    } catch {
+    } catch (rpcErr) {
       // RPC failure — insert as unverified. Revenue dashboard reconciles later.
+      console.warn(`[claim/confirm] Fee verification RPC failed for sig=${feeSig} wallet=${feeWallet}:`, rpcErr instanceof Error ? rpcErr.message : rpcErr);
     }
 
     // Skip insert if on-chain verification found zero transfer (avoids CHECK constraint violation)
@@ -90,16 +91,15 @@ export async function POST(request: Request) {
     }
 
     const supabase = createServiceClient();
-    await supabase.from('claim_fees').insert({
+    const { error: insertError } = await supabase.from('claim_fees').insert({
       wallet_address: feeWallet,
       tx_signature: feeSig,
       fee_lamports: feeLamports,
       verified,
-    }).then(({ error }) => {
-      if (error && error.code !== '23505') {
-        console.warn('[claim/confirm] Fee log insert failed:', error.message);
-      }
     });
+    if (insertError && insertError.code !== '23505') {
+      console.error('[claim/confirm] Fee log insert FAILED (revenue loss):', insertError.message, { sig: feeSig, wallet: feeWallet });
+    }
     return NextResponse.json({ ok: true });
   }
 

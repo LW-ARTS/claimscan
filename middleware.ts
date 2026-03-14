@@ -186,8 +186,8 @@ export function middleware(request: NextRequest) {
     }
 
     // Reject oversized or unbounded POST bodies before they reach route handlers.
-    // Block requests missing Content-Length entirely to prevent bypass.
-    if (request.method === 'POST') {
+    // Webhooks may use chunked transfer encoding (no Content-Length), so exclude them.
+    if (request.method === 'POST' && !pathname.startsWith('/api/webhooks')) {
       const contentLength = request.headers.get('content-length');
       if (!contentLength) {
         return NextResponse.json(

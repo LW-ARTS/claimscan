@@ -279,15 +279,13 @@ function isMigrated(account: Record<string, unknown>): boolean {
  * stale data into the cache.
  */
 function raceGpaTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
-  let timedOut = false;
+  let timerId: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => {
-      timedOut = true;
+    timerId = setTimeout(() => {
       reject(new Error(`${label} timed out after ${GPA_TIMEOUT_MS}ms`));
     }, GPA_TIMEOUT_MS);
   });
-  return Promise.race([promise, timeoutPromise]).then((val) => {
-    if (timedOut) throw new Error(`${label} timed out`);
-    return val;
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timerId);
   });
 }

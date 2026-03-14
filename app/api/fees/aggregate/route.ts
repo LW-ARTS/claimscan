@@ -21,7 +21,8 @@ export async function GET(request: Request) {
     .from('fee_records')
     .select('id, platform, chain, token_address, token_symbol, total_earned, total_claimed, total_unclaimed, total_earned_usd, claim_status, last_synced_at')
     .eq('creator_id', creatorId)
-    .order('last_synced_at', { ascending: false });
+    .order('last_synced_at', { ascending: false })
+    .limit(500);
 
   if (error) {
     console.error('[fees/aggregate] query failed:', error.message);

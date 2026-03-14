@@ -80,7 +80,19 @@ export const PLATFORM_CONFIG = {
   revshare: { name: 'RevShare', chain: 'sol' as const, color: '#4CAF50' },
   coinbarrel: { name: 'Coinbarrel', chain: 'sol' as const, color: '#FF8C00' },
   raydium: { name: 'Raydium', chain: 'sol' as const, color: '#6C5CE7' },
+  heaven: { name: 'Heaven', chain: 'sol' as const, color: '#FFD700' },
 } as const;
+
+// ═══════════════════════════════════════════════
+// ClaimScan Fee Config
+// ═══════════════════════════════════════════════
+
+/** Wallet that receives the ClaimScan service fee on claims. */
+export const CLAIMSCAN_FEE_WALLET = '8VU2cuNTgxqXEfCXrhLzt7rbVxeoev881C9jY3LGivzR';
+/** Fee in basis points (85 = 0.85%). */
+export const CLAIMSCAN_FEE_BPS = 85;
+/** Minimum fee in lamports. Below this, skip the fee tx (gas would cost more). */
+export const MIN_FEE_LAMPORTS = 1_000_000n; // 0.001 SOL
 
 // ═══════════════════════════════════════════════
 // Timing Constants

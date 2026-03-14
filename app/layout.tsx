@@ -154,12 +154,6 @@ export default function RootLayout({
                   </span>
                 </Link>
                 <div className="flex items-center gap-2">
-                  <Link
-                    href="/docs"
-                    className="px-2 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    Docs
-                  </Link>
                   <WalletButton />
                 </div>
               </nav>

@@ -19,7 +19,7 @@ export default function GlobalError({
       <body className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <div className="text-center space-y-4">
           <h2 className="text-2xl font-bold">Something went wrong</h2>
-          <p className="text-muted-foreground">Error ID: {error.digest}</p>
+          <p className="text-muted-foreground">An unexpected error occurred. Please try again.</p>
           <button
             onClick={reset}
             className="rounded-lg bg-foreground px-6 py-2.5 text-sm font-bold text-background"
