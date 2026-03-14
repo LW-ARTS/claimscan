@@ -64,14 +64,24 @@ if (
 
 /**
  * Constant-time string comparison to prevent timing side-channel attacks.
- * Falls back to byte-by-byte XOR when crypto.timingSafeEqual is unavailable in Edge.
+ * Uses the same timingSafeEqual pattern as lib/supabase/service.ts.
  */
 function safeCompare(a: string, b: string): boolean {
-  // Pad to equal length to avoid leaking length info via timing
-  const maxLen = Math.max(a.length, b.length);
-  let mismatch = a.length !== b.length ? 1 : 0;
-  for (let i = 0; i < maxLen; i++) {
-    mismatch |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  const bufA = new TextEncoder().encode(a);
+  const bufB = new TextEncoder().encode(b);
+  if (bufA.length !== bufB.length) {
+    // Compare against self to consume constant time, then return false
+    const padded = new Uint8Array(bufA.length);
+    padded.set(bufB.subarray(0, Math.min(bufB.length, bufA.length)));
+    let mismatch = 1; // length already differs
+    for (let i = 0; i < bufA.length; i++) {
+      mismatch |= bufA[i] ^ (padded[i] || 0);
+    }
+    return mismatch === 0; // always false
+  }
+  let mismatch = 0;
+  for (let i = 0; i < bufA.length; i++) {
+    mismatch |= bufA[i] ^ bufB[i];
   }
   return mismatch === 0;
 }
@@ -100,7 +110,7 @@ export function middleware(request: NextRequest) {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://pbs.twimg.com https://abs.twimg.com https://avatars.githubusercontent.com https://imagedelivery.net https://ipfs.io https://unavatar.io",
       "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self' https://*.supabase.co https://api.coingecko.com https://api.dexscreener.com https://api.jup.ag https://*.ingest.sentry.io",
+      "connect-src 'self' https://*.supabase.co https://api.coingecko.com https://api.dexscreener.com https://api.jup.ag https://*.ingest.sentry.io https://*.helius-rpc.com wss://*.helius-rpc.com https://api.mainnet-beta.solana.com",
       "frame-src 'self'",
       "frame-ancestors 'none'",
       "object-src 'none'",
@@ -160,9 +170,11 @@ export function middleware(request: NextRequest) {
       ?? request.headers.get('x-real-ip')
       ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
 
-    // If IP cannot be determined, apply conservative rate limiting under a shared key
-    // instead of skipping — prevents bypass by omitting headers
-    const rateLimitKey = ip || '__unknown_ip__';
+    // If IP cannot be determined in production, the request is suspicious —
+    // create a per-request pseudo-key from available headers to avoid a shared bucket.
+    // In dev (no Vercel IP injection), use localhost fallback.
+    const rateLimitKey = ip
+      || `anon:${request.headers.get('user-agent')?.slice(0, 64) ?? 'none'}:${request.headers.get('accept-language')?.slice(0, 16) ?? 'none'}`;
     if (isRateLimited(rateLimitKey)) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },

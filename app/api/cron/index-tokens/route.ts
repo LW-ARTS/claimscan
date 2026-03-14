@@ -30,11 +30,16 @@ export async function GET(request: Request) {
     // Fetch creators who haven't been token-indexed recently.
     // Order by last_token_sync_at ASC NULLS FIRST so never-indexed creators
     // get priority, then the most stale ones come next.
-    const { data: creators } = await supabase
+    const { data: creators, error: queryError } = await supabase
       .from('creators')
       .select('id, last_token_sync_at, wallets(*)')
       .order('last_token_sync_at', { ascending: true, nullsFirst: true })
       .limit(15);
+
+    if (queryError) {
+      console.error('[index-tokens] Failed to query creators:', queryError.message);
+      return NextResponse.json({ error: 'Database query failed' }, { status: 500 });
+    }
 
     if (!creators || creators.length === 0) {
       return NextResponse.json({ ok: true, indexed: 0, tokens: 0 });

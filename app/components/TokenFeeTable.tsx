@@ -17,6 +17,8 @@ interface TokenFeeTableProps {
   fees: FeeRecord[];
   solPrice?: number;
   ethPrice?: number;
+  connectedWallet?: string | null;
+  onClaimToken?: (tokenMint: string) => void;
 }
 
 /** Format token display: $SYMBOL when available, shortened address as fallback */
@@ -30,7 +32,7 @@ function tokenDisplay(fee: FeeRecord): { label: string; badge: string } {
   return { label: short, badge: '?' };
 }
 
-export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTableProps) {
+export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWallet, onClaimToken }: TokenFeeTableProps) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_COUNT);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -96,6 +98,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
                   <button
                     type="button"
                     onClick={() => handleCopy(fee.id, fee.token_address!)}
+                    aria-label={copiedId === fee.id ? 'Copied' : 'Copy contract address'}
                     title="Copy contract address"
                     className="inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground/40 transition-all hover:text-foreground active:scale-90"
                   >
@@ -131,6 +134,14 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
                 <p className="font-mono tabular-nums text-muted-foreground">{formatTokenAmount(fee.total_claimed, decimals)}{currencyLabel(fee.chain)}</p>
               </div>
             </div>
+            {connectedWallet && onClaimToken && fee.platform === 'bags' && fee.claim_status !== 'claimed' && safeBigInt(fee.total_unclaimed) > 0n && (
+              <button
+                onClick={() => onClaimToken(fee.token_address)}
+                className="mt-3 w-full rounded-lg bg-foreground py-2 text-xs font-semibold text-background transition-all hover:opacity-90 active:scale-[0.98]"
+              >
+                Claim
+              </button>
+            )}
           </div>
         );
       })}
@@ -164,6 +175,11 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
               <th scope="col" className="px-4 py-3 text-right text-[11px] font-normal tracking-wide text-muted-foreground/40">
                 Status
               </th>
+              {connectedWallet && onClaimToken && (
+                <th scope="col" className="px-4 py-3 text-right text-[11px] font-normal tracking-wide text-muted-foreground/40">
+                  Action
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -187,7 +203,8 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
                         <button
                           type="button"
                           onClick={() => handleCopy(fee.id, fee.token_address!)}
-                          title="Copy contract address"
+                          aria-label={copiedId === fee.id ? 'Copied' : 'Copy contract address'}
+                    title="Copy contract address"
                           className="inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground/40 transition-all hover:text-foreground active:scale-90"
                         >
                           {copiedId === fee.id ? (
@@ -220,6 +237,18 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0 }: TokenFeeTabl
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     <ClaimStatusBadge status={fee.claim_status} />
                   </td>
+                  {connectedWallet && onClaimToken && (
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      {fee.platform === 'bags' && fee.claim_status !== 'claimed' && safeBigInt(fee.total_unclaimed) > 0n && (
+                        <button
+                          onClick={() => onClaimToken(fee.token_address)}
+                          className="rounded-md bg-foreground px-2.5 py-1 text-[11px] font-medium text-background transition-all hover:opacity-90 active:scale-95"
+                        >
+                          Claim
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}

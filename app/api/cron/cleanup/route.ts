@@ -47,6 +47,29 @@ export async function GET(request: Request) {
       }
     }
 
+    // Expire stale claim_attempts (pending/signing > 5min = blockhash expired)
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { count: claimsPending } = await supabase
+      .from('claim_attempts')
+      .update(
+        { status: 'expired', error_reason: 'Blockhash expired (stale)', updated_at: new Date().toISOString() },
+        { count: 'exact' }
+      )
+      .in('status', ['pending', 'signing'])
+      .lt('created_at', fiveMinAgo);
+
+    // Expire submitted claims where updated_at > 2 minutes ago
+    // (uses updated_at, not created_at, so slow signing doesn't cause premature expiry)
+    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { count: claimsExpired } = await supabase
+      .from('claim_attempts')
+      .update(
+        { status: 'expired', error_reason: 'Transaction confirmation timeout', updated_at: new Date().toISOString() },
+        { count: 'exact' }
+      )
+      .eq('status', 'submitted')
+      .lt('updated_at', twoMinAgo);
+
     // Clean stale token_prices (not updated in 7 days)
     const sevenDaysAgo = new Date(
       Date.now() - 7 * 24 * 60 * 60 * 1000
@@ -62,6 +85,8 @@ export async function GET(request: Request) {
       logsDeleted: logsDeleted ?? 0,
       creatorsDeleted,
       pricesDeleted: pricesDeleted ?? 0,
+      claimsPending: claimsPending ?? 0,
+      claimsExpired: claimsExpired ?? 0,
     });
   } catch (error) {
     console.error('Cleanup error:', error);

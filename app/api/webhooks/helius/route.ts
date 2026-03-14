@@ -44,12 +44,14 @@ interface HeliusWebhookEvent {
 }
 
 export async function POST(request: Request) {
-  // Verify webhook secret if configured (constant-time comparison)
-  if (WEBHOOK_SECRET) {
-    const authHeader = request.headers.get('authorization');
-    if (!verifyWebhookSecret(authHeader, WEBHOOK_SECRET)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  // Verify webhook secret — fail closed if not configured
+  if (!WEBHOOK_SECRET) {
+    console.error('[webhook] HELIUS_WEBHOOK_SECRET is not configured — rejecting request');
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
+  }
+  const authHeader = request.headers.get('authorization');
+  if (!verifyWebhookSecret(authHeader, WEBHOOK_SECRET)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {

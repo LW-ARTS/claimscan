@@ -274,17 +274,20 @@ function isMigrated(account: Record<string, unknown>): boolean {
 
 /**
  * Race a GPA promise against a timeout.
- * getProgramAccounts can be very slow on some RPCs.
+ * The Meteora SDK doesn't accept AbortSignal, so we use Promise.race.
+ * A `timedOut` flag prevents the late-resolving promise from writing
+ * stale data into the cache.
  */
 function raceGpaTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${GPA_TIMEOUT_MS}ms`)),
-      GPA_TIMEOUT_MS
-    );
-    promise.then(
-      (val) => { clearTimeout(timer); resolve(val); },
-      (err) => { clearTimeout(timer); reject(err); },
-    );
+  let timedOut = false;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      timedOut = true;
+      reject(new Error(`${label} timed out after ${GPA_TIMEOUT_MS}ms`));
+    }, GPA_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeoutPromise]).then((val) => {
+    if (timedOut) throw new Error(`${label} timed out`);
+    return val;
   });
 }

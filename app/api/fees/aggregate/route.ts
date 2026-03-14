@@ -24,6 +24,7 @@ export async function GET(request: Request) {
     .order('last_synced_at', { ascending: false });
 
   if (error) {
+    console.error('[fees/aggregate] query failed:', error.message);
     return NextResponse.json(
       { error: 'Failed to fetch fee records' },
       { status: 500 }
