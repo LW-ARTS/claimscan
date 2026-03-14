@@ -186,7 +186,7 @@ export async function GET(request: Request) {
           if (discovered.length > 0) {
             const { error } = await supabase
               .from('creator_tokens')
-              .upsert(discovered, { onConflict: 'token_address,chain' });
+              .upsert(discovered, { onConflict: 'token_address,chain', ignoreDuplicates: true });
             if (!error) tokensIndexed += discovered.length;
           }
 
