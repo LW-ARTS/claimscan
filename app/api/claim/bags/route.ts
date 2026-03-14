@@ -3,6 +3,7 @@ import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { createServiceClient } from '@/lib/supabase/service';
 import { generateBatchClaimTransactions } from '@/lib/platforms/bags-claim';
 import { generateConfirmToken } from '@/lib/claim/hmac';
+import { CLAIMSCAN_FEE_BPS, MIN_FEE_LAMPORTS } from '@/lib/constants';
 
 /** Vercel Hobby hard limit is 10s. Reduced batch size (10 mints) fits within this budget. */
 export const maxDuration = 10;
@@ -223,8 +224,55 @@ export async function POST(request: Request) {
     });
   }
 
+  // Calculate service fee server-side from DB fee_records (not client-controlled)
+  // Filter by creator_id that owns this wallet to avoid cross-wallet fee inflation
+  const successMints = transactions.map((t) => t.tokenMint);
+  let feeLamports = '0';
+  if (successMints.length > 0) {
+    // Find creator(s) associated with this wallet
+    const { data: walletRows } = await supabase
+      .from('wallets')
+      .select('creator_id')
+      .eq('address', wallet)
+      .limit(1);
+    const creatorId = walletRows?.[0]?.creator_id;
+
+    // If wallet has no associated creator, skip fee calculation entirely
+    // to avoid unscoped queries that could sum other creators' records
+    if (!creatorId) {
+      return NextResponse.json({
+        transactions,
+        feeLamports: '0',
+        failedMints: [
+          ...skippedMints,
+          ...results
+            .filter((r) => r.error || r.transactions.length === 0)
+            .map((r) => ({ tokenMint: r.tokenMint, error: r.error || 'No transactions returned' })),
+        ],
+      });
+    }
+
+    const { data: feeRecords } = await supabase
+      .from('fee_records')
+      .select('total_unclaimed')
+      .in('token_address', successMints)
+      .eq('platform', 'bags')
+      .eq('creator_id', creatorId);
+
+    if (feeRecords && feeRecords.length > 0) {
+      let totalUnclaimed = 0n;
+      for (const r of feeRecords) {
+        const val = r.total_unclaimed;
+        if (val && /^\d+$/.test(val)) totalUnclaimed += BigInt(val);
+      }
+      const fee = totalUnclaimed * BigInt(CLAIMSCAN_FEE_BPS) / 10_000n;
+      if (fee >= MIN_FEE_LAMPORTS) feeLamports = fee.toString();
+    }
+  }
+
   return NextResponse.json({
     transactions,
+    feeLamports,
     failedMints: [
       ...skippedMints,
       ...results

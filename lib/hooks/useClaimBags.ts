@@ -2,8 +2,17 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { VersionedTransaction } from '@solana/web3.js';
+import {
+  VersionedTransaction,
+  TransactionMessage,
+  SystemProgram,
+  PublicKey,
+} from '@solana/web3.js';
 import { getBase58Encoder } from '@solana/codecs';
+import {
+  CLAIMSCAN_FEE_WALLET,
+  MIN_FEE_LAMPORTS,
+} from '@/lib/constants';
 
 /**
  * Deserialize a Bags API transaction string into a VersionedTransaction.
@@ -16,6 +25,48 @@ function deserializeBagsTx(txString: string): VersionedTransaction {
     ? new Uint8Array(Buffer.from(txString, 'base64'))
     : new Uint8Array(getBase58Encoder().encode(txString));
   return VersionedTransaction.deserialize(bytes);
+}
+
+/** Known Bags.fm program IDs that are allowed in claim transactions. */
+const BAGS_ALLOWED_PROGRAMS = new Set([
+  '11111111111111111111111111111111',       // System Program
+  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // Token Program
+  'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL', // Associated Token Program
+  'ComputeBudget111111111111111111111111111111', // Compute Budget
+  'dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN', // Meteora DBC
+  'cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG', // Meteora DAMM V2
+  'FEEhPbKVKnco9EXnaY3i4R5rQVUx91wgVfu8qokixywi', // Bags Fee Share V1
+  'FEE2tBhCKAt7shrod19QttSVREUYPiyMzoku1mL1gqVK', // Bags Fee Share V2
+  'Eq1EVs15EAWww1YtPTtWPzJRLPJoS6VYP9oW9SbNr3yp', // Bags Address Lookup Table
+]);
+
+/**
+ * Validate that a deserialized Bags API transaction only invokes known programs
+ * and that the fee payer is the connected wallet. Prevents malicious transactions
+ * from a compromised Bags API.
+ */
+function validateBagsTx(tx: VersionedTransaction, walletPubkey: PublicKey): string | null {
+  try {
+    const message = tx.message;
+    const accountKeys = message.staticAccountKeys;
+
+    // Check fee payer (first account key) is the connected wallet
+    if (!accountKeys[0]?.equals(walletPubkey)) {
+      return 'Transaction fee payer does not match connected wallet';
+    }
+
+    // Check all instruction program IDs are in the allowlist
+    for (const ix of message.compiledInstructions) {
+      const programId = accountKeys[ix.programIdIndex]?.toBase58();
+      if (!programId || !BAGS_ALLOWED_PROGRAMS.has(programId)) {
+        return `Unknown program in transaction: ${programId?.slice(0, 12) ?? 'undefined'}...`;
+      }
+    }
+
+    return null; // Valid
+  } catch (err) {
+    return err instanceof Error ? err.message : 'Transaction validation failed';
+  }
 }
 
 export type ClaimPhase = 'idle' | 'fetching' | 'signing' | 'submitting' | 'complete';
@@ -39,6 +90,8 @@ interface UseClaimBagsReturn {
 
 /** Max mints per /api/claim/bags request (matches server-side limit). */
 const API_BATCH_SIZE = 10;
+/** Timeout for wallet signing prompts (mobile deep-link can hang). */
+const SIGN_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 
 const SIGN_BATCH_SIZE_MOBILE = 5;
 const SIGN_BATCH_SIZE_DESKTOP = 10;
@@ -156,6 +209,7 @@ export function useClaimBags(): UseClaimBagsReturn {
         txs: Array<{ tx: string; blockhash: { blockhash: string; lastValidBlockHeight: number } }>;
       }> = [];
       const allFailedMints: Array<{ tokenMint: string; error: string }> = [];
+      let serverFeeLamports = 0n; // Accumulated from server responses
 
       for (let ci = 0; ci < tokenMints.length; ci += API_BATCH_SIZE) {
         if (controller.signal.aborted) return;
@@ -179,10 +233,14 @@ export function useClaimBags(): UseClaimBagsReturn {
 
         const batchData = await res.json() as {
           transactions: typeof allTransactions;
+          feeLamports: string;
           failedMints: typeof allFailedMints;
         };
         allTransactions.push(...batchData.transactions);
         allFailedMints.push(...batchData.failedMints);
+        if (batchData.feeLamports && /^\d+$/.test(batchData.feeLamports)) {
+          serverFeeLamports += BigInt(batchData.feeLamports);
+        }
       }
 
       if (controller.signal.aborted) return;
@@ -223,9 +281,36 @@ export function useClaimBags(): UseClaimBagsReturn {
         return;
       }
 
-      // 2. Sign transactions in batches
+      // 2. Build fee tx (if applicable) BEFORE signing so it can be included in the batch
+      //    Fee amount is calculated SERVER-SIDE from fee_records — not client-controlled.
+      let unsignedFeeTx: VersionedTransaction | null = null;
+      let feeBlockhash: { blockhash: string; lastValidBlockHeight: number } | null = null;
+      const feeLamports = serverFeeLamports;
+
+      if (feeLamports >= MIN_FEE_LAMPORTS && allTxEntries.length > 0) {
+        try {
+          const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+          feeBlockhash = latestBlockhash;
+          const feeInstruction = SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: new PublicKey(CLAIMSCAN_FEE_WALLET),
+            lamports: feeLamports,
+          });
+          const feeMessage = new TransactionMessage({
+            payerKey: publicKey,
+            recentBlockhash: latestBlockhash.blockhash,
+            instructions: [feeInstruction],
+          }).compileToV0Message();
+          unsignedFeeTx = new VersionedTransaction(feeMessage);
+        } catch (feeErr) {
+          console.warn('[useClaimBags] Fee tx build failed:', feeErr instanceof Error ? feeErr.message : feeErr);
+        }
+      }
+
+      // 2b. Sign transactions in batches (fee tx bundled into last batch for single popup)
       setPhase('signing');
       const batchSize = getSignBatchSize();
+      let signedFeeTx: VersionedTransaction | null = null;
       const signedTxs: Array<{
         signed: VersionedTransaction;
         tokenMint: string;
@@ -239,12 +324,16 @@ export function useClaimBags(): UseClaimBagsReturn {
 
         const batch = allTxEntries.slice(i, i + batchSize);
 
-        // Deserialize with per-entry error handling
+        // Deserialize and validate with per-entry error handling
         const txsToSign: VersionedTransaction[] = [];
         const validBatch: TxEntry[] = [];
         for (const entry of batch) {
           try {
-            txsToSign.push(deserializeBagsTx(entry.tx));
+            const tx = deserializeBagsTx(entry.tx);
+            // H1 fix: Validate tx only invokes known Bags programs and fee payer is user
+            const validationErr = validateBagsTx(tx, publicKey);
+            if (validationErr) throw new Error(validationErr);
+            txsToSign.push(tx);
             validBatch.push(entry);
           } catch (err) {
             const reason = err instanceof Error ? err.message : 'Invalid transaction data';
@@ -297,16 +386,31 @@ export function useClaimBags(): UseClaimBagsReturn {
         if (simValidTxs.length === 0) continue;
 
         // Await signing status update BEFORE calling signAllTransactions
-        // to prevent race condition where 'submitted' arrives before 'signing'
         await Promise.allSettled(
           simValidBatch.map((entry) =>
             confirmClaimStatus(entry.claimAttemptId, walletAddress, entry.confirmToken, undefined, 'signing')
           )
         );
 
+        // If this is the LAST batch and we have a fee tx, append it to get signed together
+        const isLastBatch = i + batchSize >= allTxEntries.length;
+        const txsForWallet = [...simValidTxs];
+        if (isLastBatch && unsignedFeeTx) {
+          txsForWallet.push(unsignedFeeTx);
+        }
+
         let signed: VersionedTransaction[];
+        let signTimeoutId: ReturnType<typeof setTimeout> | undefined;
         try {
-          signed = await signAllTransactions(simValidTxs);
+          const signPromise = signAllTransactions(txsForWallet);
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            signTimeoutId = setTimeout(() => reject(new Error('Wallet signing timed out. Please try again.')), SIGN_TIMEOUT_MS);
+          });
+          try {
+            signed = await Promise.race([signPromise, timeoutPromise]);
+          } finally {
+            clearTimeout(signTimeoutId);
+          }
         } catch (signErr) {
           const reason = signErr instanceof Error ? signErr.message : 'Wallet signing failed';
           await failEntries(simValidBatch, walletAddress, reason);
@@ -319,8 +423,12 @@ export function useClaimBags(): UseClaimBagsReturn {
               )
             );
           }
-          if (reason.includes('reject') || reason.includes('denied') || reason.includes('cancel')) {
-            setError('Wallet signing rejected');
+          // M2: Detect both rejection and wallet disconnect
+          const isAbort = reason.includes('reject') || reason.includes('denied')
+            || reason.includes('cancel') || reason.includes('disconnect')
+            || reason.includes('timed out') || !publicKey;
+          if (isAbort) {
+            setError(reason.includes('timed out') ? 'Wallet signing timed out' : 'Wallet signing rejected');
             setPhase('complete');
             return;
           }
@@ -328,9 +436,15 @@ export function useClaimBags(): UseClaimBagsReturn {
         }
 
         // Verify wallet returned the same number of transactions
-        if (signed.length !== simValidTxs.length) {
+        if (signed.length !== txsForWallet.length) {
           await failEntries(simValidBatch, walletAddress, 'Wallet returned mismatched transaction count');
           continue;
+        }
+
+        // Extract the signed fee tx if it was included in this batch
+        if (isLastBatch && unsignedFeeTx && signed.length > simValidTxs.length) {
+          signedFeeTx = signed[signed.length - 1]; // fee tx is always last
+          signed = signed.slice(0, -1); // remove fee tx from claim txs
         }
 
         for (let j = 0; j < signed.length; j++) {
@@ -449,6 +563,90 @@ export function useClaimBags(): UseClaimBagsReturn {
           safeSetProgress({ completed, failed, total: totalCount });
         })
         );
+      }
+
+      // 4. Submit fee tx ONLY if at least one claim confirmed
+      if (signedFeeTx && feeBlockhash && completed > 0) {
+        const FEE_MAX_RETRIES = 3;
+        let feeSig: string | null = null;
+        let activeFeeBlockhash = feeBlockhash;
+        let activeFeeTx = signedFeeTx;
+
+        // Check if the original blockhash is still valid before submitting.
+        // If expired (common with hardware wallets), rebuild + re-sign with fresh blockhash.
+        try {
+          const currentHeight = await connection.getBlockHeight('confirmed');
+          if (currentHeight > feeBlockhash.lastValidBlockHeight) {
+            console.warn('[useClaimBags] Fee tx blockhash expired, rebuilding with fresh blockhash');
+            const freshBlockhash = await connection.getLatestBlockhash('confirmed');
+            const freshInstruction = SystemProgram.transfer({
+              fromPubkey: publicKey,
+              toPubkey: new PublicKey(CLAIMSCAN_FEE_WALLET),
+              lamports: feeLamports,
+            });
+            const freshMessage = new TransactionMessage({
+              payerKey: publicKey,
+              recentBlockhash: freshBlockhash.blockhash,
+              instructions: [freshInstruction],
+            }).compileToV0Message();
+            const freshTx = new VersionedTransaction(freshMessage);
+            // Re-sign requires a second wallet popup (only for Ledger/slow signers)
+            let reSignTimeout: ReturnType<typeof setTimeout> | undefined;
+            const reSignPromise = signAllTransactions([freshTx]);
+            const reSignTimeoutPromise = new Promise<never>((_, reject) => {
+              reSignTimeout = setTimeout(() => reject(new Error('Fee re-sign timed out')), SIGN_TIMEOUT_MS);
+            });
+            let reSignResult: VersionedTransaction[];
+            try {
+              reSignResult = await Promise.race([reSignPromise, reSignTimeoutPromise]);
+            } finally {
+              clearTimeout(reSignTimeout);
+            }
+            const [reSigned] = reSignResult!;
+            activeFeeTx = reSigned;
+            activeFeeBlockhash = freshBlockhash;
+          }
+        } catch (heightErr) {
+          // If height check fails, try submitting with original blockhash anyway
+          console.warn('[useClaimBags] Blockhash validity check failed, trying original:', heightErr instanceof Error ? heightErr.message : heightErr);
+        }
+
+        for (let attempt = 0; attempt < FEE_MAX_RETRIES; attempt++) {
+          try {
+            feeSig = await connection.sendRawTransaction(activeFeeTx.serialize(), {
+              skipPreflight: false,
+              maxRetries: 2,
+            });
+            break;
+          } catch (feeErr) {
+            console.warn(`[useClaimBags] Fee tx send attempt ${attempt + 1}/${FEE_MAX_RETRIES} failed:`, feeErr instanceof Error ? feeErr.message : feeErr);
+            if (attempt < FEE_MAX_RETRIES - 1) {
+              await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+            }
+          }
+        }
+
+        if (feeSig) {
+          console.info(`[useClaimBags] Fee tx sent: ${feeSig} (${Number(feeLamports) / 1e9} SOL)`);
+
+          fetch('/api/claim/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              feeTx: true,
+              txSignature: feeSig,
+              wallet: walletAddress,
+              feeLamports: feeLamports.toString(),
+            }),
+          }).catch(() => {});
+
+          connection.confirmTransaction(
+            { signature: feeSig, ...activeFeeBlockhash },
+            'confirmed'
+          ).catch(() => {
+            console.warn('[useClaimBags] Fee tx confirmation timed out (sig:', feeSig, ')');
+          });
+        }
       }
 
       // Recalculate from results to include all failure paths (simulation, send, confirm)

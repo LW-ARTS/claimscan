@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { isValidSolanaAddress } from '@/lib/chains/solana';
+import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
 import { createServiceClient } from '@/lib/supabase/service';
 import { invalidatePositionsCache } from '@/lib/platforms/bags-api';
 import { generateConfirmToken, verifyConfirmToken } from '@/lib/claim/hmac';
+import { CLAIMSCAN_FEE_WALLET } from '@/lib/constants';
 import type { ClaimAttemptStatus } from '@/lib/supabase/types';
 
 /**
@@ -24,23 +25,73 @@ const VALID_TRANSITIONS: Record<ClaimAttemptStatus, ClaimAttemptStatus[]> = {
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const TX_SIG_RE = /^[1-9A-HJ-NP-Za-km-z]{86,88}$/;
 
 export async function POST(request: Request) {
-  let body: {
-    claimAttemptId?: string;
-    wallet?: string;
-    confirmToken?: string;
-    txSignature?: string;
-    status?: string;
-    errorReason?: string;
-  };
+  let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { claimAttemptId, wallet, confirmToken, txSignature, status, errorReason } = body;
+  // Handle fee tx logging (separate from claim status updates)
+  if (body.feeTx === true) {
+    const { txSignature: feeSig, wallet: feeWallet, feeLamports } = body as {
+      txSignature?: string; wallet?: string; feeLamports?: string;
+    };
+    // Validate inputs to prevent DB pollution from unauthenticated requests
+    if (
+      !feeSig || typeof feeSig !== 'string' || !TX_SIG_RE.test(feeSig) ||
+      !feeWallet || typeof feeWallet !== 'string' || !isValidSolanaAddress(feeWallet) ||
+      !feeLamports || typeof feeLamports !== 'string' || !/^\d+$/.test(feeLamports)
+    ) {
+      return NextResponse.json({ ok: true }); // Silent ignore invalid data
+    }
+    const parsedFee = BigInt(feeLamports);
+    if (parsedFee <= 0n) return NextResponse.json({ ok: true });
+
+    // Verify the fee tx actually exists on-chain and transferred to the treasury.
+    // Verify on-chain via RPC. Mark as verified only if check passes.
+    let verified = false;
+    try {
+      const tx = await withRpcFallback(
+        (c) => c.getTransaction(feeSig!, { maxSupportedTransactionVersion: 0 }),
+        'fee-verify'
+      );
+      if (!tx || tx.meta?.err) {
+        return NextResponse.json({ ok: true }); // Tx doesn't exist or failed on-chain
+      }
+      const accountKeys = tx.transaction.message.getAccountKeys();
+      const feeWalletFound = accountKeys.staticAccountKeys.some(
+        (key) => key.toBase58() === CLAIMSCAN_FEE_WALLET
+      );
+      if (!feeWalletFound) {
+        return NextResponse.json({ ok: true }); // Tx doesn't involve the fee wallet
+      }
+      verified = true;
+    } catch {
+      // RPC failure — insert as unverified. Revenue dashboard reconciles later.
+    }
+
+    const supabase = createServiceClient();
+    await supabase.from('claim_fees').insert({
+      wallet_address: feeWallet,
+      tx_signature: feeSig,
+      fee_lamports: feeLamports,
+      verified,
+    }).then(({ error }) => {
+      if (error && error.code !== '23505') {
+        console.warn('[claim/confirm] Fee log insert failed:', error.message);
+      }
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  const { claimAttemptId, wallet, confirmToken, txSignature, status, errorReason } = body as {
+    claimAttemptId?: string; wallet?: string; confirmToken?: string;
+    txSignature?: string; status?: string; errorReason?: string;
+  };
 
   // Validate all required auth fields
   if (!claimAttemptId || typeof claimAttemptId !== 'string' || !UUID_RE.test(claimAttemptId)) {
@@ -58,7 +109,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `status must be one of: ${validStatuses.join(', ')}` }, { status: 400 });
   }
 
-  const TX_SIG_RE = /^[1-9A-HJ-NP-Za-km-z]{86,88}$/;
   if (txSignature && (typeof txSignature !== 'string' || !TX_SIG_RE.test(txSignature))) {
     return NextResponse.json({ error: 'Invalid txSignature format' }, { status: 400 });
   }
@@ -122,14 +172,20 @@ export async function POST(request: Request) {
     updateData.error_reason = errorReason.slice(0, 500);
   }
 
-  const { error: updateError } = await supabase
+  // Optimistic lock: only update if status hasn't changed since we read it
+  const { error: updateError, count: updateCount } = await supabase
     .from('claim_attempts')
-    .update(updateData)
-    .eq('id', claimAttemptId);
+    .update(updateData, { count: 'exact' })
+    .eq('id', claimAttemptId)
+    .eq('status', attempt.status);
 
   if (updateError) {
     console.error('[claim/confirm] Update error:', updateError.message);
     return NextResponse.json({ error: 'Failed to update claim status' }, { status: 500 });
+  }
+  if (updateCount === 0) {
+    // Status was changed by a concurrent request — stale update
+    return NextResponse.json({ error: 'Claim status was already updated' }, { status: 409 });
   }
 
   // On confirmed: invalidate positions cache
