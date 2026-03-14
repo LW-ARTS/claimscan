@@ -84,6 +84,11 @@ export async function POST(request: Request) {
       // RPC failure — insert as unverified. Revenue dashboard reconciles later.
     }
 
+    // Skip insert if on-chain verification found zero transfer (avoids CHECK constraint violation)
+    if (feeLamports === '0') {
+      return NextResponse.json({ ok: true });
+    }
+
     const supabase = createServiceClient();
     await supabase.from('claim_fees').insert({
       wallet_address: feeWallet,
