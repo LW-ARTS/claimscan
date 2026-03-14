@@ -113,7 +113,7 @@ export async function GET(request: Request) {
       if (discoveredTokens.length > 0) {
         const { error } = await supabase
           .from('creator_tokens')
-          .upsert(discoveredTokens, { onConflict: 'token_address,chain' });
+          .upsert(discoveredTokens, { onConflict: 'token_address,chain', ignoreDuplicates: true });
 
         if (error) {
           console.warn(`[index-tokens] upsert failed for creator ${creator.id}:`, error.message);
