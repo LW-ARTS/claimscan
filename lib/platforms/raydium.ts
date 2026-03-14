@@ -127,7 +127,7 @@ export const raydiumAdapter: PlatformAdapter = {
         platform: 'raydium' as const,
         symbol: sanitizeTokenSymbol(t.symbol),
         name: sanitizeTokenName(t.name),
-        imageUrl: t.imageUri ?? t.image ?? null,
+        imageUrl: (t.imageUri ?? t.image ?? '').startsWith('https://') ? (t.imageUri ?? t.image ?? null) : null,
       })).filter((t) => t.tokenAddress.length > 0);
     } catch (err) {
       console.warn(

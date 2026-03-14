@@ -167,7 +167,7 @@ export const clankerAdapter: PlatformAdapter = {
       platform: 'clanker' as const,
       symbol: sanitizeTokenSymbol(t.symbol),
       name: sanitizeTokenName(t.name),
-      imageUrl: t.img_url,
+      imageUrl: t.img_url?.startsWith('https://') ? t.img_url : null,
     }));
   },
 
