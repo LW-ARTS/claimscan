@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { PLATFORM_CONFIG } from '@/lib/constants'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -96,7 +97,7 @@ export function formatTokenAmount(raw: string, decimals: number): string {
  * Validate a wallet object shape for API input validation.
  */
 export const VALID_CHAINS = new Set(['sol', 'base', 'eth']);
-export const VALID_PLATFORMS = new Set(['bags', 'clanker', 'pump', 'zora', 'bankr', 'believe', 'revshare', 'coinbarrel', 'raydium']);
+export const VALID_PLATFORMS = new Set(Object.keys(PLATFORM_CONFIG));
 
 /**
  * Validate that a value is a valid non-negative integer string (safe for BigInt storage).
@@ -161,7 +162,7 @@ const NATIVE_TOKEN_FEE_PLATFORMS = new Set([
  * Compute USD value for a fee record.
  * Prefers DB-stored total_earned_usd; falls back to amount × native token price
  * ONLY for platforms that denominate fees in the native token.
- * For non-native token platforms (RevShare, Clanker, Bankr, Believe),
+ * For non-native token platforms (RevShare, Clanker, Believe, Heaven),
  * returns 0 when total_earned_usd is not available to avoid wrong USD values.
  */
 export function computeFeeUsd(

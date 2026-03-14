@@ -62,9 +62,6 @@ async function resolveHandleToWallet(
   return address;
 }
 
-/** Max concurrent API requests to avoid overwhelming bags.fm or Vercel connection limits. */
-const CONCURRENCY_LIMIT = 40;
-
 /** Minimum earned value in USD to include in results.
  *  Filters out dust positions, saving storage. Uses live SOL price. */
 const MIN_UNCLAIMED_USD = 15;
