@@ -76,7 +76,9 @@ export async function bagsFetch<T>(
       try {
         const body = await res.json() as { resetTime?: string };
         if (body.resetTime) resetAt = new Date(body.resetTime).getTime();
-      } catch { /* use default */ }
+      } catch (parseErr) {
+        console.warn('[bags] Could not parse 429 resetTime, using 5min default:', parseErr instanceof Error ? parseErr.message : parseErr);
+      }
       keyRateLimits.set(apiKey, resetAt);
       const keysLeft = keys.filter((k) => (keyRateLimits.get(k) ?? 0) <= Date.now()).length;
       const keyIdx = keys.indexOf(apiKey);
