@@ -287,10 +287,11 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
           key={platform}
           role="tab"
           aria-selected={false}
+          aria-disabled="true"
+          disabled
           aria-controls={`${tabsId}-panel`}
           id={`${tabsId}-tab-${platform}`}
           tabIndex={-1}
-          onClick={() => setActiveTab(platform)}
           className="sr-only"
         >
           {PLATFORM_CONFIG[platform]?.name ?? platform} (0)

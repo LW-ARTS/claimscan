@@ -207,7 +207,7 @@ export function ProfileHero({
             } else if (line.startsWith('data: ') && currentEvent) {
               try {
                 const data = JSON.parse(line.slice(6));
-                if (currentEvent === 'partial-result' && data.fees) {
+                if (currentEvent === 'partial-result' && data.fees && data.platform in PLATFORM_CONFIG) {
                   streamedFees.set(data.platform, data.fees);
                   flushStreamedFees();
                   setLoading(false);
