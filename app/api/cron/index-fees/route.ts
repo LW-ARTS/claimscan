@@ -67,28 +67,49 @@ export async function GET(request: Request) {
       const fees = await fetchAllFees(resolvedWallets);
 
       if (fees.length > 0) {
-        const feeRows = fees.map((fee) => ({
-          creator_id: creator.id,
-          creator_token_id: null,
-          platform: fee.platform,
-          chain: fee.chain,
-          token_address: fee.tokenAddress,
-          token_symbol: fee.tokenSymbol,
-          total_earned: fee.totalEarned,
-          total_claimed: fee.totalClaimed,
-          total_unclaimed: fee.totalUnclaimed,
-          total_earned_usd: fee.totalEarnedUsd,
-          claim_status:
-            safeBigInt(fee.totalUnclaimed) > 0n && safeBigInt(fee.totalClaimed) > 0n
-              ? 'partially_claimed' as const
-              : safeBigInt(fee.totalUnclaimed) > 0n
-                ? 'unclaimed' as const
-                : safeBigInt(fee.totalEarned) > 0n
-                  ? 'claimed' as const
-                  : 'unclaimed' as const,
-          royalty_bps: fee.royaltyBps,
-          last_synced_at: new Date().toISOString(),
-        }));
+        // Fetch existing claimed values to prevent regression (adapters may return '0' on rate limit)
+        const tokenAddresses = fees.map((f) => f.tokenAddress);
+        const { data: existingRecords } = await supabase
+          .from('fee_records')
+          .select('token_address, platform, chain, total_claimed')
+          .eq('creator_id', creator.id)
+          .in('token_address', tokenAddresses);
+
+        const existingClaimedMap = new Map(
+          (existingRecords ?? []).map((r) => [`${r.token_address}:${r.platform}:${r.chain}`, r.total_claimed])
+        );
+
+        const feeRows = fees.map((fee) => {
+          const key = `${fee.tokenAddress}:${fee.platform}:${fee.chain}`;
+          const existingClaimed = existingClaimedMap.get(key);
+          // Preserve the higher total_claimed to prevent regression from partial scans
+          const totalClaimed = existingClaimed && safeBigInt(existingClaimed) > safeBigInt(fee.totalClaimed)
+            ? existingClaimed
+            : fee.totalClaimed;
+
+          return {
+            creator_id: creator.id,
+            creator_token_id: null,
+            platform: fee.platform,
+            chain: fee.chain,
+            token_address: fee.tokenAddress,
+            token_symbol: fee.tokenSymbol,
+            total_earned: fee.totalEarned,
+            total_claimed: totalClaimed,
+            total_unclaimed: fee.totalUnclaimed,
+            total_earned_usd: fee.totalEarnedUsd,
+            claim_status:
+              safeBigInt(fee.totalUnclaimed) > 0n && safeBigInt(totalClaimed) > 0n
+                ? 'partially_claimed' as const
+                : safeBigInt(fee.totalUnclaimed) > 0n
+                  ? 'unclaimed' as const
+                  : safeBigInt(fee.totalEarned) > 0n
+                    ? 'claimed' as const
+                    : 'unclaimed' as const,
+            royalty_bps: fee.royaltyBps,
+            last_synced_at: new Date().toISOString(),
+          };
+        });
 
         const { error: upsertError } = await supabase
           .from('fee_records')
