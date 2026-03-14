@@ -79,7 +79,8 @@ export async function bagsFetch<T>(
       } catch { /* use default */ }
       keyRateLimits.set(apiKey, resetAt);
       const keysLeft = keys.filter((k) => (keyRateLimits.get(k) ?? 0) <= Date.now()).length;
-      console.warn(`[bags] key ${apiKey.slice(-6)} rate limited until ${new Date(resetAt).toISOString()} (${keysLeft} keys remaining)`);
+      const keyIdx = keys.indexOf(apiKey);
+      console.warn(`[bags] key #${keyIdx} rate limited until ${new Date(resetAt).toISOString()} (${keysLeft} keys remaining)`);
       if (keysLeft > 0) return bagsFetch<T>(path, options, attempt + 1);
       return null;
     }
