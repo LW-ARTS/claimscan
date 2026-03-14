@@ -657,6 +657,9 @@ export function useClaimBags(): UseClaimBagsReturn {
           const solFrac = (feeLamports % 1_000_000_000n).toString().padStart(9, '0').replace(/0+$/, '') || '0';
           console.info(`[useClaimBags] Fee tx sent: ${feeSig} (${solWhole}.${solFrac} SOL)`);
 
+          // Use the first confirmed claim's HMAC token to authenticate the fee log.
+          // This prevents unauthorized fee injection from on-chain observers.
+          const authEntry = allTransactions[0];
           fetch('/api/claim/confirm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -665,6 +668,8 @@ export function useClaimBags(): UseClaimBagsReturn {
               txSignature: feeSig,
               wallet: walletAddress,
               feeLamports: feeLamports.toString(),
+              claimAttemptId: authEntry?.claimAttemptId,
+              confirmToken: authEntry?.confirmToken,
             }),
           })
             .then((res) => {

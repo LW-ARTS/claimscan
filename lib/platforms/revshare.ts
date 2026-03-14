@@ -221,7 +221,7 @@ async function findMintsByWithdrawAuthority(wallet: string, signal?: AbortSignal
     {
       memcmp: {
         offset: ACCOUNT_TYPE_OFFSET,
-        bytes: '2', // base58 encoding of byte [1] (Mint)
+        bytes: '2', // base58('0x01') = '2' → AccountType::Mint
       },
     },
     {

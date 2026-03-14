@@ -99,7 +99,14 @@ export async function GET(request: Request) {
 
     if (url.searchParams.get('also') === 'prices' && Date.now() - wallclockStart < 4_000) {
       try {
-        const nativePrices = await getNativeTokenPrices();
+        // Budget remaining time for price fetch (leave 1s buffer for DB writes)
+        const priceTimeout = Math.max(1000, 9_000 - (Date.now() - wallclockStart));
+        const nativePrices = await Promise.race([
+          getNativeTokenPrices(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Price fetch budget exceeded')), priceTimeout)
+          ),
+        ]);
         const now = new Date().toISOString();
 
         // Upsert native prices (SOL, ETH) in parallel
