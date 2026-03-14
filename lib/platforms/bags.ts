@@ -148,7 +148,13 @@ export const bagsAdapter: PlatformAdapter = {
       });
     }
 
-    return enrichSolanaTokenSymbols(fees);
+    // Enrichment is cosmetic (adds token symbols) — don't let it destroy fee data
+    try {
+      return await enrichSolanaTokenSymbols(fees);
+    } catch (enrichErr) {
+      console.warn('[bags] enrichSolanaTokenSymbols failed, returning fees without symbols:', enrichErr instanceof Error ? enrichErr.message : enrichErr);
+      return fees;
+    }
   },
 
   async getCreatorTokens(wallet: string): Promise<CreatorToken[]> {

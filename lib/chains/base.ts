@@ -326,7 +326,7 @@ export async function getClankerClaimLogs(
       ? latestBlock - SCAN_WINDOW_BLOCKS
       : CLANKER_FEELOCKER_DEPLOY_BLOCK;
 
-    console.log(`[base] getClankerClaimLogs: scanning ${tokens.length} tokens, blocks ${fromBlock}..${latestBlock} (${latestBlock - fromBlock} blocks, ${(latestBlock - fromBlock) / LOGS_CHUNK_SIZE} chunks)`);
+    console.debug(`[base] getClankerClaimLogs: scanning ${tokens.length} tokens, blocks ${fromBlock}..${latestBlock} (${latestBlock - fromBlock} blocks, ${(latestBlock - fromBlock) / LOGS_CHUNK_SIZE} chunks)`);
 
     const logs = await chunkedGetLogs({
       address: tokens,
@@ -345,7 +345,7 @@ export async function getClankerClaimLogs(
       claimMap.set(token, (claimMap.get(token) ?? 0n) + value);
     }
 
-    console.log(`[base] getClankerClaimLogs: found ${claimMap.size} tokens with claims, ${logs.length} transfers in ${Date.now() - t0}ms`);
+    console.debug(`[base] getClankerClaimLogs: found ${claimMap.size} tokens with claims, ${logs.length} transfers in ${Date.now() - t0}ms`);
     return claimMap;
   };
 
