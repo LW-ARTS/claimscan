@@ -203,7 +203,8 @@ export async function POST(request: Request) {
   };
   if (txSignature) updateData.tx_signature = txSignature;
   if (errorReason && typeof errorReason === 'string') {
-    updateData.error_reason = errorReason.slice(0, 500);
+    // eslint-disable-next-line no-control-regex
+    updateData.error_reason = errorReason.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 500);
   }
 
   // Optimistic lock: only update if status hasn't changed since we read it

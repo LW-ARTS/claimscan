@@ -61,7 +61,8 @@ export async function POST(request: Request) {
     if (!contentLength) {
       return NextResponse.json({ error: 'Content-Length required' }, { status: 411 });
     }
-    if (parseInt(contentLength, 10) > 1_048_576) {
+    const parsedLength = parseInt(contentLength, 10);
+    if (isNaN(parsedLength) || parsedLength > 1_048_576) {
       return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
     }
 
@@ -77,17 +78,17 @@ export async function POST(request: Request) {
       // Collect all accounts affected by this transaction
       const affectedAccounts = new Set<string>();
 
-      for (const transfer of event.nativeTransfers ?? []) {
+      for (const transfer of (event.nativeTransfers ?? []).slice(0, 100)) {
         affectedAccounts.add(transfer.toUserAccount);
         affectedAccounts.add(transfer.fromUserAccount);
       }
 
-      for (const transfer of event.tokenTransfers ?? []) {
+      for (const transfer of (event.tokenTransfers ?? []).slice(0, 100)) {
         affectedAccounts.add(transfer.toUserAccount);
         affectedAccounts.add(transfer.fromUserAccount);
       }
 
-      for (const data of event.accountData ?? []) {
+      for (const data of (event.accountData ?? []).slice(0, 100)) {
         affectedAccounts.add(data.account);
       }
 
