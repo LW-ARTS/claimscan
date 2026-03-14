@@ -4,7 +4,8 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { generateBatchClaimTransactions } from '@/lib/platforms/bags-claim';
 import { generateConfirmToken } from '@/lib/claim/hmac';
 
-export const maxDuration = 30;
+/** Vercel Hobby hard limit is 10s. Reduced batch size (10 mints) fits within this budget. */
+export const maxDuration = 10;
 
 export async function POST(request: Request) {
   // Fail fast if HMAC secret is not configured
@@ -27,9 +28,9 @@ export async function POST(request: Request) {
   }
 
   // Validate tokenMints
-  if (!Array.isArray(tokenMints) || tokenMints.length === 0 || tokenMints.length > 50) {
+  if (!Array.isArray(tokenMints) || tokenMints.length === 0 || tokenMints.length > 10) {
     return NextResponse.json(
-      { error: 'tokenMints must be an array of 1-50 items' },
+      { error: 'tokenMints must be an array of 1-10 items' },
       { status: 400 }
     );
   }
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
   if (cleanup1.error) console.error('[claim/bags] Stale pending/signing cleanup failed:', cleanup1.error.message);
   if (cleanup2.error) console.error('[claim/bags] Stale submitted cleanup failed:', cleanup2.error.message);
 
-  // DB-based rate limit: max 50 active claims per wallet
+  // DB-based rate limit: max 30 active claims per wallet
   const { count: activeCount, error: countError } = await supabase
     .from('claim_attempts')
     .select('id', { count: 'exact', head: true })
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 503 });
   }
 
-  if (activeCount !== null && activeCount >= 50) {
+  if (activeCount !== null && activeCount >= 30) {
     return NextResponse.json(
       { error: 'Too many active claims. Please wait for existing claims to complete.' },
       { status: 429 }

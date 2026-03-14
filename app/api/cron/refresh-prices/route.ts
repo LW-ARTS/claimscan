@@ -4,7 +4,7 @@ import { getNativeTokenPrices, getTokenPrice } from '@/lib/prices';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress } from '@/lib/chains/base';
 
-export const maxDuration = 60;
+export const maxDuration = 10;
 
 /**
  * Validate that a token address is well-formed for its chain
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
       .select('chain, token_address, token_symbol')
       .not('token_address', 'in', '("SOL","ETH")')
       .order('last_synced_at', { ascending: false })
-      .limit(50);
+      .limit(15);
 
     if (tokensError) {
       console.error('[refresh-prices] Failed to query fee_records:', tokensError.message);
