@@ -55,8 +55,21 @@ function validateBagsTx(tx: VersionedTransaction, walletPubkey: PublicKey): stri
       return 'Transaction fee payer does not match connected wallet';
     }
 
+    // Determine total keys available (static + ALT-resolved)
+    const totalStaticKeys = accountKeys.length;
+    const altKeyCount = 'addressTableLookups' in message
+      ? (message.addressTableLookups as Array<{ writableIndexes: number[]; readonlyIndexes: number[] }>)
+          .reduce((sum, alt) => sum + alt.writableIndexes.length + alt.readonlyIndexes.length, 0)
+      : 0;
+
     // Check all instruction program IDs are in the allowlist
     for (const ix of message.compiledInstructions) {
+      // If programIdIndex points to an ALT-resolved key (not in static keys),
+      // we cannot resolve it client-side without fetching the ALT account.
+      // Reject to be safe — legitimate Bags txs use static keys for programs.
+      if (ix.programIdIndex >= totalStaticKeys) {
+        return `Program at index ${ix.programIdIndex} resolved via Address Lookup Table — cannot verify (${altKeyCount} ALT keys detected)`;
+      }
       const programId = accountKeys[ix.programIdIndex]?.toBase58();
       if (!programId || !BAGS_ALLOWED_PROGRAMS.has(programId)) {
         return `Unknown program in transaction: ${programId?.slice(0, 12) ?? 'undefined'}...`;
@@ -626,7 +639,9 @@ export function useClaimBags(): UseClaimBagsReturn {
         }
 
         if (feeSig) {
-          console.info(`[useClaimBags] Fee tx sent: ${feeSig} (${Number(feeLamports) / 1e9} SOL)`);
+          const solWhole = feeLamports / 1_000_000_000n;
+          const solFrac = (feeLamports % 1_000_000_000n).toString().padStart(9, '0').replace(/0+$/, '') || '0';
+          console.info(`[useClaimBags] Fee tx sent: ${feeSig} (${solWhole}.${solFrac} SOL)`);
 
           fetch('/api/claim/confirm', {
             method: 'POST',
