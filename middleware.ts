@@ -128,8 +128,9 @@ export function middleware(request: NextRequest) {
   }
 
   // CORS — fail closed to production URL; never reflect attacker-controlled origin
+  const ALLOWED_ORIGINS = new Set(['https://claimscan.tech', 'https://www.claimscan.tech']);
   const rawOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  const allowedOrigin = rawOrigin && rawOrigin.startsWith('https://') ? rawOrigin : 'https://claimscan.tech';
+  const allowedOrigin = rawOrigin && ALLOWED_ORIGINS.has(rawOrigin) ? rawOrigin : 'https://claimscan.tech';
   response.headers.set('Access-Control-Allow-Origin', allowedOrigin);
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
