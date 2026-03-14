@@ -4,7 +4,7 @@ import type { ResolvedWallet, TokenFee } from '@/lib/platforms/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 55;
+export const maxDuration = 10;
 
 /**
  * SSE streaming endpoint for live fees.
@@ -12,8 +12,8 @@ export const maxDuration = 55;
  * so fast adapters (Pump, Bags) appear instantly while slow ones
  * (Coinbarrel, RevShare) stream in later.
  *
- * This bypasses the Vercel Hobby 10s limit on the JSON route because
- * SSE connections with `runtime = 'nodejs'` get up to 55s.
+ * On Vercel Hobby (10s limit), fast adapters still deliver results;
+ * slower adapters may be cut off but the client handles partial data gracefully.
  */
 export async function POST(request: Request) {
   const contentType = request.headers.get('content-type') ?? '';

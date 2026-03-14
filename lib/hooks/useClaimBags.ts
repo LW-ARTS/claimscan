@@ -37,6 +37,9 @@ interface UseClaimBagsReturn {
   error: string | null;
 }
 
+/** Max mints per /api/claim/bags request (matches server-side limit). */
+const API_BATCH_SIZE = 10;
+
 const SIGN_BATCH_SIZE_MOBILE = 5;
 const SIGN_BATCH_SIZE_DESKTOP = 10;
 
@@ -144,33 +147,48 @@ export function useClaimBags(): UseClaimBagsReturn {
     activeEntriesRef.current = [];
 
     try {
-      // 1. Fetch claim transactions from backend
-      const res = await fetch('/api/claim/bags', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wallet: walletAddress, tokenMints }),
-        signal: controller.signal,
-      });
+      // 1. Fetch claim transactions from backend — chunk into API_BATCH_SIZE
+      //    to fit each request within Vercel Hobby's 10s serverless limit.
+      const allTransactions: Array<{
+        tokenMint: string;
+        claimAttemptId: string;
+        confirmToken: string;
+        txs: Array<{ tx: string; blockhash: { blockhash: string; lastValidBlockHeight: number } }>;
+      }> = [];
+      const allFailedMints: Array<{ tokenMint: string; error: string }> = [];
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(data.error || `HTTP ${res.status}`);
+      for (let ci = 0; ci < tokenMints.length; ci += API_BATCH_SIZE) {
+        if (controller.signal.aborted) return;
+        const chunk = tokenMints.slice(ci, ci + API_BATCH_SIZE);
+
+        const res = await fetch('/api/claim/bags', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wallet: walletAddress, tokenMints: chunk }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: 'Request failed' }));
+          // If one batch fails, mark those mints as failed and continue
+          for (const mint of chunk) {
+            allFailedMints.push({ tokenMint: mint, error: errData.error || `HTTP ${res.status}` });
+          }
+          continue;
+        }
+
+        const batchData = await res.json() as {
+          transactions: typeof allTransactions;
+          failedMints: typeof allFailedMints;
+        };
+        allTransactions.push(...batchData.transactions);
+        allFailedMints.push(...batchData.failedMints);
       }
-
-      const data = await res.json() as {
-        transactions: Array<{
-          tokenMint: string;
-          claimAttemptId: string;
-          confirmToken: string;
-          txs: Array<{ tx: string; blockhash: { blockhash: string; lastValidBlockHeight: number } }>;
-        }>;
-        failedMints: Array<{ tokenMint: string; error: string }>;
-      };
 
       if (controller.signal.aborted) return;
 
       // Build tx entries with confirmTokens
-      const allTxEntries: TxEntry[] = data.transactions.flatMap((t) =>
+      const allTxEntries: TxEntry[] = allTransactions.flatMap((t) =>
         t.txs.map((tx) => ({
           ...tx,
           tokenMint: t.tokenMint,
@@ -182,12 +200,12 @@ export function useClaimBags(): UseClaimBagsReturn {
 
       // Initialize results — one per token (not per tx)
       const claimResults: ClaimResult[] = [
-        ...data.transactions.map((t) => ({
+        ...allTransactions.map((t) => ({
           tokenMint: t.tokenMint,
           claimAttemptId: t.claimAttemptId,
           status: 'pending' as const,
         })),
-        ...data.failedMints.map((f) => ({
+        ...allFailedMints.map((f) => ({
           tokenMint: f.tokenMint,
           claimAttemptId: '',
           status: 'failed' as const,
@@ -197,8 +215,8 @@ export function useClaimBags(): UseClaimBagsReturn {
       setResults(claimResults);
 
       // Progress tracks tokens (same unit as results array)
-      const totalTokens = data.transactions.length + data.failedMints.length;
-      setProgress({ completed: 0, failed: data.failedMints.length, total: totalTokens });
+      const totalTokens = allTransactions.length + allFailedMints.length;
+      setProgress({ completed: 0, failed: allFailedMints.length, total: totalTokens });
 
       if (allTxEntries.length === 0) {
         setPhase('complete');
@@ -331,7 +349,7 @@ export function useClaimBags(): UseClaimBagsReturn {
       // 3. Submit all transactions in parallel, then confirm in parallel
       setPhase('submitting');
       let completed = 0;
-      let failed = data.failedMints.length;
+      let failed = allFailedMints.length;
       const totalCount = totalTokens;
 
       // Phase 3a: Send signed txs to RPC in chunks of RPC_CONCURRENCY

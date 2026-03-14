@@ -3,8 +3,9 @@ import { createServiceClient, verifyCronSecret } from '@/lib/supabase/service';
 import { fetchAllFees } from '@/lib/resolve/identity';
 import { safeBigInt } from '@/lib/utils';
 import type { ResolvedWallet } from '@/lib/platforms/types';
+import type { Platform, Chain } from '@/lib/supabase/types';
 
-export const maxDuration = 60;
+export const maxDuration = 10;
 
 export async function GET(request: Request) {
   if (!verifyCronSecret(request)) {
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
       .select('id, wallets(*)')
       .lt('updated_at', oneHourAgo)
       .order('updated_at', { ascending: true })
-      .limit(20);
+      .limit(5);
 
     if (queryError) {
       console.error('[index-fees] Failed to query stale creators:', queryError.message);
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
 
     let indexed = 0;
     // Wallclock guard — stop processing before maxDuration to avoid hard timeout
-    const deadline = Date.now() + 50_000; // 50s of 60s budget
+    const deadline = Date.now() + 8_000; // 8s of 10s budget
 
     for (const creator of staleCreators) {
       if (Date.now() > deadline) {
@@ -116,7 +117,90 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, indexed });
+    // --- Phase 2: Token indexing (if requested and time permits) ---
+    const url = new URL(request.url);
+    let tokensIndexed = 0;
+
+    if (url.searchParams.get('also') === 'tokens' && Date.now() < deadline) {
+      try {
+        const { getAllAdapters } = await import('@/lib/platforms');
+        const GPA_PLATFORMS = new Set(['coinbarrel', 'believe', 'revshare']);
+        const gpaAdapters = getAllAdapters().filter((a) => GPA_PLATFORMS.has(a.platform));
+        const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+        const { data: tokenCreators } = await supabase
+          .from('creators')
+          .select('id, last_token_sync_at, wallets(*)')
+          .order('last_token_sync_at', { ascending: true, nullsFirst: true })
+          .limit(1);
+
+        for (const creator of tokenCreators ?? []) {
+          if (Date.now() > deadline) break;
+          if (creator.last_token_sync_at && creator.last_token_sync_at > tenMinAgo) continue;
+
+          const wallets: ResolvedWallet[] = (creator.wallets ?? [])
+            .filter((w: { address: string; chain: string; source_platform: string }) => w.address && w.chain)
+            .map((w: { address: string; chain: string; source_platform: string }) => ({
+              address: w.address,
+              chain: w.chain as ResolvedWallet['chain'],
+              sourcePlatform: w.source_platform as ResolvedWallet['sourcePlatform'],
+            }));
+
+          if (wallets.length === 0) continue;
+
+          const discovered: Array<{
+            creator_id: string;
+            platform: Platform;
+            chain: Chain;
+            token_address: string;
+            token_symbol: string | null;
+            token_name: string | null;
+            token_image_url: string | null;
+          }> = [];
+
+          const tasks = wallets.flatMap((wallet) =>
+            gpaAdapters
+              .filter((a) => a.chain === wallet.chain)
+              .map(async (adapter) => {
+                try {
+                  const tokens = await adapter.getCreatorTokens(wallet.address);
+                  for (const token of tokens) {
+                    discovered.push({
+                      creator_id: creator.id,
+                      platform: token.platform,
+                      chain: token.chain,
+                      token_address: token.tokenAddress,
+                      token_symbol: token.symbol,
+                      token_name: token.name,
+                      token_image_url: token.imageUrl,
+                    });
+                  }
+                } catch (err) {
+                  console.warn(`[index-fees+tokens] ${adapter.platform} failed:`, err instanceof Error ? err.message : err);
+                }
+              })
+          );
+
+          await Promise.allSettled(tasks);
+
+          if (discovered.length > 0) {
+            const { error } = await supabase
+              .from('creator_tokens')
+              .upsert(discovered, { onConflict: 'token_address,chain' });
+            if (!error) tokensIndexed += discovered.length;
+          }
+
+          await supabase
+            .from('creators')
+            .update({ last_token_sync_at: new Date().toISOString() })
+            .eq('id', creator.id);
+        }
+      } catch (tokenErr) {
+        console.warn('[index-fees] token indexing phase failed:', tokenErr instanceof Error ? tokenErr.message : tokenErr);
+      }
+    }
+
+    return NextResponse.json({ ok: true, indexed, tokensIndexed });
   } catch (error) {
     console.error('Index fees error:', error);
     return NextResponse.json(

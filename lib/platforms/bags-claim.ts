@@ -59,8 +59,9 @@ export async function generateClaimTransactions(
   }
 }
 
-/** Max concurrent claim tx generation requests to Bags API. */
-const CLAIM_CONCURRENCY = 10;
+/** Max concurrent claim tx generation requests to Bags API.
+ * Kept at 5 to fit within Vercel Hobby 10s function timeout. */
+const CLAIM_CONCURRENCY = 5;
 
 /**
  * Generate claim transactions for multiple tokens in parallel.
