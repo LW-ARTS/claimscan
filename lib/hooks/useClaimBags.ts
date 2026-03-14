@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import {
   VersionedTransaction,
@@ -706,6 +706,11 @@ export function useClaimBags(): UseClaimBagsReturn {
       walletRef.current = '';
     }
   }, [publicKey, signAllTransactions, connection]);
+
+  // Abort in-flight operations on unmount to prevent post-unmount state updates
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
 
   return { execute, cancel, phase, progress, results, error };
 }

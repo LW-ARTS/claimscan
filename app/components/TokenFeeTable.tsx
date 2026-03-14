@@ -37,11 +37,15 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  const handleCopy = useCallback((id: string, address: string) => {
-    navigator.clipboard.writeText(address);
-    setCopiedId(id);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setCopiedId(null), 1500);
+  const handleCopy = useCallback(async (id: string, address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopiedId(id);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopiedId(null), 1500);
+    } catch {
+      // Clipboard API not available (insecure context or permission denied)
+    }
   }, []);
 
   // Memoize sort + display value computation so it only re-runs when inputs change

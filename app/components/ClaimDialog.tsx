@@ -168,7 +168,9 @@ export function ClaimDialog({
                       className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2"
                     >
                       <span className="font-mono text-sm">
-                        {fee.token_symbol ? `$${fee.token_symbol}` : fee.token_address.slice(0, 8) + '...'}
+                        {fee.token_symbol
+                          ? `$${fee.token_symbol.replace(/[^\w\s\-\.]/g, '').trim().slice(0, 20)}`
+                          : fee.token_address.slice(0, 8) + '...'}
                       </span>
                       <div className="text-right">
                         <span className="text-sm font-medium tabular-nums">
