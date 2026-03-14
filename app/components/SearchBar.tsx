@@ -38,7 +38,8 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
         !e.metaKey &&
         !e.ctrlKey &&
         !(e.target instanceof HTMLInputElement) &&
-        !(e.target instanceof HTMLTextAreaElement)
+        !(e.target instanceof HTMLTextAreaElement) &&
+        !(e.target as HTMLElement).isContentEditable
       ) {
         e.preventDefault();
         inputRef.current?.focus();

@@ -353,7 +353,7 @@ export function ClaimDialog({
                       }>
                         {r.status === 'confirmed' ? 'Confirmed' : 'Failed'}
                       </span>
-                      {r.txSignature && (
+                      {r.txSignature && /^[1-9A-HJ-NP-Za-km-z]{86,88}$/.test(r.txSignature) && (
                         <a
                           href={`https://solscan.io/tx/${r.txSignature}`}
                           target="_blank"
