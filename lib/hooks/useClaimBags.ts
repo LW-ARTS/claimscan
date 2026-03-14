@@ -596,15 +596,14 @@ export function useClaimBags(): UseClaimBagsReturn {
             const reSignTimeoutPromise = new Promise<never>((_, reject) => {
               reSignTimeout = setTimeout(() => reject(new Error('Fee re-sign timed out')), SIGN_TIMEOUT_MS);
             });
-            let reSignResult: VersionedTransaction[];
             try {
-              reSignResult = await Promise.race([reSignPromise, reSignTimeoutPromise]);
+              const reSignResult = await Promise.race([reSignPromise, reSignTimeoutPromise]);
+              const [reSigned] = reSignResult;
+              activeFeeTx = reSigned;
+              activeFeeBlockhash = freshBlockhash;
             } finally {
               clearTimeout(reSignTimeout);
             }
-            const [reSigned] = reSignResult!;
-            activeFeeTx = reSigned;
-            activeFeeBlockhash = freshBlockhash;
           }
         } catch (heightErr) {
           // If height check fails, try submitting with original blockhash anyway
