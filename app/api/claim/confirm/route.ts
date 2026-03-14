@@ -37,17 +37,18 @@ export async function POST(request: Request) {
 
   // Handle fee tx logging (separate from claim status updates)
   if (body.feeTx === true) {
-    const { txSignature: feeSig, wallet: feeWallet, feeLamports } = body as {
+    const { txSignature: feeSig, wallet: feeWallet, feeLamports: rawFeeLamports } = body as {
       txSignature?: string; wallet?: string; feeLamports?: string;
     };
     // Validate inputs to prevent DB pollution from unauthenticated requests
     if (
       !feeSig || typeof feeSig !== 'string' || !TX_SIG_RE.test(feeSig) ||
       !feeWallet || typeof feeWallet !== 'string' || !isValidSolanaAddress(feeWallet) ||
-      !feeLamports || typeof feeLamports !== 'string' || !/^\d+$/.test(feeLamports)
+      !rawFeeLamports || typeof rawFeeLamports !== 'string' || !/^\d+$/.test(rawFeeLamports)
     ) {
       return NextResponse.json({ ok: true }); // Silent ignore invalid data
     }
+    let feeLamports: string = rawFeeLamports;
     const parsedFee = BigInt(feeLamports);
     if (parsedFee <= 0n) return NextResponse.json({ ok: true });
 
@@ -63,13 +64,22 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true }); // Tx doesn't exist or failed on-chain
       }
       const accountKeys = tx.transaction.message.getAccountKeys();
-      const feeWalletFound = accountKeys.staticAccountKeys.some(
+      const feeWalletIdx = accountKeys.staticAccountKeys.findIndex(
         (key) => key.toBase58() === CLAIMSCAN_FEE_WALLET
       );
-      if (!feeWalletFound) {
+      if (feeWalletIdx === -1) {
         return NextResponse.json({ ok: true }); // Tx doesn't involve the fee wallet
       }
-      verified = true;
+      // Verify the actual transferred amount matches claimed feeLamports
+      const pre = tx.meta?.preBalances?.[feeWalletIdx] ?? 0;
+      const post = tx.meta?.postBalances?.[feeWalletIdx] ?? 0;
+      const actualDelta = BigInt(post) - BigInt(pre);
+      const claimedFee = BigInt(feeLamports);
+      if (actualDelta < claimedFee) {
+        // Client reported more than actually transferred — store actual amount
+        feeLamports = actualDelta > 0n ? actualDelta.toString() : '0';
+      }
+      verified = actualDelta > 0n;
     } catch {
       // RPC failure — insert as unverified. Revenue dashboard reconciles later.
     }
@@ -180,6 +190,11 @@ export async function POST(request: Request) {
     .eq('status', attempt.status);
 
   if (updateError) {
+    // 23505 = unique_violation — another active claim exists for this wallet+token
+    // (e.g., recovery transition from failed→submitted while a new claim was created)
+    if (updateError.code === '23505') {
+      return NextResponse.json({ error: 'Another active claim exists for this token' }, { status: 409 });
+    }
     console.error('[claim/confirm] Update error:', updateError.message);
     return NextResponse.json({ error: 'Failed to update claim status' }, { status: 500 });
   }

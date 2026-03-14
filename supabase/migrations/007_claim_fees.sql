@@ -3,7 +3,7 @@ CREATE TABLE claim_fees (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wallet_address TEXT NOT NULL,
   tx_signature TEXT NOT NULL UNIQUE,
-  fee_lamports TEXT NOT NULL CHECK (fee_lamports ~ '^\d+$'),
+  fee_lamports TEXT NOT NULL CHECK (fee_lamports ~ '^\d+$' AND fee_lamports::numeric > 0 AND fee_lamports::numeric <= 500000000000),
   verified BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
