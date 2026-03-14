@@ -2,6 +2,7 @@ export type Platform = 'bags' | 'clanker' | 'pump' | 'zora' | 'bankr' | 'believe
 export type Chain = 'sol' | 'base' | 'eth';
 export type IdentityProvider = 'twitter' | 'github' | 'farcaster' | 'wallet';
 export type ClaimStatus = 'claimed' | 'unclaimed' | 'partially_claimed' | 'auto_distributed';
+export type ClaimAttemptStatus = 'pending' | 'signing' | 'submitted' | 'confirmed' | 'finalized' | 'failed' | 'expired';
 
 export interface Database {
   public: {
@@ -230,6 +231,51 @@ export interface Database {
           updated_at?: string;
         };
         Relationships: [];
+      };
+      claim_attempts: {
+        Row: {
+          id: string;
+          creator_id: string | null;
+          wallet_address: string;
+          platform: Platform;
+          chain: Chain;
+          token_address: string;
+          status: ClaimAttemptStatus;
+          tx_signature: string | null;
+          amount_lamports: string | null;
+          error_reason: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          creator_id?: string | null;
+          wallet_address: string;
+          platform?: Platform;
+          chain?: Chain;
+          token_address: string;
+          status?: ClaimAttemptStatus;
+          tx_signature?: string | null;
+          amount_lamports?: string | null;
+          error_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          creator_id?: string | null;
+          wallet_address?: string;
+          platform?: Platform;
+          chain?: Chain;
+          token_address?: string;
+          status?: ClaimAttemptStatus;
+          tx_signature?: string | null;
+          amount_lamports?: string | null;
+          error_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [{ foreignKeyName: 'claim_attempts_creator_id_fkey'; columns: ['creator_id']; referencedRelation: 'creators'; referencedColumns: ['id'] }];
       };
       search_log: {
         Row: {

@@ -55,12 +55,17 @@ export async function GET(request: Request) {
     }
 
     // Get unique token addresses from fee_records that need price updates
-    const { data: tokens } = await supabase
+    const { data: tokens, error: tokensError } = await supabase
       .from('fee_records')
       .select('chain, token_address, token_symbol')
       .not('token_address', 'in', '("SOL","ETH")')
       .order('last_synced_at', { ascending: false })
       .limit(50);
+
+    if (tokensError) {
+      console.error('[refresh-prices] Failed to query fee_records:', tokensError.message);
+      return NextResponse.json({ error: 'Database query failed' }, { status: 500 });
+    }
 
     // Deduplicate
     const unique = new Map<string, { chain: 'sol' | 'base' | 'eth'; address: string; symbol: string }>();

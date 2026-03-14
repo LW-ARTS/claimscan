@@ -1,12 +1,40 @@
 'use client';
 
-import { useState, useId, useMemo } from 'react';
+import { useState, useId, useMemo, useCallback, useEffect, Component, type ReactNode } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import dynamic from 'next/dynamic';
 import { TokenFeeTable } from './TokenFeeTable';
 import { PlatformIcon } from './PlatformIcon';
 import { ChainIcon } from './ChainIcon';
 import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
-import { computeFeeUsd, formatUsd } from '@/lib/utils';
+import { computeFeeUsd, formatUsd, safeBigInt } from '@/lib/utils';
 import type { Database, Platform, Chain } from '@/lib/supabase/types';
+
+const ClaimDialog = dynamic(
+  () => import('./ClaimDialog').then((m) => ({ default: m.ClaimDialog })),
+  { ssr: false },
+);
+
+/** Error boundary that falls back to rendering children without claim UI. */
+class ClaimErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; fallback: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error) {
+    console.warn('[ClaimErrorBoundary] Wallet UI error caught:', error.message);
+  }
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 
@@ -31,6 +59,55 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
   const [activeTab, setActiveTab] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unclaimed' | 'claimed' | 'partial'>('all');
   const tabsId = useId();
+  const { publicKey } = useWallet();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  // Only expose wallet after client mount to avoid SSR issues
+  const connectedWallet = mounted ? (publicKey?.toBase58() ?? null) : null;
+
+  // Claim dialog state
+  const [claimDialogOpen, setClaimDialogOpen] = useState(false);
+  const [selectedForClaim, setSelectedForClaim] = useState<string[]>([]);
+
+  // Local optimistic updates for claimed tokens
+  const [claimedMints, setClaimedMints] = useState<Set<string>>(new Set());
+
+  // Apply optimistic updates to fees
+  const displayFees = useMemo(() => {
+    if (claimedMints.size === 0) return fees;
+    return fees.map((fee) => {
+      if (claimedMints.has(fee.token_address) && fee.platform === 'bags') {
+        return { ...fee, total_unclaimed: '0', claim_status: 'claimed' as const };
+      }
+      return fee;
+    });
+  }, [fees, claimedMints]);
+
+  const handleClaimToken = useCallback((tokenMint: string) => {
+    setSelectedForClaim([tokenMint]);
+    setClaimDialogOpen(true);
+  }, []);
+
+  const handleClaimAllBags = useCallback(() => {
+    const bagsUnclaimed = displayFees.filter(
+      (f) => f.platform === 'bags' && f.claim_status !== 'claimed' && safeBigInt(f.total_unclaimed) > 0n
+    );
+    setSelectedForClaim(bagsUnclaimed.map((f) => f.token_address));
+    setClaimDialogOpen(true);
+  }, [displayFees]);
+
+  const handleClaimComplete = useCallback((confirmedMints: string[]) => {
+    setClaimedMints((prev) => {
+      const next = new Set(prev);
+      for (const mint of confirmedMints) next.add(mint);
+      return next;
+    });
+    // Dispatch custom event so ProfileHero can trigger an immediate live fee refresh
+    // instead of waiting for the next 30s poll cycle.
+    window.dispatchEvent(new CustomEvent('claimscan:claim-complete', {
+      detail: { mints: confirmedMints },
+    }));
+  }, []);
 
   // Arrow key navigation for WAI-ARIA tablist pattern
   function handleTabKeyDown(e: React.KeyboardEvent, tabKeys: string[]) {
@@ -58,7 +135,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
   // Compute chain summaries (absorbed from ChainBreakdown)
   const chainSummaries = useMemo(() => {
     const byChain = new Map<Chain, ChainSummary>();
-    for (const fee of fees) {
+    for (const fee of displayFees) {
       const existing = byChain.get(fee.chain) ?? {
         chain: fee.chain,
         name: CHAIN_CONFIG[fee.chain]?.name ?? fee.chain,
@@ -72,12 +149,12 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
       byChain.set(fee.chain, existing);
     }
     return Array.from(byChain.values());
-  }, [fees, solPrice, ethPrice]);
+  }, [displayFees, solPrice, ethPrice]);
 
   // Group fees by platform (memoized — fees can contain hundreds of records)
   const { byPlatform, platformsWithData, platformsEmpty } = useMemo(() => {
     const byPlatform = new Map<Platform, FeeRecord[]>();
-    for (const fee of fees) {
+    for (const fee of displayFees) {
       const existing = byPlatform.get(fee.platform) ?? [];
       existing.push(fee);
       byPlatform.set(fee.platform, existing);
@@ -85,9 +162,9 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
     const platformsWithData = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) > 0);
     const platformsEmpty = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) === 0);
     return { byPlatform, platformsWithData, platformsEmpty };
-  }, [fees]);
+  }, [displayFees]);
 
-  const platformFiltered = activeTab === 'all' ? fees : (byPlatform.get(activeTab as Platform) ?? []);
+  const platformFiltered = activeTab === 'all' ? displayFees : (byPlatform.get(activeTab as Platform) ?? []);
   const filteredFees = statusFilter === 'all'
     ? platformFiltered
     : statusFilter === 'unclaimed'
@@ -171,7 +248,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
           <span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
             activeTab === 'all' ? 'bg-background/20' : 'bg-muted'
           }`}>
-            {fees.length}
+            {displayFees.length}
           </span>
         </button>
         {platformsWithData.map((platform) => {
@@ -246,15 +323,36 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
         })}
       </div>
 
+      {/* Claim All button for Bags unclaimed */}
+      {connectedWallet && (activeTab === 'all' || activeTab === 'bags') && (() => {
+        const bagsUnclaimed = (activeTab === 'all' ? displayFees : (byPlatform.get('bags') ?? []))
+          .filter((f) => f.platform === 'bags' && f.claim_status !== 'claimed' && safeBigInt(f.total_unclaimed) > 0n);
+        if (bagsUnclaimed.length === 0) return null;
+        return (
+          <button
+            onClick={handleClaimAllBags}
+            className="w-full rounded-xl bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90 active:scale-[0.99]"
+          >
+            Claim All Unclaimed ({bagsUnclaimed.length} Bags token{bagsUnclaimed.length !== 1 ? 's' : ''})
+          </button>
+        );
+      })()}
+
       {/* Tab panel */}
       <div
         role="tabpanel"
         id={`${tabsId}-panel`}
         aria-labelledby={`${tabsId}-tab-${activeTab}`}
-        tabIndex={0}
+        tabIndex={-1}
       >
         {filteredFees.length > 0 ? (
-          <TokenFeeTable fees={filteredFees} solPrice={solPrice} ethPrice={ethPrice} />
+          <TokenFeeTable
+            fees={filteredFees}
+            solPrice={solPrice}
+            ethPrice={ethPrice}
+            connectedWallet={connectedWallet}
+            onClaimToken={handleClaimToken}
+          />
         ) : (
           <div className="flex flex-col items-center justify-center rounded-xl border border-border/30 bg-card py-12 text-center">
             <PlatformIcon platform={activeTab} className="mb-2 h-6 w-6 text-muted-foreground/30" aria-hidden />
@@ -266,6 +364,24 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
           </div>
         )}
       </div>
+
+      {/* Claim Dialog — wrapped in error boundary for wallet/connection failures */}
+      {connectedWallet && claimDialogOpen && (
+        <ClaimErrorBoundary fallback={
+          <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+            Failed to load claim dialog. Please refresh the page and try again.
+          </p>
+        }>
+          <ClaimDialog
+            open={claimDialogOpen}
+            onOpenChange={setClaimDialogOpen}
+            wallet={connectedWallet}
+            fees={displayFees.filter((f) => selectedForClaim.includes(f.token_address) && f.platform === 'bags')}
+            solPrice={solPrice}
+            onClaimComplete={handleClaimComplete}
+          />
+        </ClaimErrorBoundary>
+      )}
     </div>
   );
 }

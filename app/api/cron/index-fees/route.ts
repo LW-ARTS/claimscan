@@ -16,12 +16,17 @@ export async function GET(request: Request) {
   try {
     // Only re-index creators whose data is stale (updated > 1 hour ago)
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { data: staleCreators } = await supabase
+    const { data: staleCreators, error: queryError } = await supabase
       .from('creators')
       .select('id, wallets(*)')
       .lt('updated_at', oneHourAgo)
       .order('updated_at', { ascending: true })
       .limit(20);
+
+    if (queryError) {
+      console.error('[index-fees] Failed to query stale creators:', queryError.message);
+      return NextResponse.json({ error: 'Database query failed' }, { status: 500 });
+    }
 
     if (!staleCreators || staleCreators.length === 0) {
       return NextResponse.json({ ok: true, indexed: 0 });

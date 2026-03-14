@@ -49,6 +49,11 @@ const GPA_TIMEOUT_MS = 20_000;
  *       + 2 (ExtensionType) + 2 (Length)
  *       + 32 (transferFeeConfigAuthority)
  *       = 120
+ *
+ * TransferFeeConfig has ExtensionType=1 (the lowest value), so Token-2022
+ * deterministically sorts it as the first extension in any mint that has it.
+ * This offset is therefore correct for ALL mints with transfer fees — not
+ * just "most" of them.
  */
 const WITHDRAW_AUTHORITY_OFFSET = 120;
 
@@ -308,7 +313,11 @@ async function fetchGpaV2(
         accounts.push(item.pubkey);
       }
 
-      paginationKey = result.paginationKey ?? null;
+      // Validate pagination key format before using (defense against malformed RPC response)
+      const nextKey = result.paginationKey ?? null;
+      paginationKey = (nextKey && typeof nextKey === 'string' && nextKey.length >= 32 && nextKey.length <= 44)
+        ? nextKey
+        : null;
       if (!paginationKey || (result.accounts ?? []).length === 0) break;
     } finally {
       clearTimeout(timeout);

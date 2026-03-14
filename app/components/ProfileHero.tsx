@@ -291,6 +291,15 @@ export function ProfileHero({
       }
     });
 
+    // Listen for claim-complete events from PlatformBreakdown to trigger
+    // immediate refresh instead of waiting for the next 30s poll cycle.
+    function handleClaimComplete() {
+      if (!controller.signal.aborted) {
+        streamLiveFees();
+      }
+    }
+    window.addEventListener('claimscan:claim-complete', handleClaimComplete);
+
     function handleVisibility() {
       if (document.hidden) {
         clearTimeout(timeoutId);
@@ -309,6 +318,7 @@ export function ProfileHero({
       controller.abort();
       webhookSSE?.close();
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('claimscan:claim-complete', handleClaimComplete);
     };
   }, [walletsKey]);
 

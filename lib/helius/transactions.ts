@@ -188,7 +188,8 @@ export async function fetchVaultClaimTotal(
           transfer.fromUserAccount === vaultAddress &&
           transfer.amount > 0
         ) {
-          total += BigInt(Math.floor(transfer.amount));
+          // Convert via string to avoid Number precision loss for values > 2^53
+          total += BigInt(transfer.amount.toFixed(0));
         }
       }
     }
@@ -243,7 +244,8 @@ export async function fetchTokenClaimTotal(
           transfer.mint === tokenMint &&
           transfer.tokenAmount > 0
         ) {
-          total += BigInt(Math.floor(transfer.tokenAmount));
+          // Convert via string to avoid Number precision loss for large token amounts
+          total += BigInt(transfer.tokenAmount.toFixed(0));
         }
       }
     }

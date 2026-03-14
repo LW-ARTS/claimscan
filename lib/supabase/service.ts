@@ -3,11 +3,16 @@ import { timingSafeEqual } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Module-level singleton — avoids creating a new client per request
-let _serviceClient: ReturnType<typeof createClient<Database>> | null = null;
+// Singleton anchored on globalThis to survive Next.js hot-module-replacement in dev.
+// Without this, each file save during development creates a new Supabase client
+// and leaks the previous connection.
+const SUPABASE_KEY = '__claimscan_supabase_service__';
+const g = globalThis as typeof globalThis & {
+  [SUPABASE_KEY]?: ReturnType<typeof createClient<Database>>;
+};
 
-export function createServiceClient() {
-  if (_serviceClient) return _serviceClient;
+export function createServiceClient(): ReturnType<typeof createClient<Database>> {
+  if (g[SUPABASE_KEY]) return g[SUPABASE_KEY]!;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -16,10 +21,11 @@ export function createServiceClient() {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  _serviceClient = createClient<Database>(url, key, {
+  const client = createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  return _serviceClient;
+  g[SUPABASE_KEY] = client;
+  return client;
 }
 
 export function verifyCronSecret(request: Request): boolean {
