@@ -25,7 +25,7 @@ export async function getCachedTokenAddresses(
       .eq('address', wallet)
       .eq('chain', chain)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (!walletRow) return null;
 

@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from '@/lib/supabase/types';
 
 export const runtime = 'edge';
 export const alt = 'ClaimScan Creator Fee Receipt';
@@ -103,7 +104,7 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (url && key) {
-      const supabase = createClient(url, key, {
+      const supabase = createClient<Database>(url, key, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
 
