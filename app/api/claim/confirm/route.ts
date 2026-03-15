@@ -168,7 +168,7 @@ export async function POST(request: Request) {
   // Fetch attempt and verify wallet ownership
   const { data: attempt, error: fetchError } = await supabase
     .from('claim_attempts')
-    .select('id, wallet_address, token_address, platform, chain, status')
+    .select('id, wallet_address, token_address, platform, chain, status, created_at')
     .eq('id', claimAttemptId)
     .single();
 
@@ -194,6 +194,21 @@ export async function POST(request: Request) {
       { error: 'Invalid status transition' },
       { status: 422 }
     );
+  }
+
+  // Limit recovery window: failed/expired → submitted only within 15 minutes
+  const RECOVERY_WINDOW_MS = 15 * 60 * 1000;
+  if (
+    (attempt.status === 'failed' || attempt.status === 'expired') &&
+    validatedStatus === 'submitted'
+  ) {
+    const createdAt = new Date(attempt.created_at).getTime();
+    if (Date.now() - createdAt > RECOVERY_WINDOW_MS) {
+      return NextResponse.json(
+        { error: 'Recovery window expired — start a new claim' },
+        { status: 410 }
+      );
+    }
   }
 
   // Update the claim attempt
