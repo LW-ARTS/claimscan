@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { resolveAndPersistCreator } from '@/lib/services/creator';
+import { verifyTurnstile } from '@/lib/turnstile';
 
 export async function POST(request: Request) {
   const contentType = request.headers.get('content-type') ?? '';
@@ -12,6 +13,19 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
+
+    // Verify Cloudflare Turnstile token (skipped if not configured)
+    const ip = request.headers.get('x-real-ip')
+      ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      ?? null;
+    const turnstile = await verifyTurnstile(body.cfTurnstileToken ?? null, ip);
+    if (!turnstile.success) {
+      return NextResponse.json(
+        { error: turnstile.error ?? 'Captcha verification failed' },
+        { status: 403 }
+      );
+    }
+
     const query = body.query?.trim();
 
     if (!query || typeof query !== 'string' || query.length < 2 || query.length > 256) {
