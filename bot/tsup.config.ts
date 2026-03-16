@@ -24,7 +24,7 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   bundle: true,
-  external: ['grammy', 'dotenv'],
+  external: ['grammy', 'dotenv', 'bigint-buffer'],
   esbuildOptions(options) {
     options.alias = {
       'server-only': path.resolve(__dirname, 'shims/server-only.ts'),
