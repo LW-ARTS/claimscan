@@ -1,0 +1,82 @@
+import 'dotenv/config';
+import { bot } from './bot';
+import { requireChannel, handleCheckJoined } from './middleware/require-channel';
+import { handleHelp, handleStart } from './handlers/help';
+import { handleCaDetect } from './handlers/ca-detect';
+import { handleScan } from './handlers/scan';
+import { handleStats } from './handlers/stats';
+import { handleCallbacks } from './handlers/callbacks';
+import { startPolling } from './workers/poll';
+
+// "I joined" button check — must be before the requireChannel middleware
+bot.callbackQuery('check_joined', handleCheckJoined);
+
+// Channel membership gate — blocks all handlers below if user hasn't joined
+bot.use(requireChannel);
+
+// Register command handlers
+bot.command('help', handleHelp);
+bot.command('start', handleStart);
+bot.command('scan', handleScan);
+bot.command('stats', handleStats);
+
+// Register callback query handler (inline buttons)
+bot.on('callback_query:data', handleCallbacks);
+
+// Register CA auto-detection on all text messages (must be last)
+bot.on('message:text', handleCaDetect);
+
+// Graceful shutdown
+let shuttingDown = false;
+
+async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[bot] ${signal} received — shutting down...`);
+
+  stopPolling();
+  await bot.stop();
+
+  console.log('[bot] Shutdown complete');
+  process.exit(0);
+}
+
+let stopPolling = () => {};
+
+// Start bot + polling worker
+async function main() {
+  console.log('[bot] Starting ClaimScan bot...');
+
+  // Register bot commands for Telegram menu autocomplete (non-fatal)
+  try {
+    await bot.api.setMyCommands([
+      { command: 'scan', description: 'Full creator fee report by handle' },
+      { command: 'stats', description: 'Tracked tokens in this group' },
+      { command: 'help', description: 'Command reference' },
+    ]);
+  } catch (err) {
+    console.warn('[bot] Failed to register commands (non-fatal):', err instanceof Error ? err.message : err);
+  }
+
+  // Start the claim polling worker
+  const pollHandle = startPolling();
+  stopPolling = pollHandle.stop;
+
+  // Start long polling
+  await bot.start({
+    onStart: (info) => {
+      console.log(`[bot] @${info.username} is running`);
+    },
+  });
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (err) => {
+  console.error('[bot] Unhandled rejection:', err);
+});
+
+main().catch((err) => {
+  console.error('[bot] Fatal error:', err);
+  process.exit(1);
+});
