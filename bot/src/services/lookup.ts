@@ -1,5 +1,6 @@
 import { heliusDasRpc } from '@/lib/helius/client';
 import { getAdapter } from '@/lib/platforms/index';
+import { getTokenFees, wethToWei, sumDailyEarningsWei } from '@/lib/platforms/bankr';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 import {
   PUMP_PROGRAM_ID,
@@ -267,9 +268,56 @@ async function discoverBaseToken(tokenAddress: string): Promise<LookupResult | n
     console.warn('[lookup] Clanker API lookup failed:', err instanceof Error ? err.message : err);
   }
 
-  // TODO: Add Zora discovery if needed
+  // Try Bankr Doppler API (public, no auth needed)
+  try {
+    const result = await discoverBankrToken(tokenAddress);
+    if (result) return result;
+  } catch (err) {
+    console.warn('[lookup] Bankr discovery failed:', err instanceof Error ? err.message : err);
+  }
 
   return null;
+}
+
+// ═══════════════════════════════════════════════
+// Base Discovery — Bankr Doppler API (public, no auth)
+// ═══════════════════════════════════════════════
+
+async function discoverBankrToken(tokenAddress: string): Promise<LookupResult | null> {
+  const feeData = await getTokenFees(tokenAddress);
+  if (!feeData) return null;
+
+  const { totals, dailyEarnings, tokens } = feeData;
+  const claimableWei = wethToWei(totals?.claimableWeth);
+  const dailyEarnedWei = sumDailyEarningsWei(dailyEarnings);
+  const claimedWeiFromTotals = wethToWei(totals?.claimedWeth);
+  const totalsEarnedWei = (BigInt(claimableWei) + BigInt(claimedWeiFromTotals)).toString();
+
+  const totalEarnedWei = BigInt(dailyEarnedWei) > BigInt(totalsEarnedWei)
+    ? dailyEarnedWei
+    : totalsEarnedWei;
+
+  const totalClaimedWei = BigInt(totalEarnedWei) > BigInt(claimableWei)
+    ? (BigInt(totalEarnedWei) - BigInt(claimableWei)).toString()
+    : '0';
+
+  // No fees at all = probably not a Bankr token
+  if (totalEarnedWei === '0' && claimableWei === '0') return null;
+
+  // Try to extract symbol from the tokens array
+  const tokenSymbol = tokens?.[0]?.symbol ?? tokens?.[0]?.name ?? null;
+
+  return await enrichResult('bankr', 'base', {
+    tokenAddress,
+    tokenSymbol,
+    feeRecipient: feeData.address || null, // Doppler returns the fee recipient address
+    feeRecipientHandle: null,
+    totalEarned: totalEarnedWei,
+    totalClaimed: totalClaimedWei,
+    totalUnclaimed: claimableWei,
+    totalEarnedUsd: null,
+    creatorId: null,
+  });
 }
 
 // ═══════════════════════════════════════════════
