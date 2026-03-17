@@ -322,7 +322,6 @@ async function discoverBankrToken(tokenAddress: string): Promise<LookupResult | 
 
     // Check exactMatch first (API returns this for CA lookups)
     const exactMatch = searchData.exactMatch as Record<string, unknown> | undefined;
-    console.log(`[bankr-debug] exactMatch:`, JSON.stringify(exactMatch ?? 'none'));
     if (exactMatch) {
       const fr = exactMatch.feeRecipient as { walletAddress?: string; xUsername?: string } | undefined;
       if (fr?.xUsername) feeRecipientHandle = fr.xUsername;
