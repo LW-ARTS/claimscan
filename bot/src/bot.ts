@@ -1,4 +1,3 @@
-import { Agent } from 'undici';
 import { Bot, GrammyError, HttpError } from 'grammy';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -6,19 +5,8 @@ if (!token) {
   throw new Error('TELEGRAM_BOT_TOKEN is not set');
 }
 
-// Force IPv4 for Telegram API requests.
-// Node 22 Happy Eyeballs tries IPv6 first, which fails/times out
-// on VPS providers without proper IPv6 routing.
-const ipv4Agent = new Agent({ connect: { family: 4 } });
-
-export const bot = new Bot(token, {
-  client: {
-    baseFetchConfig: {
-      // @ts-expect-error — grammY passes this to fetch()
-      dispatcher: ipv4Agent,
-    },
-  },
-});
+// IPv4 is forced globally via setGlobalDispatcher in index.ts
+export const bot = new Bot(token);
 
 // Global error handler — log and recover, never crash
 bot.catch(async (err) => {

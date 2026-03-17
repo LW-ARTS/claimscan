@@ -1,3 +1,13 @@
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');
+
+// Force ALL fetch() calls to use IPv4.
+// Node 22 Happy Eyeballs tries IPv6 first, which times out on VPS
+// providers without proper IPv6 routing. This patches the global fetch
+// so every library (grammY, etc.) automatically uses IPv4.
+import { Agent, setGlobalDispatcher } from 'undici';
+setGlobalDispatcher(new Agent({ connect: { family: 4 } }));
+
 import 'dotenv/config';
 import { bot } from './bot';
 import { requireChannel, handleCheckJoined } from './middleware/require-channel';
