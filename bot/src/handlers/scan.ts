@@ -92,6 +92,9 @@ export async function handleScan(ctx: Context): Promise<void> {
       parse_mode: 'HTML',
       reply_markup: buttons.length > 0 ? { inline_keyboard: buttons } : undefined,
       link_preview_options: { is_disabled: true },
+      ...(inGroup && ctx.message?.message_id
+        ? { reply_parameters: { message_id: ctx.message.message_id } }
+        : {}),
     });
   } catch (err) {
     // Set cooldown even on failure to prevent DoS via repeated timeouts

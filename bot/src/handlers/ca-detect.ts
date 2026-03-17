@@ -76,6 +76,9 @@ export async function handleCaDetect(ctx: Context): Promise<void> {
         parse_mode: 'HTML',
         reply_markup: { inline_keyboard: buttons },
         link_preview_options: { is_disabled: true },
+        ...(isGroup && ctx.message?.message_id
+          ? { reply_parameters: { message_id: ctx.message.message_id } }
+          : {}),
       });
 
       // Auto-track if unclaimed > 0
