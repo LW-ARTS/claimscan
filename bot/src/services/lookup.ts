@@ -201,29 +201,35 @@ async function discoverSolanaToken(tokenAddress: string): Promise<LookupResult |
 // Base Discovery — Clanker API
 // ═══════════════════════════════════════════════
 
-interface ClankerTokenResponse {
-  id: number;
-  name: string;
-  symbol: string;
-  pool_address: string;
-  requestor_address: string;
-  type: string;
+interface ClankerTokensResponse {
+  data: Array<{
+    id: number;
+    name: string;
+    symbol: string;
+    contract_address: string;
+    pool_address: string;
+    requestor_address: string;
+    type: string;
+  }>;
 }
 
 async function discoverBaseToken(tokenAddress: string): Promise<LookupResult | null> {
-  // Try Clanker API first
+  // Try Clanker public API (GET /api/tokens?q=<address>)
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
 
     const res = await fetch(
-      `${CLANKER_API_BASE}/get-clanker-by-address?address=${encodeURIComponent(tokenAddress)}`,
+      `https://www.clanker.world/api/tokens?q=${encodeURIComponent(tokenAddress)}`,
       { signal: controller.signal }
     );
     clearTimeout(timeout);
 
     if (res.ok) {
-      const data: ClankerTokenResponse = await res.json();
+      const body: ClankerTokensResponse = await res.json();
+      const data = body.data?.find(
+        (t) => t.contract_address?.toLowerCase() === tokenAddress.toLowerCase()
+      );
       if (data && data.requestor_address) {
         const adapter = getAdapter('clanker');
         if (adapter?.supportsLiveFees) {
