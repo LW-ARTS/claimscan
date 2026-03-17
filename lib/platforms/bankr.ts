@@ -315,7 +315,7 @@ interface BankrSearchResponse {
   };
 }
 
-interface BankrTokenFeeResponse {
+export interface BankrTokenFeeResponse {
   address: string;
   chain: string;
   tokens?: Array<{
@@ -416,7 +416,7 @@ async function searchLaunches(query: string): Promise<BankrSearchResponse> {
   }
 }
 
-async function getTokenFees(tokenAddress: string, externalSignal?: AbortSignal): Promise<BankrTokenFeeResponse | null> {
+export async function getTokenFees(tokenAddress: string, externalSignal?: AbortSignal): Promise<BankrTokenFeeResponse | null> {
   // Check in-memory cache first
   const cached = dopplerCacheGet(tokenAddress);
   if (cached) return cached;
@@ -444,7 +444,7 @@ async function getTokenFees(tokenAddress: string, externalSignal?: AbortSignal):
 /**
  * Convert a human-readable WETH amount (e.g. "0.005417") to wei string.
  */
-function wethToWei(val: string | null | undefined): string {
+export function wethToWei(val: string | null | undefined): string {
   if (!val) return '0';
   let str = val.trim();
   if (!str || str === '0' || str === '0.000000') return '0';
@@ -468,7 +468,7 @@ function wethToWei(val: string | null | undefined): string {
  * returns "0" even when substantial amounts were claimed on-chain.
  * `dailyEarnings[].weth` is consistent and accurate.
  */
-function sumDailyEarningsWei(dailyEarnings: Array<{ date: string; weth: string }> | undefined): string {
+export function sumDailyEarningsWei(dailyEarnings: Array<{ date: string; weth: string }> | undefined): string {
   if (!dailyEarnings || dailyEarnings.length === 0) return '0';
   let total = BigInt(0);
   for (const day of dailyEarnings) {
