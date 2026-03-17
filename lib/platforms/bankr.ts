@@ -292,7 +292,7 @@ function bankrAuthHeaders(): Record<string, string> {
 /** Whether we have ANY Bankr auth (bearer OR API key) for Search API */
 const HAS_BANKR_AUTH = !!(BANKR_BEARER || BANKR_API_KEY);
 
-interface BankrTokenLaunch {
+export interface BankrTokenLaunch {
   tokenName: string;
   tokenSymbol: string;
   tokenAddress: string;
@@ -307,7 +307,7 @@ interface BankrPaginatedResponse {
   nextCursor?: string | null;
 }
 
-interface BankrSearchResponse {
+export interface BankrSearchResponse {
   groups?: {
     tokens?: { results: BankrTokenLaunch[]; hasMore: boolean };
     byDeployer?: { results: BankrTokenLaunch[]; hasMore: boolean };
@@ -398,7 +398,7 @@ async function searchLaunchesPaginated(
   return filtered;
 }
 
-async function searchLaunches(query: string): Promise<BankrSearchResponse> {
+export async function searchLaunches(query: string): Promise<BankrSearchResponse> {
   if (!HAS_BANKR_AUTH) return {};
   try {
     const controller = new AbortController();

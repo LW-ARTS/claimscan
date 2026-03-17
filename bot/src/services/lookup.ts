@@ -1,6 +1,6 @@
 import { heliusDasRpc } from '@/lib/helius/client';
 import { getAdapter } from '@/lib/platforms/index';
-import { getTokenFees, wethToWei, sumDailyEarningsWei } from '@/lib/platforms/bankr';
+import { getTokenFees, wethToWei, sumDailyEarningsWei, searchLaunches } from '@/lib/platforms/bankr';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 import {
   PUMP_PROGRAM_ID,
@@ -313,11 +313,34 @@ async function discoverBankrToken(tokenAddress: string): Promise<LookupResult | 
   // Try to extract symbol from the tokens array
   const tokenSymbol = tokens?.[0]?.symbol ?? tokens?.[0]?.name ?? null;
 
+  // Try to resolve the fee recipient handle via Search API
+  let feeRecipientHandle: string | null = null;
+  let feeRecipient: string | null = feeData.address || null;
+  try {
+    const searchData = await searchLaunches(tokenAddress);
+    const allResults = [
+      ...(searchData.groups?.tokens?.results ?? []),
+      ...(searchData.groups?.byFeeRecipient?.results ?? []),
+      ...(searchData.groups?.byDeployer?.results ?? []),
+    ];
+    const match = allResults.find(
+      (t) => t.tokenAddress?.toLowerCase() === tokenAddress.toLowerCase()
+    );
+    if (match?.feeRecipient?.xUsername) {
+      feeRecipientHandle = match.feeRecipient.xUsername;
+    }
+    if (match?.feeRecipient?.walletAddress) {
+      feeRecipient = match.feeRecipient.walletAddress;
+    }
+  } catch {
+    // Non-fatal — we still have fee data without the handle
+  }
+
   return await enrichResult('bankr', 'base', {
     tokenAddress,
     tokenSymbol,
-    feeRecipient: feeData.address || null, // Doppler returns the fee recipient address
-    feeRecipientHandle: null,
+    feeRecipient,
+    feeRecipientHandle,
     totalEarned: totalEarnedWei,
     totalClaimed: totalClaimedWei,
     totalUnclaimed: claimableWei,
