@@ -317,31 +317,38 @@ async function discoverBankrToken(tokenAddress: string): Promise<LookupResult | 
   let feeRecipientHandle: string | null = null;
   let feeRecipient: string | null = feeData.address || null;
   try {
-    console.log(`[bankr-debug] Calling searchLaunches for ${tokenAddress}`);
-    const searchData = await searchLaunches(tokenAddress);
-    console.log(`[bankr-debug] searchLaunches response keys:`, Object.keys(searchData));
-    console.log(`[bankr-debug] groups:`, JSON.stringify(searchData.groups ? Object.keys(searchData.groups) : 'no groups'));
-    const allResults = [
-      ...(searchData.groups?.tokens?.results ?? []),
-      ...(searchData.groups?.byFeeRecipient?.results ?? []),
-      ...(searchData.groups?.byDeployer?.results ?? []),
-    ];
-    console.log(`[bankr-debug] allResults count: ${allResults.length}`);
-    if (allResults.length > 0) {
-      console.log(`[bankr-debug] first result:`, JSON.stringify(allResults[0], null, 2));
+    // Cast to Record to access exactMatch field the API returns but isn't typed
+    const searchData = await searchLaunches(tokenAddress) as Record<string, unknown>;
+
+    // Check exactMatch first (API returns this for CA lookups)
+    const exactMatch = searchData.exactMatch as Record<string, unknown> | undefined;
+    console.log(`[bankr-debug] exactMatch:`, JSON.stringify(exactMatch ?? 'none'));
+    if (exactMatch) {
+      const fr = exactMatch.feeRecipient as { walletAddress?: string; xUsername?: string } | undefined;
+      if (fr?.xUsername) feeRecipientHandle = fr.xUsername;
+      if (fr?.walletAddress) feeRecipient = fr.walletAddress;
     }
-    const match = allResults.find(
-      (t) => t.tokenAddress?.toLowerCase() === tokenAddress.toLowerCase()
-    );
-    console.log(`[bankr-debug] match found: ${!!match}, xUsername: ${match?.feeRecipient?.xUsername ?? 'none'}`);
-    if (match?.feeRecipient?.xUsername) {
-      feeRecipientHandle = match.feeRecipient.xUsername;
+
+    // Fallback: check groups
+    if (!feeRecipientHandle) {
+      const groups = searchData.groups as { tokens?: { results: Array<{ tokenAddress: string; feeRecipient?: { walletAddress?: string; xUsername?: string } }> }; byDeployer?: { results: Array<{ tokenAddress: string; feeRecipient?: { walletAddress?: string; xUsername?: string } }> }; byFeeRecipient?: { results: Array<{ tokenAddress: string; feeRecipient?: { walletAddress?: string; xUsername?: string } }> } } | undefined;
+      const allResults = [
+        ...(groups?.tokens?.results ?? []),
+        ...(groups?.byFeeRecipient?.results ?? []),
+        ...(groups?.byDeployer?.results ?? []),
+      ];
+      const match = allResults.find(
+        (t) => t.tokenAddress?.toLowerCase() === tokenAddress.toLowerCase()
+      );
+      if (match?.feeRecipient?.xUsername) {
+        feeRecipientHandle = match.feeRecipient.xUsername;
+      }
+      if (match?.feeRecipient?.walletAddress && !feeRecipient) {
+        feeRecipient = match.feeRecipient.walletAddress;
+      }
     }
-    if (match?.feeRecipient?.walletAddress) {
-      feeRecipient = match.feeRecipient.walletAddress;
-    }
-  } catch (err) {
-    console.warn(`[bankr-debug] searchLaunches failed:`, err instanceof Error ? err.message : err);
+  } catch {
+    // Non-fatal -- we still have fee data without the handle
   }
 
   return await enrichResult('bankr', 'base', {
