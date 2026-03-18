@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/cleanup?also=prices",
-      "schedule": "*/10 * * * *"
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/cron/index-fees?also=tokens",
-      "schedule": "*/10 * * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
