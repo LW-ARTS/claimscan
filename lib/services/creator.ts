@@ -151,7 +151,29 @@ async function doResolve(
         };
       }
 
-      // Cache is stale — fully re-resolve before returning
+      // Cache is stale — for heavy creators (500+ records), return stale data
+      // immediately and let the daily cron refresh in background. These creators
+      // have too many positions to fetch within Vercel's 10s budget (e.g. finnbags
+      // has 6000+ Bags positions = 4MB response = 24s download time).
+      if (allFeeRecords.length > 500) {
+        console.info(`[creator] returning stale cache for heavy creator ${parsed.value} (${allFeeRecords.length} records, last synced ${new Date(maxSyncedAt).toISOString()})`);
+        const { data: claimEvents } = await supabase
+          .from('claim_events')
+          .select('*')
+          .eq('creator_id', data.id)
+          .order('claimed_at', { ascending: false })
+          .limit(50);
+        return {
+          creator: { ...data, fee_records: allFeeRecords },
+          wallets: data.wallets ?? [],
+          fees: allFeeRecords,
+          claimEvents: (claimEvents ?? []) as ClaimEventRow[],
+          resolveMs: Date.now() - start,
+          cached: true,
+        };
+      }
+
+      // Normal creators: fully re-resolve before returning
       return await freshResolve(parsed, supabase, data.id, start);
     }
   }
