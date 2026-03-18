@@ -9,6 +9,7 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import { getBase58Encoder } from '@solana/codecs';
+import { signedFetch } from '@/lib/signed-fetch';
 import {
   CLAIMSCAN_FEE_WALLET,
   MIN_FEE_LAMPORTS,
@@ -132,28 +133,37 @@ async function confirmClaimStatus(
   txSignature: string | undefined,
   status: ClaimStatus,
   errorReason?: string
-): Promise<void> {
+): Promise<'ok' | 'already_finalized' | 'error'> {
   try {
     const body: Record<string, unknown> = { claimAttemptId, wallet, confirmToken, status };
     if (txSignature) body.txSignature = txSignature;
     if (errorReason) body.errorReason = errorReason;
-    const res = await fetch('/api/claim/confirm', {
+    const res = await signedFetch('/api/claim/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (res.status === 409) {
+      const resBody = await res.json().catch(() => ({ error: '' }));
+      if (resBody.error === 'Claim already finalized' || resBody.error === 'Claim status was already updated') {
+        return 'already_finalized';
+      }
+    }
     if (!res.ok) {
       console.warn(`[useClaimBags] confirm rejected: HTTP ${res.status} for ${status}`, await res.text().catch(() => ''));
+      return 'error';
     }
+    return 'ok';
   } catch (err) {
     console.warn('[useClaimBags] confirm network error:', err instanceof Error ? err.message : err);
+    return 'error';
   }
 }
 
 /** Mark all entries as failed in the DB. Fires in parallel for speed. Best-effort. */
 async function failEntries(entries: TxEntry[], wallet: string, reason: string): Promise<void> {
   const seen = new Set<string>();
-  const promises: Promise<void>[] = [];
+  const promises: Promise<'ok' | 'already_finalized' | 'error'>[] = [];
   for (const entry of entries) {
     if (seen.has(entry.claimAttemptId)) continue;
     seen.add(entry.claimAttemptId);
@@ -228,7 +238,7 @@ export function useClaimBags(): UseClaimBagsReturn {
         if (controller.signal.aborted) return;
         const chunk = tokenMints.slice(ci, ci + API_BATCH_SIZE);
 
-        const res = await fetch('/api/claim/bags', {
+        const res = await signedFetch('/api/claim/bags', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ wallet: walletAddress, tokenMints: chunk }),
@@ -573,19 +583,31 @@ export function useClaimBags(): UseClaimBagsReturn {
               )
             );
           } catch (confirmErr) {
-            failed++;
             const reason = confirmErr instanceof Error ? confirmErr.message : 'Confirmation failed';
-            await confirmClaimStatus(entry.claimAttemptId, walletAddress, entry.confirmToken, entry.sig, 'failed', reason);
+            const confirmResult = await confirmClaimStatus(entry.claimAttemptId, walletAddress, entry.confirmToken, entry.sig, 'failed', reason);
             activeEntriesRef.current = activeEntriesRef.current.filter(
               (e) => e.claimAttemptId !== entry.claimAttemptId
             );
-            safeSetResults((prev) =>
-              prev.map((r) =>
-                r.claimAttemptId === entry.claimAttemptId
-                  ? { ...r, status: 'failed' as const, error: reason }
-                  : r
-              )
-            );
+            if (confirmResult === 'already_finalized') {
+              // Claim was already finalized server-side — treat as confirmed, not failed
+              completed++;
+              safeSetResults((prev) =>
+                prev.map((r) =>
+                  r.claimAttemptId === entry.claimAttemptId
+                    ? { ...r, status: 'confirmed' as const }
+                    : r
+                )
+              );
+            } else {
+              failed++;
+              safeSetResults((prev) =>
+                prev.map((r) =>
+                  r.claimAttemptId === entry.claimAttemptId
+                    ? { ...r, status: 'failed' as const, error: reason }
+                    : r
+                )
+              );
+            }
           }
           safeSetProgress({ completed, failed, total: totalCount });
         })
@@ -660,7 +682,7 @@ export function useClaimBags(): UseClaimBagsReturn {
           // Use the first confirmed claim's HMAC token to authenticate the fee log.
           // This prevents unauthorized fee injection from on-chain observers.
           const authEntry = allTransactions[0];
-          fetch('/api/claim/confirm', {
+          signedFetch('/api/claim/confirm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

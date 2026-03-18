@@ -168,6 +168,7 @@ export const coinbarrelAdapter: PlatformAdapter = {
   supportsIdentityResolution: false,
   supportsLiveFees: true,
   supportsHandleBasedFees: false,
+  historicalCoversLive: true,
 
   async resolveIdentity(
     _handle: string,
@@ -266,7 +267,7 @@ export const coinbarrelAdapter: PlatformAdapter = {
 
           const claimed = claimMap.get(pool.poolAddress) ?? 0n;
 
-          // creatorFeesB is SOL (quote token) fees accumulated for creator
+          // creatorFeesB = SOL (quote token) creator fees
           if (pool.creatorFeesB > 0n || claimed > 0n) {
             fees.push({
               tokenAddress: mintAddr,
@@ -280,34 +281,34 @@ export const coinbarrelAdapter: PlatformAdapter = {
               royaltyBps: null,
             });
           }
-        }
-      }
 
-      // Process bonding curves (pre-migration tokens)
-      // Only if they haven't already been counted via pools.
-      // We use accumulatedHolderRewards from the GPA data directly,
-      // avoiding N+1 getBondingCurveState calls per curve.
-      if (curves.status === 'fulfilled') {
-        for (const curve of curves.value) {
-          const mintAddr = curve.tokenMint.toBase58();
-          // Skip if already processed via pool
-          if (poolTokenMints.has(mintAddr)) continue;
-
-          if (curve.accumulatedHolderRewards > 0n) {
+          // creatorFeesA = token-A (meme token) creator fees
+          // Uses real mint address with feeTokenType metadata to avoid
+          // breaking price lookups and DB consistency
+          if (pool.creatorFeesA > 0n) {
             fees.push({
               tokenAddress: mintAddr,
-              tokenSymbol: 'SOL',
+              tokenSymbol: null,
               chain: 'sol',
               platform: 'coinbarrel',
-              totalEarned: curve.accumulatedHolderRewards.toString(),
+              totalEarned: pool.creatorFeesA.toString(),
               totalClaimed: '0',
-              totalUnclaimed: curve.accumulatedHolderRewards.toString(),
+              totalUnclaimed: pool.creatorFeesA.toString(),
               totalEarnedUsd: null,
               royaltyBps: null,
+              feeTokenType: 'token-a',
             });
           }
         }
       }
+
+      // Bonding curves (pre-migration tokens) — skip for fee reporting.
+      // The GPA reads ACCUMULATED_HOLDER_REWARDS_SOL which is the holder reward pool,
+      // NOT the creator's personal fee share. Creator fees on bonding curves are not
+      // directly readable from a single account field. Migrated tokens (pools above)
+      // have explicit ACCUMULATED_CREATOR_TRADER_FEES fields which are correct.
+      // Pre-migration tokens with unclaimed creator fees will be captured once they
+      // migrate to pools.
 
       return fees;
     } catch (err) {

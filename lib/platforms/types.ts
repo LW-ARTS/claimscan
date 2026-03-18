@@ -37,6 +37,7 @@ export interface TokenFee {
   totalUnclaimed: string;
   totalEarnedUsd: number | null;
   royaltyBps: number | null;
+  feeTokenType?: string;
 }
 
 // ═══════════════════════════════════════════════
@@ -69,6 +70,9 @@ export interface PlatformAdapter {
   supportsLiveFees: boolean;
   /** Can this platform query fees designated to a social handle directly? */
   supportsHandleBasedFees: boolean;
+  /** Does getHistoricalFees already cover getLiveUnclaimedFees data?
+   * When true, the orchestrator skips the live call to avoid duplicate API/RPC work. */
+  historicalCoversLive: boolean;
 
   /**
    * Resolve a social identity (twitter, github, etc.) to wallet addresses.

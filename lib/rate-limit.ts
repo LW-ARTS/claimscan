@@ -25,4 +25,8 @@ if (url && token) {
   });
 }
 
+if (!generalLimiter && process.env.NODE_ENV === 'production') {
+  console.error('[rate-limit] CRITICAL: Upstash Redis not configured in production. Rate limiting is per-instance only.');
+}
+
 export { generalLimiter, searchLimiter };

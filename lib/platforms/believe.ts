@@ -92,6 +92,7 @@ export const believeAdapter: PlatformAdapter = {
   supportsIdentityResolution: false,
   supportsLiveFees: true,
   supportsHandleBasedFees: false,
+  historicalCoversLive: true,
 
   async resolveIdentity(
     _handle: string,

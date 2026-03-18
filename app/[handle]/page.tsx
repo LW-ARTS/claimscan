@@ -2,11 +2,12 @@
 // first-visit resolution is capped to fit within this budget.
 export const maxDuration = 10;
 
+import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { resolveAndPersistCreator } from '@/lib/services/creator';
 import { getNativeTokenPrices } from '@/lib/prices';
-import { safeBigInt, toUsdValue } from '@/lib/utils';
+import { computeFeeUsd } from '@/lib/utils';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 import { SearchBar } from '../components/SearchBar';
 import { ProfileHero } from '../components/ProfileHero';
@@ -80,18 +81,21 @@ export default async function ProfilePage({ params }: PageProps) {
   }
 
   // Fetch creator data and native prices in parallel (independent operations)
-  const [result, prices] = await Promise.all([
+  const [result, prices] = await Promise.allSettled([
     resolveAndPersistCreator(decoded),
     getNativeTokenPrices(),
   ]);
 
-  if (!result.creator) {
+  const creatorResult = result.status === 'fulfilled' ? result.value : null;
+  const priceResult = prices.status === 'fulfilled' ? prices.value : { sol: 0, eth: 0, stale: true };
+
+  if (!creatorResult?.creator) {
     return (
       <div className="space-y-8">
         <SearchBar />
-        <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div role="alert" className="flex flex-col items-center justify-center py-20 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white/[0.06]">
-            <svg className="h-7 w-7 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <svg className="h-7 w-7 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
             </svg>
           </div>
@@ -105,9 +109,9 @@ export default async function ProfilePage({ params }: PageProps) {
     );
   }
 
-  const creator = result.creator;
-  const wallets = result.wallets;
-  const feeRecords = result.fees;
+  const creator = creatorResult!.creator;
+  const wallets = creatorResult!.wallets;
+  const feeRecords = creatorResult!.fees;
 
   const walletsForLive = wallets.map((w) => ({
     address: w.address,
@@ -118,18 +122,8 @@ export default async function ProfilePage({ params }: PageProps) {
   // Determine which chains have resolved wallets (for scan status)
   const resolvedChains = [...new Set(wallets.map((w) => w.chain))] as Chain[];
 
-  // Compute USD value for a single fee record (uses DB cache, falls back to live price)
   const feeToUsd = (fee: typeof feeRecords[number]): number => {
-    const dbUsd = fee.total_earned_usd;
-    if (typeof dbUsd === 'number' && Number.isFinite(dbUsd) && dbUsd > 0) return dbUsd;
-    const unclaimed = safeBigInt(fee.total_unclaimed);
-    const earned = safeBigInt(fee.total_earned);
-    // Prefer total_earned (claimed + unclaimed) when populated; fall back to unclaimed for stale data
-    const amount = earned > 0n ? earned : unclaimed;
-    if (amount === 0n) return 0;
-    const price = fee.chain === 'sol' ? prices.sol : prices.eth;
-    const decimals = fee.chain === 'sol' ? 9 : 18;
-    return toUsdValue(amount, decimals, price);
+    return computeFeeUsd(fee, priceResult.sol, priceResult.eth);
   };
 
   // Compute aggregate stats
@@ -167,12 +161,12 @@ export default async function ProfilePage({ params }: PageProps) {
             wallets={wallets}
             initialFees={feeRecords}
             walletsForLive={walletsForLive}
-            solPrice={prices.sol}
-            ethPrice={prices.eth}
+            solPrice={priceResult.sol}
+            ethPrice={priceResult.eth}
             handle={decoded}
             totalEarnedUsd={totalEarnedUsd}
             platformCount={platformCount}
-            resolveMs={result.resolveMs}
+            resolveMs={creatorResult!.resolveMs}
           />
         </ErrorBoundary>
       </div>
@@ -192,28 +186,55 @@ export default async function ProfilePage({ params }: PageProps) {
         </div>
       )}
 
-      {/* ZONE 2: Breakdown (chain pills + platform tabs + table) */}
-      <LazySection minHeight={200}>
-        <div className="animate-fade-in-up delay-150">
-          <PlatformBreakdown fees={feeRecords} solPrice={prices.sol} ethPrice={prices.eth} key={creator.id} />
-        </div>
-      </LazySection>
-
-      {/* ZONE 3: Claim History */}
-      {result.claimEvents.length > 0 && (
-        <LazySection minHeight={100}>
-          <div className="animate-fade-in-up delay-200">
-            <ClaimHistory events={result.claimEvents} />
+      {/* ZONE 2-4: Heavy content wrapped in Suspense so hero renders immediately */}
+      <Suspense fallback={<BreakdownSkeleton />}>
+        {/* ZONE 2: Breakdown (chain pills + platform tabs + table) */}
+        <LazySection minHeight={200}>
+          <div className="animate-fade-in-up delay-150">
+            <PlatformBreakdown fees={feeRecords} solPrice={priceResult.sol} ethPrice={priceResult.eth} wallets={wallets} key={creator.id} />
           </div>
         </LazySection>
-      )}
 
-      {/* ZONE 4: Scan Status (minimal footnote) */}
-      <LazySection minHeight={80}>
-        <div className="animate-fade-in-up delay-300">
-          <ScanStatusLog fees={feeRecords} resolvedChains={resolvedChains} />
-        </div>
-      </LazySection>
+        {/* ZONE 3: Claim History */}
+        {creatorResult!.claimEvents.length > 0 && (
+          <LazySection minHeight={100}>
+            <div className="animate-fade-in-up delay-200">
+              <ClaimHistory events={creatorResult!.claimEvents} />
+            </div>
+          </LazySection>
+        )}
+
+        {/* ZONE 4: Scan Status (minimal footnote) */}
+        <LazySection minHeight={80}>
+          <div className="animate-fade-in-up delay-300">
+            <ScanStatusLog fees={feeRecords} resolvedChains={resolvedChains} />
+          </div>
+        </LazySection>
+      </Suspense>
+    </div>
+  );
+}
+
+/** Skeleton fallback for the breakdown/history/status zones */
+function BreakdownSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse" aria-label="Loading fee breakdown">
+      {/* Platform tabs skeleton */}
+      <div className="flex gap-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-8 w-20 rounded-lg bg-foreground/[0.06]" />
+        ))}
+      </div>
+      {/* Table rows skeleton */}
+      <div className="space-y-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4">
+            <div className="h-8 w-8 rounded-full bg-foreground/[0.06]" />
+            <div className="h-4 flex-1 rounded bg-foreground/[0.06]" />
+            <div className="h-4 w-24 rounded bg-foreground/[0.06]" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

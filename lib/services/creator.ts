@@ -23,8 +23,9 @@ const inFlight = new Map<string, Promise<ResolveResult>>();
 
 /** Timeout for the entire resolve operation to prevent hung promises in inFlight map.
  *  8s keeps within Vercel Hobby's 10s maxDuration. Large creators rely on
- *  cached data from cron jobs; first-visit may show partial results. */
-const RESOLVE_TIMEOUT_MS = 8_000;
+ *  cached data from cron jobs; first-visit may show partial results.
+ *  Override via RESOLVE_TIMEOUT_MS env var for non-Vercel runtimes (e.g. bot on VPS). */
+const RESOLVE_TIMEOUT_MS = parseInt(process.env.RESOLVE_TIMEOUT_MS ?? '8000', 10);
 
 type Creator = Database['public']['Tables']['creators']['Row'];
 type Wallet = Database['public']['Tables']['wallets']['Row'];
@@ -82,7 +83,7 @@ export async function resolveAndPersistCreator(query: string): Promise<ResolveRe
  * Hash a query value for storage in search_log to avoid storing raw wallet addresses.
  */
 function hashQueryForLog(value: string): string {
-  return createHash('sha256').update(value).digest('hex').slice(0, 16);
+  return createHash('sha256').update(value).digest('hex').slice(0, 32);
 }
 
 async function doResolve(
@@ -192,6 +193,21 @@ async function freshResolve(
         ...(parsed.provider === 'farcaster' && { farcaster_handle: parsed.value }),
       };
 
+      // For wallet searches (no handle column), check if a creator already exists
+      // for this wallet to avoid creating duplicates
+      if (!handleColumn && wallets.length > 0) {
+        const { data: existingWallet } = await supabase
+          .from('wallets')
+          .select('creator_id')
+          .eq('address', wallets[0].address)
+          .limit(1)
+          .maybeSingle();
+        if (existingWallet?.creator_id) {
+          creatorId = existingWallet.creator_id;
+        }
+      }
+
+      if (!creatorId) {
       // Check error from upsert/insert to avoid silently losing data
       const { data: newCreator, error: creatorError } = handleColumn
         ? await supabase
@@ -224,6 +240,7 @@ async function freshResolve(
       } else {
         creatorId = newCreator?.id ?? null;
       }
+      } // close: if (!creatorId) before insert
     }
 
     if (!creatorId) {
@@ -250,13 +267,22 @@ async function freshResolve(
       }
     }
 
-    // Fetch wallet-based fees across all platforms (only if wallets found)
-    const walletFees = wallets.length > 0 ? await fetchAllFees(wallets) : [];
+    // Fetch wallet-based fees AND existing DB records in parallel (independent operations)
+    const [walletFees, existingFeesResult] = await Promise.all([
+      wallets.length > 0 ? fetchAllFees(wallets) : Promise.resolve([]),
+      creatorId
+        ? supabase
+            .from('fee_records')
+            .select('platform, chain, token_address, total_claimed, total_earned, total_unclaimed, total_earned_usd, token_symbol, royalty_bps')
+            .eq('creator_id', creatorId!)
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+    if (existingFeesResult.error) {
+      console.error('[creator] Failed to fetch existing fees for claimed-preservation:', existingFeesResult.error.message);
+    }
+    const existingFees = existingFeesResult.data;
 
     // Merge handle-based fees + wallet-based fees, dedup by platform+chain+tokenAddress.
-    // When both sources return a fee for the same token, take the MAX of each field
-    // across both sources. This ensures claimed data isn't lost when one source has
-    // better unclaimed data and the other has better claimed data.
     const feeMap = new Map<string, typeof handleFees[number]>();
     for (const fee of handleFees) {
       const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
@@ -268,10 +294,6 @@ async function freshResolve(
       if (!existing) {
         feeMap.set(key, fee);
       } else {
-        // Both sources report the same pool — keep the snapshot with higher totalEarned.
-        // Taking MAX of claimed/unclaimed independently would break the invariant
-        // totalEarned == totalClaimed + totalUnclaimed and could overcount.
-        // As a tiebreaker, prefer the source with claimed data (richer history).
         const feeEarned = safeBigInt(fee.totalEarned);
         const existingEarned = safeBigInt(existing.totalEarned);
         if (feeEarned > existingEarned ||
@@ -289,13 +311,6 @@ async function freshResolve(
 
     // Batch upsert fee records
     if (allFees.length > 0) {
-      // Fetch existing claimed data to prevent regressions.
-      // When computeClaimedAmounts is rate-limited it returns 0 for all positions,
-      // which would overwrite previously-computed non-zero claimed values.
-      const { data: existingFees } = await supabase
-        .from('fee_records')
-        .select('platform, chain, token_address, total_claimed, total_earned, total_unclaimed, total_earned_usd, token_symbol, royalty_bps')
-        .eq('creator_id', creatorId!);
       const existingClaimedMap = new Map<string, { claimed: string; earned: string }>();
       if (existingFees) {
         for (const ef of existingFees) {
@@ -339,7 +354,7 @@ async function freshResolve(
                 ? 'unclaimed' as const
                 : safeBigInt(totalEarned) > 0n
                   ? 'claimed' as const
-                  : 'unclaimed' as const,
+                  : 'claimed' as const, // zero earned+unclaimed = nothing to claim
           royalty_bps: fee.royaltyBps,
           last_synced_at: new Date().toISOString(),
         };

@@ -32,6 +32,7 @@ exports.toBigIntBE = toBigIntBE;
 
 function toBufferLE(num, width) {
   if (typeof num !== 'bigint') throw new TypeError('Expected BigInt');
+  if (num < 0n) throw new RangeError('BigInt must be non-negative');
   if (typeof width !== 'number' || width <= 0) throw new RangeError('Width must be positive integer');
   const hex = num.toString(16).padStart(width * 2, '0').slice(0, width * 2);
   const buffer = Buffer.from(hex, 'hex');
@@ -42,6 +43,7 @@ exports.toBufferLE = toBufferLE;
 
 function toBufferBE(num, width) {
   if (typeof num !== 'bigint') throw new TypeError('Expected BigInt');
+  if (num < 0n) throw new RangeError('BigInt must be non-negative');
   if (typeof width !== 'number' || width <= 0) throw new RangeError('Width must be positive integer');
   const hex = num.toString(16).padStart(width * 2, '0').slice(0, width * 2);
   return Buffer.from(hex, 'hex');

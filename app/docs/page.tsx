@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ScrollReveal } from '../components/ScrollReveal';
+import { LazySection } from '../components/LazySection';
 
 export const metadata: Metadata = {
   title: 'ClaimScan Docs: Architecture & Roadmap',
@@ -39,7 +39,7 @@ export default function DocsPage() {
     <article className="mx-auto w-full max-w-[720px] px-5 pb-24">
 
       {/* ═══ HEADER ═══ */}
-      <ScrollReveal>
+      <LazySection>
         <header className="pb-16 pt-8 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-foreground/[0.03] px-3.5 py-1.5">
             <span className="relative flex h-2 w-2">
@@ -58,10 +58,10 @@ export default function DocsPage() {
           </p>
           <div className="mx-auto mt-8 h-px w-12 bg-foreground/15" />
         </header>
-      </ScrollReveal>
+      </LazySection>
 
       {/* ═══ OVERVIEW ═══ */}
-      <ScrollReveal>
+      <LazySection rootMargin="300px 0px">
         <section className="glass rounded-2xl p-6 sm:p-8">
           <Label>Overview</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
@@ -89,10 +89,10 @@ export default function DocsPage() {
             ))}
           </div>
         </section>
-      </ScrollReveal>
+      </LazySection>
 
       {/* ═══ PLATFORMS ═══ */}
-      <ScrollReveal>
+      <LazySection rootMargin="250px 0px">
         <section className="mt-12">
           <Label>Supported Platforms</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
@@ -145,15 +145,15 @@ export default function DocsPage() {
                 ))}
               </div>
               <div className="mt-4 rounded-lg bg-foreground/[0.03] px-3 py-2 text-[10px] text-muted-foreground">
-                + Ethereum L1, Arbitrum coming in V2
+                + ETH L1 (Zora live) · Arbitrum coming in V2
               </div>
             </div>
           </div>
         </section>
-      </ScrollReveal>
+      </LazySection>
 
       {/* ═══ HOW IT WORKS ═══ */}
-      <ScrollReveal>
+      <LazySection>
         <section className="mt-16">
           <Label>How it works</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
@@ -164,10 +164,10 @@ export default function DocsPage() {
             {[
               { step: 'Enter a handle', desc: 'Twitter, Farcaster, GitHub username, or raw wallet address.' },
               { step: 'Identity resolution', desc: 'Social identity mapped to wallet addresses across both chains via Neynar and Twitter APIs.' },
-              { step: 'Parallel platform scan', desc: 'All 9 platforms queried simultaneously. Results stream via SSE as each completes.' },
+              { step: 'Parallel platform scan', desc: 'All 9 platforms queried simultaneously. Results update in real time as each completes.' },
               { step: 'Fee aggregation', desc: 'Earned, claimed, partially claimed, and unclaimed fees pulled per token. Duplicates filtered.' },
               { step: 'USD conversion', desc: 'Live prices from CoinGecko, DexScreener, and Jupiter. Updated every 5 minutes.' },
-              { step: 'Live dashboard', desc: 'Platform breakdown, chain breakdown, token-level details. Auto-refreshes every 30 seconds.' },
+              { step: 'Live dashboard', desc: 'Platform breakdown, chain breakdown, token-level details. Auto-refreshes every 30 seconds via polling.' },
             ].map((s, i) => (
               <li key={i} className="relative mb-8 last:mb-0 pl-7">
                 <span className="absolute -left-3.5 top-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-foreground text-[11px] font-bold tabular-nums text-background">
@@ -185,10 +185,10 @@ export default function DocsPage() {
             All scanning is read-only. No wallet connection required. No signatures. No transaction risk.
           </div>
         </section>
-      </ScrollReveal>
+      </LazySection>
 
       {/* ═══ CLAIMING ═══ */}
-      <ScrollReveal>
+      <LazySection>
         <section className="mt-16">
           <Label>Claim Flow</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
@@ -232,10 +232,10 @@ export default function DocsPage() {
             ))}
           </div>
         </section>
-      </ScrollReveal>
+      </LazySection>
 
       {/* ═══ ARCHITECTURE ═══ */}
-      <ScrollReveal>
+      <LazySection>
         <section className="mt-16">
           <Label>Architecture</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
@@ -288,7 +288,7 @@ resolution   addresses     & USD values`}
           <div className="mt-6 space-y-4">
             {[
               { area: 'Streaming', items: [
-                ['SSE streaming', 'Each platform result streams to the client as it completes. No waiting for the full scan.'],
+                ['Real-time updates', 'Platform results delivered as they complete. SSE streaming on Pro plan; smart polling with 30s intervals on Hobby.'],
                 ['AbortSignal propagation', 'Every HTTP/RPC call carries an AbortSignal. Navigate away mid-scan and all in-flight requests cancel instantly.'],
               ]},
               { area: 'Performance', items: [
@@ -341,10 +341,10 @@ resolution   addresses     & USD values`}
             ))}
           </div>
         </section>
-      </ScrollReveal>
+      </LazySection>
 
       {/* ═══ SECURITY ═══ */}
-      <ScrollReveal>
+      <LazySection>
         <section className="mt-16">
           <div className="rounded-2xl bg-foreground p-6 sm:p-8">
             <Label><span className="text-background/40">Security &amp; Privacy</span></Label>
@@ -373,10 +373,10 @@ resolution   addresses     & USD values`}
             </div>
           </div>
         </section>
-      </ScrollReveal>
+      </LazySection>
 
       {/* ═══ ROADMAP ═══ */}
-      <ScrollReveal>
+      <LazySection>
         <section className="mt-16">
           <Label>Roadmap</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
@@ -400,7 +400,7 @@ resolution   addresses     & USD values`}
                     {[
                       '9 platform support (Solana + Base)',
                       'Multi-identity search (Twitter, GitHub, Farcaster, Wallet)',
-                      'SSE streaming with per-platform progress',
+                      'Real-time updates (SSE on Pro, polling on Hobby)',
                       'Signal Lock loading animation with radar-style scan UX',
                       'Vercel Hobby optimization (10s serverless limit)',
                       'AbortSignal propagation across all adapters',
@@ -449,7 +449,7 @@ resolution   addresses     & USD values`}
                       'Tri-state claim status (claimed, partial, unclaimed)',
                       'Telegram Bot (paste CA in groups/DMs for instant fee data)',
                       'One-click claim expansion (Bags.fm live, Clanker & Zora next)',
-                      'Additional chain support (Ethereum L1, Arbitrum)',
+                      'Additional chain support (full Ethereum L1, Arbitrum)',
                     ].map((item) => (
                       <div key={item} className="flex items-start gap-2.5 text-[12px] text-muted-foreground">
                         <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/15" />
@@ -486,10 +486,10 @@ resolution   addresses     & USD values`}
             </div>
           </div>
         </section>
-      </ScrollReveal>
+      </LazySection>
 
       {/* ═══ WHITEPAPER ═══ */}
-      <ScrollReveal>
+      <LazySection>
         <section className="mt-16 flex items-center justify-between rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.06)]">
           <div>
             <Label>Reference</Label>
@@ -506,10 +506,10 @@ resolution   addresses     & USD values`}
             Download PDF
           </a>
         </section>
-      </ScrollReveal>
+      </LazySection>
 
       {/* ═══ TEAM ═══ */}
-      <ScrollReveal>
+      <LazySection>
         <section className="mt-16">
           <Label>Team</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
@@ -553,10 +553,10 @@ resolution   addresses     & USD values`}
             ))}
           </div>
         </section>
-      </ScrollReveal>
+      </LazySection>
 
       {/* ═══ CTA ═══ */}
-      <ScrollReveal>
+      <LazySection>
         <section className="mt-20 rounded-2xl bg-foreground py-14 text-center">
           <h2 className="text-xl font-bold tracking-tight text-background sm:text-2xl">
             Ready to find your money?
@@ -571,7 +571,7 @@ resolution   addresses     & USD values`}
             Scan Now <span aria-hidden="true">&rarr;</span>
           </Link>
         </section>
-      </ScrollReveal>
+      </LazySection>
     </article>
   );
 }

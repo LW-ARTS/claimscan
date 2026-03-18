@@ -35,22 +35,28 @@ export async function GET(request: Request) {
       .delete({ count: 'exact' })
       .lt('searched_at', thirtyDaysAgo);
 
-    // Clean orphaned creators — batch delete instead of N+1
+    // Clean orphaned creators — find creators with no wallets, then verify no fee_records
     let creatorsDeleted = 0;
-    const { data: allCreators } = await supabase
+    const { data: noWalletCreators } = await supabase
       .from('creators')
-      .select('id, wallets(id), fee_records(id)')
+      .select('id, wallets!left(id)')
+      .is('wallets.id', null)
       .order('created_at', { ascending: true })
-      .limit(200);
+      .limit(100);
 
-    if (allCreators) {
-      const orphanIds = allCreators
-        .filter((c) => {
-          const hasWallets = Array.isArray(c.wallets) && c.wallets.length > 0;
-          const hasFees = Array.isArray(c.fee_records) && c.fee_records.length > 0;
-          return !hasWallets && !hasFees;
-        })
-        .map((c) => c.id);
+    if (noWalletCreators && noWalletCreators.length > 0) {
+      const candidateIds = noWalletCreators.map((c) => c.id);
+
+      // Check which candidates actually have wallets or fee_records
+      const [{ data: withWallets }, { data: withFees }] = await Promise.all([
+        supabase.from('wallets').select('creator_id').in('creator_id', candidateIds),
+        supabase.from('fee_records').select('creator_id').in('creator_id', candidateIds),
+      ]);
+      const hasData = new Set([
+        ...(withWallets ?? []).map((w) => w.creator_id),
+        ...(withFees ?? []).map((f) => f.creator_id),
+      ]);
+      const orphanIds = candidateIds.filter((id) => !hasData.has(id));
 
       if (orphanIds.length > 0) {
         const { count } = await supabase
@@ -83,6 +89,15 @@ export async function GET(request: Request) {
       .eq('status', 'submitted')
       .lt('updated_at', twoMinAgo);
 
+    // Delete terminal claim_attempts older than 30 days
+    const { count: claimsTerminalDeleted } = await supabase
+      .from('claim_attempts')
+      .delete({ count: 'exact' })
+      .in('status', ['confirmed', 'finalized', 'failed', 'expired'])
+      .lt('created_at', thirtyDaysAgo);
+
+    // NOTE: notification_log cleanup handled by the bot's own cron (bot table, not in webapp TS types)
+
     // Clean stale token_prices (not updated in 7 days)
     const sevenDaysAgo = new Date(
       Date.now() - 7 * 24 * 60 * 60 * 1000
@@ -97,7 +112,8 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     let tokensUpdated = 0;
 
-    if (url.searchParams.get('also') === 'prices' && Date.now() - wallclockStart < 4_000) {
+    const elapsed = Date.now() - wallclockStart;
+    if (url.searchParams.get('also') === 'prices' && elapsed < 6_000) {
       try {
         // Budget remaining time for price fetch (leave 1s buffer for DB writes)
         const priceTimeout = Math.max(1000, 9_000 - (Date.now() - wallclockStart));
@@ -174,6 +190,8 @@ export async function GET(request: Request) {
       pricesDeleted: pricesDeleted ?? 0,
       claimsPending: claimsPending ?? 0,
       claimsExpired: claimsExpired ?? 0,
+      claimsTerminalDeleted: claimsTerminalDeleted ?? 0,
+      // notificationsDeleted handled by bot cron
       tokensUpdated,
       durationMs: Date.now() - wallclockStart,
     });

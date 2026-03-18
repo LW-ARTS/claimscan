@@ -52,13 +52,16 @@ export function LazySection({
   return (
     <div
       ref={ref}
-      className={className}
+      className={`lazy-section-fallback ${className ?? ''}`.trim()}
       style={{
         opacity: animated ? 1 : 0,
         transform: animated ? 'translateY(0)' : 'translateY(12px)',
         transition: 'opacity 0.4s ease-out, transform 0.4s ease-out',
       }}
     >
+      <noscript>
+        <style>{`.lazy-section-fallback { opacity: 1 !important; transform: none !important; }`}</style>
+      </noscript>
       {children}
     </div>
   );

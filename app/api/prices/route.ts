@@ -4,6 +4,9 @@ import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress } from '@/lib/chains/base';
 import { VALID_CHAINS } from '@/lib/utils';
 
+/** Cache native prices for 5 minutes via Next.js ISR. */
+export const revalidate = 300;
+
 /**
  * Validate that a token address looks legitimate for its chain.
  */

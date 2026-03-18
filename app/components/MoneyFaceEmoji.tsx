@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
@@ -14,13 +14,27 @@ export default function MoneyFaceEmoji({ className = '', size = 64 }: MoneyFaceE
   const [animationData, setAnimationData] = useState<object | null>(null);
 
   useEffect(() => {
-    fetch('/animations/money_mouth_face.json')
+    let ignore = false;
+    const controller = new AbortController();
+
+    fetch('/animations/money_mouth_face.json', { signal: controller.signal })
       .then((res) => res.json())
-      .then(setAnimationData)
-      .catch(() => {});
+      .then((data) => {
+        if (!ignore) setAnimationData(data);
+      })
+      .catch(() => {
+        // Silently fail - emoji is decorative
+      });
+
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
   }, []);
 
-  if (!animationData) return <div style={{ width: size, height: size }} />;
+  if (!animationData) {
+    return <div className={className} style={{ width: size, height: size }} />;
+  }
 
   return (
     <div className={className} style={{ width: size, height: size }}>

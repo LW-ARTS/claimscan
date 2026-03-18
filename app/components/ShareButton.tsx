@@ -53,7 +53,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
     if (saving) return;
     setSaving(true);
     try {
-      const res = await fetch(ogUrl);
+      const res = await fetch(ogUrl, { signal: AbortSignal.timeout(15_000) });
       if (!res.ok) throw new Error('Failed to fetch OG image');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

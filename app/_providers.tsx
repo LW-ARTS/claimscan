@@ -23,10 +23,14 @@ export function Providers({ children }: { children: ReactNode }) {
   }, []);
 
   const endpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
-  if (!endpoint) {
-    // Fail explicitly instead of falling back to rate-limited public RPC
-    console.error('[Providers] NEXT_PUBLIC_SOLANA_RPC_URL is not configured');
-  }
+
+  useEffect(() => {
+    if (!endpoint) {
+      console.error('[Providers] NEXT_PUBLIC_SOLANA_RPC_URL is not configured');
+    } else if (/[?&](api[-_]?key|apikey)=/i.test(endpoint)) {
+      console.warn('[Providers] NEXT_PUBLIC_SOLANA_RPC_URL appears to contain an API key visible to browsers.');
+    }
+  }, [endpoint]);
 
   const rpcUrl = useMemo(
     () => endpoint || 'https://api.mainnet-beta.solana.com',

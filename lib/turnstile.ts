@@ -12,8 +12,15 @@ interface TurnstileResult {
 export async function verifyTurnstile(token: string | null, ip: string | null): Promise<TurnstileResult> {
   const secret = process.env.TURNSTILE_SECRET_KEY;
 
-  // If Turnstile is not configured, skip verification (opt-in feature)
-  if (!secret) return { success: true };
+  // If Turnstile is not configured: permissive ONLY in local dev, fail-closed everywhere else
+  // (prevents staging/preview deployments from accidentally running without captcha)
+  if (!secret) {
+    if (process.env.NODE_ENV === 'development') {
+      return { success: true };
+    }
+    console.error('[turnstile] TURNSTILE_SECRET_KEY not configured — failing closed');
+    return { success: false, error: 'Captcha not configured' };
+  }
 
   if (!token) return { success: false, error: 'Missing captcha token' };
 
@@ -30,8 +37,7 @@ export async function verifyTurnstile(token: string | null, ip: string | null): 
 
     if (!res.ok) {
       console.error('[turnstile] Verify endpoint returned', res.status);
-      // Fail open on Cloudflare outages to avoid blocking all users
-      return { success: true };
+      return { success: false, error: 'Captcha service unavailable' };
     }
 
     const data = await res.json();
@@ -42,7 +48,6 @@ export async function verifyTurnstile(token: string | null, ip: string | null): 
     return { success: true };
   } catch (err) {
     console.error('[turnstile] Verification error:', err instanceof Error ? err.message : err);
-    // Fail open on network errors
-    return { success: true };
+    return { success: false, error: 'Captcha verification unavailable' };
   }
 }

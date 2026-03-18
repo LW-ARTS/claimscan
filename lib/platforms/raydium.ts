@@ -2,7 +2,6 @@ import 'server-only';
 import { PublicKey } from '@solana/web3.js';
 import { RAYDIUM_LAUNCHLAB_API, RAYDIUM_LAUNCHLAB_PROGRAM_ID } from '@/lib/constants';
 import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
-import { fetchVaultClaimTotal } from '@/lib/helius/transactions';
 import { sanitizeTokenName, sanitizeTokenSymbol } from '@/lib/utils';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type {
@@ -13,24 +12,10 @@ import type {
   ClaimEvent,
 } from './types';
 
-// ═══════════════════════════════════════════════
-// Raydium LaunchLab Adapter
-//
-// Uses the Raydium LaunchLab REST API for token
-// discovery and onchain PDA for unclaimed fees.
-//
-// Program: LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj
-// Fee vault PDA: ["platform_fee_sol_vault", creator]
-// ═══════════════════════════════════════════════
-
 const RAYDIUM_LAUNCHLAB_PROGRAM = new PublicKey(RAYDIUM_LAUNCHLAB_PROGRAM_ID);
 
-/** Rent-exempt minimum for a 0-byte account. */
-const RENT_EXEMPT_MINIMUM = 890_880n;
-
-// ═══════════════════════════════════════════════
-// API Types
-// ═══════════════════════════════════════════════
+/** WSOL mint — Raydium LaunchLab uses WSOL as quote token (mintB). */
+const WSOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
 
 interface LaunchLabToken {
   mint?: string;
@@ -49,24 +34,21 @@ interface LaunchLabResponse {
   };
 }
 
-// ═══════════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════════
-
 /**
- * Derive the creator fee vault PDA for Raydium LaunchLab.
- * Seeds: ["platform_fee_sol_vault", creator_pubkey]
+ * Derive the per-token creator fee vault PDA.
+ * Seeds: [creator, mintB] — each token has its own fee vault per creator.
+ * mintB is the quote token (WSOL for LaunchLab tokens).
  */
-function deriveCreatorVault(creator: PublicKey): [PublicKey, number] {
+function deriveCreatorVault(
+  creator: PublicKey,
+  mintB: PublicKey = WSOL_MINT
+): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from('platform_fee_sol_vault'), creator.toBuffer()],
+    [creator.toBuffer(), mintB.toBuffer()],
     RAYDIUM_LAUNCHLAB_PROGRAM
   );
 }
 
-/**
- * Fetch tokens created by a wallet from Raydium LaunchLab API.
- */
 async function fetchCreatorTokens(
   wallet: string,
   externalSignal?: AbortSignal
@@ -94,16 +76,13 @@ async function fetchCreatorTokens(
   }
 }
 
-// ═══════════════════════════════════════════════
-// Raydium LaunchLab Adapter
-// ═══════════════════════════════════════════════
-
 export const raydiumAdapter: PlatformAdapter = {
   platform: 'raydium',
   chain: 'sol',
   supportsIdentityResolution: false,
   supportsLiveFees: true,
   supportsHandleBasedFees: false,
+  historicalCoversLive: true,
 
   async resolveIdentity(
     _handle: string,
@@ -130,16 +109,12 @@ export const raydiumAdapter: PlatformAdapter = {
         imageUrl: (t.imageUri ?? t.image ?? '').startsWith('https://') ? (t.imageUri ?? t.image ?? null) : null,
       })).filter((t) => t.tokenAddress.length > 0);
     } catch (err) {
-      console.warn(
-        '[raydium] getCreatorTokens failed:',
-        err instanceof Error ? err.message : err
-      );
+      console.warn('[raydium] getCreatorTokens failed:', err instanceof Error ? err.message : err);
       return [];
     }
   },
 
   async getHistoricalFees(wallet: string): Promise<TokenFee[]> {
-    // Same as live — onchain vault is the source of truth
     return this.getLiveUnclaimedFees(wallet);
   },
 
@@ -148,37 +123,46 @@ export const raydiumAdapter: PlatformAdapter = {
 
     try {
       const creatorPk = new PublicKey(wallet);
-      const [vault] = deriveCreatorVault(creatorPk);
-      const vaultAddr = vault.toBase58();
 
-      // Fetch unclaimed balance + claimed total in parallel
-      const [balanceResult, claimedResult] = await Promise.allSettled([
-        withRpcFallback((c) => c.getBalance(vault), 'raydium-vault-balance', signal),
-        fetchVaultClaimTotal(vaultAddr, signal),
-      ]);
+      // Discover tokens first, then check per-token vaults
+      const tokens = await fetchCreatorTokens(wallet, signal);
+      if (tokens.length === 0) return [];
 
-      const balance = balanceResult.status === 'fulfilled' ? BigInt(balanceResult.value) : 0n;
-      const unclaimed = balance > RENT_EXEMPT_MINIMUM ? balance - RENT_EXEMPT_MINIMUM : 0n;
-      const claimed = claimedResult.status === 'fulfilled' ? claimedResult.value : 0n;
+      // LaunchLab vault PDA is [creator, WSOL_MINT] — one vault per creator
+      // (all LaunchLab tokens use WSOL as quote). Query ONCE, report once.
+      const [vault] = deriveCreatorVault(creatorPk, WSOL_MINT);
+      const balance = await withRpcFallback(
+        (c) => c.getBalance(vault),
+        `raydium-vault-${wallet.slice(0, 8)}`,
+        signal
+      );
+      // Vault balance includes rent-exempt minimum (890,880 lamports)
+      const RENT_EXEMPT_MINIMUM = 890_880n;
+      const rawBalance = BigInt(balance);
+      const unclaimed = rawBalance > RENT_EXEMPT_MINIMUM ? rawBalance - RENT_EXEMPT_MINIMUM : 0n;
 
-      if (unclaimed === 0n && claimed === 0n) return [];
+      if (unclaimed <= 0n) return [];
+
+      // Attribute to the first token that has a valid mint address
+      const firstToken = tokens.find((t) => t.mint || t.tokenMint);
+      const firstMint = firstToken?.mint ?? firstToken?.tokenMint ?? wallet;
 
       return [{
-        tokenAddress: `SOL:raydium:${vaultAddr}`,
-        tokenSymbol: 'SOL',
+        tokenAddress: firstMint,
+        tokenSymbol: sanitizeTokenSymbol(firstToken?.symbol) || 'SOL',
         chain: 'sol',
         platform: 'raydium',
-        totalEarned: (unclaimed + claimed).toString(),
-        totalClaimed: claimed.toString(),
+        // totalEarned = unclaimed since claimed tracking was removed
+        // (fetchVaultClaimTotal was unreliable). MAX preservation in
+        // creator.ts ensures existing claimed values are never regressed.
+        totalEarned: unclaimed.toString(),
+        totalClaimed: '0',
         totalUnclaimed: unclaimed.toString(),
         totalEarnedUsd: null,
         royaltyBps: null,
       }];
     } catch (err) {
-      console.warn(
-        '[raydium] getLiveUnclaimedFees failed:',
-        err instanceof Error ? err.message : err
-      );
+      console.warn('[raydium] getLiveUnclaimedFees failed:', err instanceof Error ? err.message : err);
       return [];
     }
   },

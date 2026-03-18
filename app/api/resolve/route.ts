@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { parseSearchQuery, resolveWallets } from '@/lib/resolve/identity';
 
+export const maxDuration = 10;
+
 export async function POST(request: Request) {
   const contentType = request.headers.get('content-type') ?? '';
   if (!contentType.includes('application/json')) {

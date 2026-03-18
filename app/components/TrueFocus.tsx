@@ -1,7 +1,20 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { motion } from 'motion/react';
+
+// useSyncExternalStore for prefers-reduced-motion (per React docs pattern #13)
+function subscribePrefersReducedMotion(callback: () => void) {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    mq.addEventListener('change', callback);
+    return () => mq.removeEventListener('change', callback);
+}
+function getReducedMotionSnapshot() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+function getReducedMotionServerSnapshot() {
+    return false;
+}
 
 interface TrueFocusProps {
     sentence?: string;
@@ -34,6 +47,11 @@ const TrueFocus: React.FC<TrueFocusProps> = ({
     className = '',
 }) => {
     const words = sentence.split(separator);
+    const prefersReducedMotion = useSyncExternalStore(
+        subscribePrefersReducedMotion,
+        getReducedMotionSnapshot,
+        getReducedMotionServerSnapshot,
+    );
     const [currentIndex, setCurrentIndex] = useState<number>(0);
     const [lastActiveIndex, setLastActiveIndex] = useState<number | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -53,12 +71,14 @@ const TrueFocus: React.FC<TrueFocusProps> = ({
         }
     }, [manualMode, animationDuration, pauseBetweenAnimations, words.length]);
 
-    useEffect(() => {
+    // useLayoutEffect: measure DOM synchronously before paint to avoid bracket flash
+    useLayoutEffect(() => {
         if (currentIndex === null || currentIndex === -1) return;
-        if (!wordRefs.current[currentIndex] || !containerRef.current) return;
+        const activeEl = wordRefs.current[currentIndex];
+        if (!activeEl || !containerRef.current) return;
 
         const parentRect = containerRef.current.getBoundingClientRect();
-        const activeRect = wordRefs.current[currentIndex]!.getBoundingClientRect();
+        const activeRect = activeEl.getBoundingClientRect();
 
         setFocusRect({
             x: activeRect.left - parentRect.left,
@@ -76,8 +96,8 @@ const TrueFocus: React.FC<TrueFocusProps> = ({
     };
 
     const handleMouseLeave = () => {
-        if (manualMode) {
-            setCurrentIndex(lastActiveIndex!);
+        if (manualMode && lastActiveIndex !== null) {
+            setCurrentIndex(lastActiveIndex);
         }
     };
 
@@ -98,14 +118,10 @@ const TrueFocus: React.FC<TrueFocusProps> = ({
                         className="relative cursor-pointer"
                         style={
                             {
-                                filter: manualMode
-                                    ? isActive
-                                        ? `blur(0px)`
-                                        : `blur(${blurAmount}px)`
-                                    : isActive
-                                        ? `blur(0px)`
-                                        : `blur(${blurAmount}px)`,
-                                transition: `filter ${animationDuration}s ease`,
+                                filter: prefersReducedMotion
+                                    ? 'none'
+                                    : isActive ? 'blur(0px)' : `blur(${blurAmount}px)`,
+                                transition: prefersReducedMotion ? 'none' : `filter ${animationDuration}s ease`,
                                 outline: 'none',
                                 userSelect: 'none'
                             } as React.CSSProperties
@@ -118,7 +134,7 @@ const TrueFocus: React.FC<TrueFocusProps> = ({
                 );
             })}
 
-            <motion.div
+            {!prefersReducedMotion && <motion.div
                 className="absolute top-0 left-0 pointer-events-none box-border border-0"
                 animate={{
                     x: focusRect.x,
@@ -165,7 +181,7 @@ const TrueFocus: React.FC<TrueFocusProps> = ({
                         filter: 'drop-shadow(0 0 4px var(--glow-color))'
                     }}
                 ></span>
-            </motion.div>
+            </motion.div>}
         </div>
     );
 };

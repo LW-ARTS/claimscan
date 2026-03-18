@@ -104,7 +104,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                     onClick={() => handleCopy(fee.id, fee.token_address!)}
                     aria-label={copiedId === fee.id ? 'Copied' : 'Copy contract address'}
                     title="Copy contract address"
-                    className="inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground/40 transition-all hover:text-foreground active:scale-90"
+                    className="inline-flex items-center justify-center rounded p-3 -m-1.5 text-muted-foreground/60 transition-all hover:text-foreground active:scale-90"
                   >
                     {copiedId === fee.id ? (
                       <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -141,6 +141,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
             {connectedWallet && onClaimToken && fee.platform === 'bags' && fee.claim_status !== 'claimed' && safeBigInt(fee.total_unclaimed) > 0n && (
               <button
                 onClick={() => onClaimToken(fee.token_address)}
+                aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
                 className="mt-3 w-full rounded-lg bg-foreground py-2 text-xs font-semibold text-background transition-all hover:opacity-90 active:scale-[0.98]"
               >
                 Claim
@@ -209,7 +210,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                           onClick={() => handleCopy(fee.id, fee.token_address!)}
                           aria-label={copiedId === fee.id ? 'Copied' : 'Copy contract address'}
                     title="Copy contract address"
-                          className="inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground/40 transition-all hover:text-foreground active:scale-90"
+                          className="inline-flex items-center justify-center rounded p-3 -m-1.5 text-muted-foreground/60 transition-all hover:text-foreground active:scale-90"
                         >
                           {copiedId === fee.id ? (
                             <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -246,6 +247,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                       {fee.platform === 'bags' && fee.claim_status !== 'claimed' && safeBigInt(fee.total_unclaimed) > 0n && (
                         <button
                           onClick={() => onClaimToken(fee.token_address)}
+                          aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
                           className="rounded-md bg-foreground px-2.5 py-1 text-[11px] font-medium text-background transition-all hover:opacity-90 active:scale-95"
                         >
                           Claim

@@ -53,8 +53,14 @@ export async function verifyRequestSignature(
 ): Promise<boolean> {
   const key = process.env.NEXT_PUBLIC_API_SIGN_KEY;
 
-  // If signing is not configured, skip verification (opt-in)
-  if (!key) return true;
+  // If signing is not configured: fail-closed in production, permissive in dev
+  if (!key) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[request-signing] NEXT_PUBLIC_API_SIGN_KEY not configured in production');
+      return false;
+    }
+    return true;
+  }
 
   // If configured but no signature provided, reject
   if (!sig) return false;

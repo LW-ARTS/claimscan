@@ -26,6 +26,7 @@ export const zoraAdapter: PlatformAdapter = {
   supportsIdentityResolution: false,
   supportsLiveFees: true,
   supportsHandleBasedFees: false,
+  historicalCoversLive: false,
 
   async resolveIdentity(
     _handle: string,

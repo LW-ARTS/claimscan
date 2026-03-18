@@ -69,6 +69,7 @@ export const revshareAdapter: PlatformAdapter = {
   supportsIdentityResolution: false,
   supportsLiveFees: true,
   supportsHandleBasedFees: false,
+  historicalCoversLive: false,
 
   async resolveIdentity(
     _handle: string,

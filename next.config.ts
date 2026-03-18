@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   experimental: {
     viewTransition: true,
   },
-  serverExternalPackages: ['@solana/web3.js', 'viem'],
+  serverExternalPackages: ['@solana/web3.js', 'viem', '@meteora-ag/dynamic-bonding-curve-sdk'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'pbs.twimg.com' },
@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
       { protocol: 'https', hostname: 'imagedelivery.net' },
       { protocol: 'https', hostname: 'ipfs.io' },
+      { protocol: 'https', hostname: 'unavatar.io' },
     ],
   },
 };
