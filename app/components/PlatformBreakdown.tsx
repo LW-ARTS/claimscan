@@ -217,21 +217,21 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
               {chainSummaries.map((chain) => (
                 <div key={chain.chain} className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-black" aria-hidden="true" />
-                  <span className="text-sm font-medium text-black" style={{ fontFamily: 'var(--font-sans)' }}>{chain.name}</span>
-                  <span className="text-sm font-bold tabular-nums text-black" style={{ fontFamily: 'var(--font-sans)' }}>{formatUsd(chain.totalUsd)}</span>
+                  <span className="text-sm font-medium text-black">{chain.name}</span>
+                  <span className="text-sm font-bold tabular-nums text-black">{formatUsd(chain.totalUsd)}</span>
                 </div>
               ))}
             </div>
             {(totalUnclaimed > 0 || totalPartial > 0) && (
               <div className="flex items-center gap-3">
                 {totalUnclaimed > 0 && (
-                  <span className="inline-flex items-center gap-1.5 bg-[#f5f5f5] px-3 py-1.5 text-xs font-medium text-black" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <span className="inline-flex items-center gap-1.5 bg-[#f5f5f5] px-3 py-1.5 font-mono text-xs font-medium text-black">
                     <span className="h-1.5 w-1.5 rounded-full bg-black" />
                     {totalUnclaimed} unclaimed
                   </span>
                 )}
                 {totalPartial > 0 && (
-                  <span className="inline-flex items-center gap-1.5 bg-[#f5f5f5] px-3 py-1.5 text-xs font-medium text-[#777]" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <span className="inline-flex items-center gap-1.5 bg-[#f5f5f5] px-3 py-1.5 font-mono text-xs font-medium text-[#777]">
                     <span className="h-1.5 w-1.5 rounded-full bg-[#777]" />
                     {totalPartial} partial
                   </span>
@@ -260,10 +260,9 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
                 ? 'bg-black text-white'
                 : 'border border-[#ddd] text-black hover:bg-[#f5f5f5]'
             }`}
-            style={{ fontFamily: 'var(--font-sans)' }}
           >
             All
-            <span className={`text-xs tabular-nums ${activeTab === 'all' ? 'text-white/60' : 'text-[#777]'}`} style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className={`font-mono text-xs tabular-nums ${activeTab === 'all' ? 'text-white/60' : 'text-[#777]'}`}>
               {displayFees.length}
             </span>
           </button>
@@ -284,11 +283,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
                     ? 'bg-black text-white'
                     : 'border border-[#ddd] text-black hover:bg-[#f5f5f5]'
                 }`}
-                style={{ fontFamily: 'var(--font-sans)' }}
               >
                 <PlatformIcon platform={platform} className="h-3.5 w-3.5" aria-hidden />
                 <span>{config?.name ?? platform}</span>
-                <span className={`text-xs tabular-nums ${activeTab === platform ? 'text-white/60' : 'text-[#777]'}`} style={{ fontFamily: 'var(--font-mono)' }}>
+                <span className={`font-mono text-xs tabular-nums ${activeTab === platform ? 'text-white/60' : 'text-[#777]'}`}>
                   {count}
                 </span>
               </button>
@@ -344,10 +342,9 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
                   ? 'bg-black text-white'
                   : 'text-[#777] hover:text-black'
               }`}
-              style={{ fontFamily: 'var(--font-sans)' }}
             >
               {status}
-              <span className={`text-xs tabular-nums ${isActive ? 'text-white/60' : 'text-[#999]'}`} style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className={`font-mono text-xs tabular-nums ${isActive ? 'text-white/60' : 'text-[#999]'}`}>
                 {count}
               </span>
             </button>
@@ -366,7 +363,6 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
             <button
               onClick={handleClaimAllBags}
               className="flex h-12 w-full cursor-pointer items-center justify-center bg-black text-sm font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-black/90 active:scale-[0.99]"
-              style={{ fontFamily: 'var(--font-sans)' }}
             >
               CLAIM ALL UNCLAIMED ({bagsUnclaimed.length} BAGS TOKEN{bagsUnclaimed.length !== 1 ? 'S' : ''})
             </button>
