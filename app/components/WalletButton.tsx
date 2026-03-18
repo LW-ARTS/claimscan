@@ -81,7 +81,7 @@ function WalletButtonInner() {
       <button
         onClick={() => setVisible(true)}
         disabled={connecting}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:border-foreground/20 hover:text-foreground disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:border-foreground/20 hover:text-foreground hover:shadow-[0_0_12px_rgba(255,255,255,0.06)] hover:-translate-y-px active:scale-[0.97] active:shadow-none disabled:opacity-50 disabled:hover:translate-y-0 disabled:active:scale-100"
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 9m18 0V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3" />
@@ -101,7 +101,7 @@ function WalletButtonInner() {
         onClick={() => setShowMenu((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={showMenu}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:border-foreground/20 hover:text-foreground"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:border-foreground/20 hover:text-foreground hover:shadow-[0_0_12px_rgba(255,255,255,0.06)] hover:-translate-y-px active:scale-[0.97] active:shadow-none"
       >
         <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
           <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 motion-safe:animate-ping" />
@@ -113,47 +113,45 @@ function WalletButtonInner() {
         </svg>
       </button>
 
-      {showMenu && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-50 mt-1.5 w-48 rounded-xl border border-border bg-card shadow-lg"
-          onKeyDown={(e) => {
-            const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
-            if (!items?.length) return;
-            const idx = Array.from(items).indexOf(e.target as HTMLButtonElement);
-            if (e.key === 'ArrowDown') { e.preventDefault(); items[(idx + 1) % items.length].focus(); }
-            if (e.key === 'ArrowUp') { e.preventDefault(); items[(idx - 1 + items.length) % items.length].focus(); }
-          }}
+      <div
+        role="menu"
+        className={`absolute right-0 top-full z-50 mt-1.5 w-48 rounded-xl border border-border bg-card shadow-lg transition-all duration-200 origin-top-right ${showMenu ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'}`}
+        onKeyDown={(e) => {
+          const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+          if (!items?.length) return;
+          const idx = Array.from(items).indexOf(e.target as HTMLButtonElement);
+          if (e.key === 'ArrowDown') { e.preventDefault(); items[(idx + 1) % items.length].focus(); }
+          if (e.key === 'ArrowUp') { e.preventDefault(); items[(idx - 1 + items.length) % items.length].focus(); }
+        }}
+      >
+        <button
+          ref={firstItemRef}
+          role="menuitem"
+          onClick={handleCopy}
+          className="flex w-full items-center gap-2 rounded-t-xl px-3 py-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <button
-            ref={firstItemRef}
-            role="menuitem"
-            onClick={handleCopy}
-            className="flex w-full items-center gap-2 rounded-t-xl px-3 py-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            {copied ? (
-              <>
-                <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                Copied!
-              </>
-            ) : (
-              <>
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
-                Copy Address
-              </>
-            )}
-          </button>
-          <div className="h-px bg-border" />
-          <button
-            role="menuitem"
-            onClick={handleDisconnect}
-            className="flex w-full items-center gap-2 rounded-b-xl px-3 py-2.5 text-xs text-red-400 transition-colors hover:bg-muted"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
-            Disconnect
-          </button>
-        </div>
-      )}
+          {copied ? (
+            <>
+              <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+              Copied!
+            </>
+          ) : (
+            <>
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
+              Copy Address
+            </>
+          )}
+        </button>
+        <div className="h-px bg-border" />
+        <button
+          role="menuitem"
+          onClick={handleDisconnect}
+          className="flex w-full items-center gap-2 rounded-b-xl px-3 py-2.5 text-xs text-red-400 transition-colors hover:bg-muted"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
+          Disconnect
+        </button>
+      </div>
     </div>
   );
 }
