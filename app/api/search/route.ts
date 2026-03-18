@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { resolveAndPersistCreator } from '@/lib/services/creator';
 import { verifyTurnstile } from '@/lib/turnstile';
 
-export const maxDuration = 10;
-
 export async function POST(request: Request) {
   const contentType = request.headers.get('content-type') ?? '';
   if (!contentType.includes('application/json')) {

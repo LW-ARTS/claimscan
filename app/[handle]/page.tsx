@@ -1,7 +1,3 @@
-// Vercel Hobby limit: 10s. Large creators use cached data from cron;
-// first-visit resolution is capped to fit within this budget.
-export const maxDuration = 10;
-
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import dynamic from 'next/dynamic';
