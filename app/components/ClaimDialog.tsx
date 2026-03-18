@@ -102,8 +102,10 @@ export function ClaimDialog({
   const feeSol = Number(feeLamports * 1000n / 1_000_000_000n) / 1000;
   const feeUsd = feeSol * solPrice;
 
-  // Estimated gas (~0.005 SOL per tx + fee tx if applicable)
-  const estimatedGas = (fees.length + (feeApplied ? 1 : 0)) * 0.005;
+  // Estimated gas: ~0.000005 SOL base fee per tx + ~0.0001 SOL priority fee buffer
+  // Bags claim txs are simple (no CU-heavy compute), so priority fees are minimal
+  const txCount = fees.length + (feeApplied ? 1 : 0);
+  const estimatedGas = txCount * 0.00015;
   const hasInsufficientSol = solBalance !== null && solBalance < estimatedGas;
 
   // Trigger onClaimComplete exactly once when claim finishes
@@ -266,9 +268,15 @@ export function ClaimDialog({
               <button
                 onClick={handleClaim}
                 disabled={phase !== 'idle' || hasInsufficientSol || !!bagsWalletMismatch}
-                className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="group relative w-full overflow-hidden rounded-xl bg-foreground px-6 py-3.5 text-sm font-bold uppercase tracking-wider text-background transition-all duration-200 hover:shadow-[0_0_20px_rgba(0,0,0,0.15)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
               >
-                Claim {fees.length} Token{fees.length !== 1 ? 's' : ''}
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
+                  </svg>
+                  Claim {fees.length} Token{fees.length !== 1 ? 's' : ''}
+                </span>
+                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-background/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
               </button>
             </>
           )}
