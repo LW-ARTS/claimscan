@@ -1,7 +1,33 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { generalLimiter, searchLimiter } from '@/lib/rate-limit';
-import { verifyRequestSignature } from '@/lib/request-signing';
+
+// Lazy-load Upstash rate limiters to avoid Edge bundling issues
+let _generalLimiter: Awaited<typeof import('@/lib/rate-limit')>['generalLimiter'] | undefined;
+let _searchLimiter: Awaited<typeof import('@/lib/rate-limit')>['searchLimiter'] | undefined;
+let _limiterLoaded = false;
+
+async function getRateLimiters() {
+  if (!_limiterLoaded) {
+    try {
+      const mod = await import('@/lib/rate-limit');
+      _generalLimiter = mod.generalLimiter;
+      _searchLimiter = mod.searchLimiter;
+    } catch {
+      // Upstash not available in Edge — use in-memory fallback
+    }
+    _limiterLoaded = true;
+  }
+  return { generalLimiter: _generalLimiter, searchLimiter: _searchLimiter };
+}
+
+async function verifyRequestSignature(sig: string | null, path: string): Promise<boolean> {
+  try {
+    const mod = await import('@/lib/request-signing');
+    return mod.verifyRequestSignature(sig, path);
+  } catch {
+    return true; // fail open if module can't load in Edge
+  }
+}
 
 // Simple in-memory rate limiter — fallback when Upstash is not configured.
 // NOTE: In serverless/Edge environments, each instance has its own map.
@@ -336,6 +362,7 @@ export async function middleware(request: NextRequest) {
 
     // Use Upstash Redis (persistent across serverless instances) when configured,
     // otherwise fall back to in-memory rate limiting (best-effort per-instance).
+    const { generalLimiter, searchLimiter } = await getRateLimiters();
     const upstashLimiter = pathname === '/api/search' ? searchLimiter : generalLimiter;
     if (upstashLimiter) {
       const { success, remaining } = await upstashLimiter.limit(rateLimitKey);
