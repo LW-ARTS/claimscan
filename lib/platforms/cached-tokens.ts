@@ -13,27 +13,33 @@ import type { Platform, Chain } from '@/lib/supabase/types';
 export async function getCachedTokenAddresses(
   wallet: string,
   platform: Platform,
-  chain: Chain
+  chain: Chain,
+  creatorId?: string
 ): Promise<string[] | null> {
   try {
     const supabase = createServiceClient();
 
-    // Step 1: Resolve wallet → creator_id
-    const { data: walletRow } = await supabase
-      .from('wallets')
-      .select('creator_id')
-      .eq('address', wallet)
-      .eq('chain', chain)
-      .limit(1)
-      .maybeSingle();
+    // If creatorId is provided, skip wallet lookup
+    let resolvedCreatorId = creatorId;
+    if (!resolvedCreatorId) {
+      // Step 1: Resolve wallet → creator_id
+      const { data: walletRow } = await supabase
+        .from('wallets')
+        .select('creator_id')
+        .eq('address', wallet)
+        .eq('chain', chain)
+        .limit(1)
+        .maybeSingle();
 
-    if (!walletRow) return null;
+      if (!walletRow) return null;
+      resolvedCreatorId = walletRow.creator_id;
+    }
 
     // Step 2: Fetch cached token addresses for this creator + platform
     const { data: tokens } = await supabase
       .from('creator_tokens')
       .select('token_address')
-      .eq('creator_id', walletRow.creator_id)
+      .eq('creator_id', resolvedCreatorId)
       .eq('platform', platform)
       .eq('chain', chain);
 

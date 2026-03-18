@@ -1,10 +1,11 @@
 import 'server-only';
-import { createPublicClient, http, fallback, isAddress, getAddress, parseAbi, parseAbiItem, formatEther, type Address } from 'viem';
+import { createPublicClient, http, fallback, isAddress, getAddress, parseAbi, parseAbiItem, type Address } from 'viem';
 import { base } from 'viem/chains';
 import {
   CLANKER_FEE_LOCKER,
   ZORA_PROTOCOL_REWARDS,
-} from '@/lib/constants';
+} from '@/lib/constants-evm';
+import { chunkedGetLogs } from './evm-logs';
 
 // ═══════════════════════════════════════════════
 // Client (multi-RPC with adaptive fallback)
@@ -80,23 +81,6 @@ export const erc20Abi = parseAbi([
 /**
  * Get unclaimed fees for a single token from Clanker FeeLocker.
  */
-export async function getClankerAvailableFees(
-  owner: Address,
-  token: Address
-): Promise<bigint> {
-  try {
-    return await baseClient.readContract({
-      address: CLANKER_FEE_LOCKER,
-      abi: clankerFeeLockerAbi,
-      functionName: 'availableFees',
-      args: [owner, token],
-    });
-  } catch (err) {
-    console.warn(`[base] availableFees failed for owner=${owner} token=${token}:`, err instanceof Error ? err.message : err);
-    return 0n;
-  }
-}
-
 /**
  * Batch read unclaimed fees for multiple tokens via multicall.
  * Returns array of { token, available } for each token.
@@ -205,105 +189,16 @@ const LOGS_CHUNK_SIZE = 10_000n;
 /** Concurrent chunk requests for chunkedGetLogs. */
 const LOGS_PARALLEL_CHUNKS = 3;
 
-/** Scan window: ~200K blocks ≈ ~4.6 days of Base blocks (2s block time).
- * All tokens are scanned in a single pass (address array), so total chunks = 200K/10K = 20.
- * At 3 parallel = ~7 rounds × ~500ms = ~3.5s per scan. Combined with MAX preservation
+/** Scan window: ~500K blocks ≈ ~11.5 days of Base blocks (2s block time).
+ * All tokens are scanned in a single pass (address array), so total chunks = 500K/10K = 50.
+ * At 3 parallel = ~17 rounds × ~500ms = ~8.5s per scan. Combined with MAX preservation
  * in creator.ts, claimed values never regress from partial scans. */
-const SCAN_WINDOW_BLOCKS = 200_000n;
+const SCAN_WINDOW_BLOCKS = 500_000n;
 
 /** Timeout for getLogs-based scans — prevents blocking the resolve if RPCs are slow.
- * 25s gives room for retries (1s+2s+3s backoff) across ~7 sequential rounds,
- * while staying within the 55s overall resolve budget. */
-const CLAIM_LOGS_TIMEOUT_MS = 25_000;
-
-// ═══════════════════════════════════════════════
-// Chunked getLogs (works around RPC block limits)
-// ═══════════════════════════════════════════════
-
-/**
- * Split a large getLogs range into 10K-block chunks processed in parallel batches.
- * Uses baseLogsClient (public RPC) which supports 10K blocks per query.
- */
-/** Fetch logs for a single chunk range with retry + exponential backoff on 429. */
-async function fetchLogsChunk(params: {
-  address: Address | Address[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  event: any;
-  args: Record<string, Address>;
-  fromBlock: bigint;
-  toBlock: bigint;
-}): Promise<Array<{ address: string; args: Record<string, unknown> }>> {
-  const MAX_RETRIES = 3;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const logs = await (baseLogsClient as any).getLogs({
-        address: params.address,
-        event: params.event,
-        args: params.args,
-        fromBlock: params.fromBlock,
-        toBlock: params.toBlock,
-      });
-      return logs as Array<{ address: string; args: Record<string, unknown> }>;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const isRetryable = msg.includes('429') || msg.includes('rate limit') || msg.includes('503') || msg.includes('no backend');
-      if (isRetryable && attempt < MAX_RETRIES) {
-        const delay = 1_000 * (attempt + 1); // 1s, 2s, 3s
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
-      throw err;
-    }
-  }
-  return []; // unreachable but satisfies TS
-}
-
-async function chunkedGetLogs(params: {
-  address: Address | Address[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  event: any;
-  args: Record<string, Address>;
-  fromBlock: bigint;
-  toBlock: bigint;
-}): Promise<Array<{ address: string; args: Record<string, unknown> }>> {
-  const { address, event, args, fromBlock, toBlock } = params;
-  if (fromBlock > toBlock) return [];
-
-  // Build list of [start, end] chunk ranges
-  const chunks: Array<[bigint, bigint]> = [];
-  for (let start = fromBlock; start <= toBlock; start += LOGS_CHUNK_SIZE) {
-    const end = start + LOGS_CHUNK_SIZE - 1n > toBlock ? toBlock : start + LOGS_CHUNK_SIZE - 1n;
-    chunks.push([start, end]);
-  }
-
-  const allLogs: Array<{ address: string; args: Record<string, unknown> }> = [];
-
-  // Process in parallel batches — retry logic handles 429s
-  for (let i = 0; i < chunks.length; i += LOGS_PARALLEL_CHUNKS) {
-    const batch = chunks.slice(i, i + LOGS_PARALLEL_CHUNKS);
-    const results = await Promise.allSettled(
-      batch.map(([start, end]) =>
-        fetchLogsChunk({ address, event, args, fromBlock: start, toBlock: end })
-      )
-    );
-
-    for (const r of results) {
-      if (r.status === 'fulfilled') {
-        allLogs.push(...r.value);
-      } else {
-        console.warn('[base] chunkedGetLogs chunk failed:', r.reason instanceof Error ? r.reason.message : r.reason);
-      }
-    }
-
-    // Throttle between rounds to avoid overwhelming public RPCs
-    if (i + LOGS_PARALLEL_CHUNKS < chunks.length) {
-      await new Promise((r) => setTimeout(r, 200));
-    }
-  }
-
-  return allLogs;
-}
+ * 500K blocks / 10K chunks = 50 chunks. At 3 parallel = ~17 rounds × ~500ms = ~8.5s.
+ * 15s gives room for retries (1s+2s+3s backoff) while staying within resolve budget. */
+const CLAIM_LOGS_TIMEOUT_MS = 15_000;
 
 /**
  * Get total claimed fees per token by scanning Transfer events FROM the FeeLocker TO the owner.
@@ -326,18 +221,25 @@ export async function getClankerClaimLogs(
       ? latestBlock - SCAN_WINDOW_BLOCKS
       : CLANKER_FEELOCKER_DEPLOY_BLOCK;
 
-    console.debug(`[base] getClankerClaimLogs: scanning ${tokens.length} tokens, blocks ${fromBlock}..${latestBlock} (${latestBlock - fromBlock} blocks, ${(latestBlock - fromBlock) / LOGS_CHUNK_SIZE} chunks)`);
+    if (process.env.VERBOSE_LOGS) console.debug(`[base] getClankerClaimLogs: scanning ${tokens.length} tokens, blocks ${fromBlock}..${latestBlock} (${latestBlock - fromBlock} blocks, ${(latestBlock - fromBlock) / LOGS_CHUNK_SIZE} chunks)`);
 
-    const logs = await chunkedGetLogs({
-      address: tokens,
-      event: erc20TransferEvent,
-      args: {
-        from: CLANKER_FEE_LOCKER,
-        to: owner,
-      },
-      fromBlock,
-      toBlock: latestBlock,
-    });
+    const logs = await chunkedGetLogs(
+      baseLogsClient,
+      '[base]',
+      LOGS_CHUNK_SIZE,
+      LOGS_PARALLEL_CHUNKS,
+      200,
+      {
+        address: tokens,
+        event: erc20TransferEvent,
+        args: {
+          from: CLANKER_FEE_LOCKER,
+          to: owner,
+        },
+        fromBlock,
+        toBlock: latestBlock,
+      }
+    );
 
     for (const log of logs) {
       const token = log.address.toLowerCase();
@@ -345,7 +247,7 @@ export async function getClankerClaimLogs(
       claimMap.set(token, (claimMap.get(token) ?? 0n) + value);
     }
 
-    console.debug(`[base] getClankerClaimLogs: found ${claimMap.size} tokens with claims, ${logs.length} transfers in ${Date.now() - t0}ms`);
+    if (process.env.VERBOSE_LOGS) console.debug(`[base] getClankerClaimLogs: found ${claimMap.size} tokens with claims, ${logs.length} transfers in ${Date.now() - t0}ms`);
     return claimMap;
   };
 
@@ -386,13 +288,20 @@ export async function getZoraWithdrawLogs(
       ? latestBlock - SCAN_WINDOW_BLOCKS
       : ZORA_REWARDS_BASE_DEPLOY_BLOCK;
 
-    const logs = await chunkedGetLogs({
-      address: ZORA_PROTOCOL_REWARDS,
-      event: zoraWithdrawEvent,
-      args: { from: account },
-      fromBlock,
-      toBlock: latestBlock,
-    });
+    const logs = await chunkedGetLogs(
+      baseLogsClient,
+      '[base]',
+      LOGS_CHUNK_SIZE,
+      LOGS_PARALLEL_CHUNKS,
+      200,
+      {
+        address: ZORA_PROTOCOL_REWARDS,
+        event: zoraWithdrawEvent,
+        args: { from: account },
+        fromBlock,
+        toBlock: latestBlock,
+      }
+    );
 
     let total = 0n;
     for (const log of logs) {
@@ -421,62 +330,6 @@ export async function getZoraWithdrawLogs(
 // ERC20 Reads
 // ═══════════════════════════════════════════════
 
-/**
- * Get ERC20 token balance for an account.
- */
-export async function getErc20Balance(
-  token: Address,
-  account: Address
-): Promise<bigint> {
-  try {
-    return await baseClient.readContract({
-      address: token,
-      abi: erc20Abi,
-      functionName: 'balanceOf',
-      args: [account],
-    });
-  } catch (err) {
-    console.warn(`[base] ERC20 balanceOf failed for token=${token}:`, err instanceof Error ? err.message : err);
-    return 0n;
-  }
-}
-
-/**
- * Get ERC20 token info (symbol, name, decimals).
- */
-export async function getErc20Info(token: Address): Promise<{
-  symbol: string;
-  name: string;
-  decimals: number;
-} | null> {
-  try {
-    const results = await baseClient.multicall({
-      contracts: [
-        { address: token, abi: erc20Abi, functionName: 'symbol' },
-        { address: token, abi: erc20Abi, functionName: 'name' },
-        { address: token, abi: erc20Abi, functionName: 'decimals' },
-      ],
-      allowFailure: true,
-    });
-
-    // If decimals call failed, return null — callers should not assume 18
-    const decimals = results[2].status === 'success' ? Number(results[2].result) : null;
-    if (decimals === null) {
-      console.warn(`[base] Failed to read decimals for token ${token}, skipping`);
-      return null;
-    }
-
-    return {
-      symbol: results[0].status === 'success' ? (results[0].result as string) : 'UNKNOWN',
-      name: results[1].status === 'success' ? (results[1].result as string) : 'Unknown Token',
-      decimals,
-    };
-  } catch (err) {
-    console.warn(`[base] ERC20 info multicall failed for token=${token}:`, err instanceof Error ? err.message : err);
-    return null;
-  }
-}
-
 // ═══════════════════════════════════════════════
 // Utilities
 // ═══════════════════════════════════════════════
@@ -500,11 +353,4 @@ export function isValidEvmAddress(address: string): boolean {
  */
 export function normalizeEvmAddress(address: string): string {
   return getAddress(address);
-}
-
-/**
- * Format wei to ETH string.
- */
-export function weiToEth(wei: bigint): string {
-  return formatEther(wei);
 }

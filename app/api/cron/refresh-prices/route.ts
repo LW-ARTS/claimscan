@@ -59,6 +59,7 @@ export async function GET(request: Request) {
       .from('fee_records')
       .select('chain, token_address, token_symbol')
       .not('token_address', 'in', '("SOL","ETH")')
+      .not('token_address', 'like', '%:%')
       .order('last_synced_at', { ascending: false })
       .limit(15);
 

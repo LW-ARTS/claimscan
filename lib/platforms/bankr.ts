@@ -31,7 +31,7 @@ const AGENT_SHORT_TIMEOUT_MS = 5_000;
 
 /** Budget for Agent API in getFeesByHandle (runs in parallel with wallet resolution).
  * Reduced from 20s to 10s — Agent is a fallback; Search API is primary. */
-const AGENT_LONG_TIMEOUT_MS = 10_000;
+const AGENT_LONG_TIMEOUT_MS = 5_000;
 
 const AGENT_POLL_INTERVAL_MS = 2_000;
 
@@ -188,7 +188,33 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
     return [];
   }
 
-  return parsed
+  // Sanity checks for LLM-generated data
+  const MAX_FEE_WEI = BigInt('1000000000000000000000'); // 1000 ETH
+  const EVM_ADDR_RE = /^0x[a-fA-F0-9]{40}$/;
+
+  const validated = parsed.filter((p) => {
+    if (!EVM_ADDR_RE.test(p.tokenAddress)) {
+      console.warn(`[bankr] LLM rejected: invalid address "${p.tokenAddress}"`);
+      return false;
+    }
+    try {
+      const earnedWei = BigInt(wethToWei(p.earnedWeth) || '0');
+      if (earnedWei > MAX_FEE_WEI) {
+        console.warn(`[bankr] LLM rejected: ${p.earnedWeth} ETH exceeds 1000 ETH cap for ${p.tokenAddress}`);
+        return false;
+      }
+    } catch (err) {
+      console.warn(`[bankr] LLM rejected: BigInt parse failed for ${p.tokenAddress}:`, err instanceof Error ? err.message : err);
+      return false;
+    }
+    return true;
+  });
+
+  if (validated.length > 0) {
+    console.info(`[bankr] LLM fees for @${safeHandle}:`, validated.map((p) => `${p.tokenSymbol}:${p.earnedWeth}`).join(', '));
+  }
+
+  return validated
     .filter((p) => {
       const earned = wethToWei(p.earnedWeth);
       const unclaimed = wethToWei(p.unclaimedWeth);
@@ -459,7 +485,13 @@ export function wethToWei(val: string | null | undefined): string {
   const parts = str.split('.');
   const whole = parts[0] || '0';
   const frac = (parts[1] || '').padEnd(18, '0').slice(0, 18);
-  return (whole + frac).replace(/^0+/, '') || '0';
+  const result = (whole + frac).replace(/^0+/, '') || '0';
+  // Reject values above 1 billion ETH (obviously wrong from LLM)
+  if (result.length > 27) {
+    console.warn('[bankr] wethToWei produced unreasonably large value, clamping to 0');
+    return '0';
+  }
+  return result;
 }
 
 /**
@@ -536,6 +568,7 @@ export const bankrAdapter: PlatformAdapter = {
   supportsIdentityResolution: true,
   supportsLiveFees: true,
   supportsHandleBasedFees: true,
+  historicalCoversLive: true,
 
   async resolveIdentity(
     handle: string,

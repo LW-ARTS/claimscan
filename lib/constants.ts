@@ -1,5 +1,3 @@
-import { getAddress, type Address } from 'viem';
-
 // ═══════════════════════════════════════════════
 // Contract Addresses & Program IDs
 // ═══════════════════════════════════════════════
@@ -10,12 +8,8 @@ export const PUMPSWAP_PROGRAM_ID = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'
 export const METEORA_DBC_PROGRAM = 'dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN';
 export const COINBARREL_PROGRAM_ID = '7HxbxHnTUBaUfWjVPbPLs8gqqScmjmBWjRnETBjS9DMj';
 export const RAYDIUM_LAUNCHLAB_PROGRAM_ID = 'LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj';
-// Base (EVM) Contract Addresses — getAddress() enforces EIP-55 checksum at import time
-// and types them as Address, eliminating all downstream `as Address` casts.
-export const CLANKER_FACTORY: Address = getAddress('0xE85A59c628F7d27878ACeB4bf3b35733630083a9');
-export const CLANKER_FEE_LOCKER: Address = getAddress('0xF3622742b1E446D92e45E22923Ef11C2fcD55D68');
-export const CLANKER_LP_LOCKER: Address = getAddress('0x29d17C1A8D851d7d4cA97FAe97AcAdb398D9cCE0');
-export const ZORA_PROTOCOL_REWARDS: Address = getAddress('0x7777777F279eba3d3Ad8F4E708545291A6fDBA8B');
+// Base (EVM) Contract Addresses — moved to lib/constants-evm.ts to avoid
+// pulling viem into client bundles. Import from there for server-side code.
 
 // ═══════════════════════════════════════════════
 // API URLs
@@ -23,12 +17,8 @@ export const ZORA_PROTOCOL_REWARDS: Address = getAddress('0x7777777F279eba3d3Ad8
 
 export const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
 export const CLANKER_API_BASE = 'https://clanker.world/api';
-export const ZORA_API_BASE = 'https://api-sdk.zora.engineering/api';
-export const BANKR_API_BASE = 'https://api.bankr.bot/agent';
+// Zora adapter uses onchain reads, not REST API
 export const RAYDIUM_LAUNCHLAB_API = 'https://launch-mint-v1.raydium.io';
-
-// Identity / Social APIs
-export const NEYNAR_API_BASE = 'https://api.neynar.com/v2';
 
 // Price APIs
 export const COINGECKO_API = 'https://api.coingecko.com/api/v3';
@@ -80,7 +70,6 @@ export const PLATFORM_CONFIG = {
   revshare: { name: 'RevShare', chain: 'sol' as const, color: '#4CAF50' },
   coinbarrel: { name: 'Coinbarrel', chain: 'sol' as const, color: '#FF8C00' },
   raydium: { name: 'Raydium', chain: 'sol' as const, color: '#6C5CE7' },
-  heaven: { name: 'Heaven', chain: 'sol' as const, color: '#FFD700' },
 } as const;
 
 // ═══════════════════════════════════════════════
@@ -101,4 +90,3 @@ export const MIN_FEE_LAMPORTS = 1_000_000n; // 0.001 SOL
 export const CACHE_TTL_MS = 40 * 60 * 1000; // 40 minutes
 export const CACHE_TTL_HEAVY_MS = 2 * 60 * 60 * 1000; // 2 hours — for creators with 500+ fee records
 export const LIVE_POLL_INTERVAL_MS = 30 * 1000; // 30 seconds
-export const PRICE_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes

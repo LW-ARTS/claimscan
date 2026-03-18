@@ -85,6 +85,7 @@ export async function heliusRestApi<T>(
   const apiKey = getHeliusApiKey();
   if (!apiKey) return null;
 
+  // Helius REST API accepts api-key as query param, not Bearer auth
   const separator = path.includes('?') ? '&' : '?';
   const url = `${HELIUS_REST_URL}${path}${separator}api-key=${apiKey}`;
   const controller = new AbortController();
@@ -94,8 +95,12 @@ export async function heliusRestApi<T>(
     : controller.signal;
 
   try {
+    const existingHeaders = options.headers instanceof Headers
+      ? Object.fromEntries(options.headers.entries())
+      : (options.headers as Record<string, string>) ?? {};
     const res = await fetch(url, {
       ...options,
+      headers: { ...existingHeaders },
       signal: combinedSignal,
     });
     clearTimeout(timeout);

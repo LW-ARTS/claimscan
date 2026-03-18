@@ -195,51 +195,28 @@ export async function getUnclaimedPumpSwapFees(
   const [vault] = derivePumpSwapVault(creator);
   const wsolAta = deriveAta(vault, NATIVE_MINT);
 
-  const [nativeBalance, wsolBalance] = await Promise.all([
-    withRpcFallback((c) => c.getBalance(vault), 'pumpswap-balance'),
-    // Missing ATA is expected (not all creators have WSOL fees).
-    // Catch inside fn so withRpcFallback doesn't count it as an RPC failure.
-    withRpcFallback(
-      (c) => c.getTokenAccountBalance(wsolAta)
-        .then((info) => BigInt(info.value.amount))
-        .catch(() => 0n),
-      'pumpswap-wsol'
-    ).catch(() => 0n),
-  ]);
-
-  const nativeBig = BigInt(nativeBalance);
-  const nativeUnclaimed = nativeBig > RENT_EXEMPT_MINIMUM ? nativeBig - RENT_EXEMPT_MINIMUM : 0n;
-
-  return nativeUnclaimed + wsolBalance;
-}
-
-/**
- * Get SOL balance for any account.
- */
-export async function getSolBalance(address: string): Promise<bigint> {
-  if (!isValidSolanaAddress(address)) return 0n;
-  const pubkey = new PublicKey(address);
-  const balance = await withRpcFallback((c) => c.getBalance(pubkey), 'sol-balance');
-  return BigInt(balance);
-}
-
-/**
- * Get SPL token balance for a given token account.
- */
-export async function getTokenAccountBalance(
-  tokenAccount: string
-): Promise<bigint> {
-  try {
-    const pubkey = new PublicKey(tokenAccount);
-    const info = await withRpcFallback(
-      (c) => c.getTokenAccountBalance(pubkey), 'token-balance'
-    );
-    return BigInt(info.value.amount);
-  } catch (err) {
-    console.warn('[solana] Failed to read token account:', err instanceof Error ? err.message : err);
+  // PumpSwap stores creator fees exclusively in the WSOL ATA, not native SOL.
+  // Only catch "account not found" (expected for wallets with no WSOL ATA) —
+  // let network errors propagate to withRpcFallback for retry on backup RPC.
+  const wsolBalance = await withRpcFallback(
+    (c) => c.getTokenAccountBalance(wsolAta)
+      .then((info) => BigInt(info.value.amount))
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('could not find account') || msg.includes('Invalid param') || msg.includes('AccountNotFound')) {
+          return 0n;
+        }
+        throw err;
+      }),
+    'pumpswap-wsol'
+  ).catch((err) => {
+    console.warn('[solana] getUnclaimedPumpSwapFees RPC failed:', err instanceof Error ? err.message : err);
     return 0n;
-  }
+  });
+
+  return wsolBalance;
 }
+
 
 /**
  * Check if a Solana address is valid user address.
@@ -372,20 +349,3 @@ export async function fetchTokenMetadataBatch(
   return result;
 }
 
-// ═══════════════════════════════════════════════
-// Formatting
-// ═══════════════════════════════════════════════
-
-/**
- * Format lamports to SOL string with full precision.
- * Uses integer division + remainder to avoid Number precision loss.
- */
-export function lamportsToSol(lamports: bigint): string {
-  if (lamports === 0n) return '0';
-  const LAMPORTS_PER_SOL = 1_000_000_000n;
-  const whole = lamports / LAMPORTS_PER_SOL;
-  const remainder = lamports % LAMPORTS_PER_SOL;
-  if (remainder === 0n) return `${whole}`;
-  const fractional = remainder.toString().padStart(9, '0').replace(/0+$/, '');
-  return `${whole}.${fractional}`;
-}

@@ -3,8 +3,8 @@
 import { usePathname } from 'next/navigation';
 
 const PLATFORMS = [
-  'bags.fm', 'pump.fun', 'zora', 'clanker', 'believe',
-  'meteora', 'bankr', 'boop', 'virtuals',
+  'Bags.fm', 'Pump.fun', 'Clanker', 'Zora', 'Bankr',
+  'Believe', 'RevShare', 'Coinbarrel', 'Raydium',
 ];
 
 export default function Loading() {
@@ -12,7 +12,7 @@ export default function Loading() {
   const handle = pathname?.split('/').filter(Boolean)[0]?.replace(/^@/, '') || '';
 
   return (
-    <div className="signal-stage min-h-[60vh] flex items-center justify-center px-6 py-10">
+    <div role="status" aria-label="Scanning creator fees" className="signal-stage min-h-[60vh] flex items-center justify-center px-6 py-10">
       <div className="signal-glass-card flex flex-col items-center">
 
         {/* Handle */}

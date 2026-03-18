@@ -89,7 +89,7 @@
   --secondary: oklch(0.955 0 0);
   --secondary-foreground: oklch(0.09 0 0);
   --muted: oklch(0.955 0 0);
-  --muted-foreground: oklch(0.40 0 0);
+  --muted-foreground: oklch(0.35 0 0);
   --accent: oklch(0.955 0 0);
   --accent-foreground: oklch(0.09 0 0);
   --destructive: oklch(0.55 0.22 27);
@@ -152,9 +152,6 @@
   }
   body {
     @apply bg-background text-foreground;
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
   }
   /* Allow selection on interactive elements */
   input, textarea, [contenteditable="true"] {
@@ -179,29 +176,25 @@
     backdrop-filter: blur(20px);
     border: 1px solid oklch(0 0 0 / 8%);
   }
+  .dark .glass {
+    background: oklch(0.15 0 0 / 60%);
+  }
+  .dark .glass-strong {
+    background: oklch(0.13 0 0 / 75%);
+  }
 
   /* Entrance animations */
-  .animate-fade-in {
-    animation: fadeIn 0.6s ease-out both;
-  }
   .animate-fade-in-up {
     animation: fadeInUp 0.6s ease-out both;
   }
   .animate-fade-in-down {
     animation: fadeInDown 0.5s ease-out both;
   }
-  .animate-scale-in {
-    animation: scaleIn 0.4s ease-out both;
-  }
-  .delay-75 { animation-delay: 75ms; }
   .delay-100 { animation-delay: 100ms; }
   .delay-150 { animation-delay: 150ms; }
   .delay-200 { animation-delay: 200ms; }
   .delay-300 { animation-delay: 300ms; }
-  .delay-400 { animation-delay: 400ms; }
   .delay-500 { animation-delay: 500ms; }
-  .delay-600 { animation-delay: 600ms; }
-  .delay-700 { animation-delay: 700ms; }
 
   .shimmer {
     position: relative;
@@ -225,15 +218,6 @@
     border-radius: inherit;
   }
 
-  .dot-grid {
-    background-image: radial-gradient(oklch(0 0 0 / 4%) 1px, transparent 1px);
-    background-size: 24px 24px;
-  }
-
-  .animate-spin-slow {
-    animation: spinSlow 8s linear infinite;
-  }
-
   .scan-line::after {
     content: '';
     position: absolute;
@@ -249,6 +233,15 @@
     animation: scanSweep 3s ease-in-out infinite;
     pointer-events: none;
   }
+}
+
+/* ───── Global focus-visible ───── */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid oklch(0.7 0.15 250);
+  outline-offset: 2px;
 }
 
 /* ───── View Transitions (progressive enhancement) ───── */
@@ -305,6 +298,58 @@
   opacity: 0 !important;
 }
 
+/* ───── Hero Reveal: CSS-only overlay animation (replaces motion/react) ─── */
+.hero-reveal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: oklch(0.06 0 0);
+  opacity: 1;
+  transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: auto;
+}
+.hero-reveal-overlay[data-phase="exiting"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hero-reveal-logo-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  animation: heroLogoIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes heroLogoIn {
+  from { opacity: 0; transform: scale(0.85); filter: blur(8px); }
+  to   { opacity: 1; transform: scale(1);    filter: blur(0px); }
+}
+
+.hero-reveal-wordmark {
+  color: oklch(0.97 0 0);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: heroWordmarkIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+}
+@media (min-width: 640px) {
+  .hero-reveal-wordmark { font-size: 1.5rem; }
+}
+@keyframes heroWordmarkIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ───── Hide footer on homepage (server component, CSS-only conditional) ─── */
+main:has([data-page="home"]) ~ .site-footer {
+  display: none;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -317,17 +362,9 @@
   from { opacity: 0; transform: translateY(-12px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
 @keyframes shimmerSweep {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
-}
-@keyframes spinSlow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 @keyframes scanSweep {
   0% { background-position: -40% 0; }

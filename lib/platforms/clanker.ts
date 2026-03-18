@@ -84,6 +84,7 @@ export const clankerAdapter: PlatformAdapter = {
   supportsIdentityResolution: true,
   supportsLiveFees: true,
   supportsHandleBasedFees: false,
+  historicalCoversLive: true,
 
   async resolveIdentity(
     handle: string,
@@ -141,8 +142,13 @@ export const clankerAdapter: PlatformAdapter = {
     const MAX_PAGES = 10; // 200 tokens max safety cap
     const allTokens: ClankerToken[] = [];
     const seen = new Set<string>();
+    const paginationDeadline = Date.now() + 6_000;
 
     for (let page = 1; page <= MAX_PAGES; page++) {
+      if (Date.now() > paginationDeadline) {
+        console.warn(`[clanker] Pagination deadline exceeded for ${wallet} at page ${page}/${MAX_PAGES}, ${allTokens.length} tokens fetched`);
+        break;
+      }
       const data = await clankerFetch<ClankerSearchCreatorResponse>(
         `/search-creator?q=${encodeURIComponent(wallet)}&page=${page}`
       );
@@ -220,6 +226,7 @@ export const clankerAdapter: PlatformAdapter = {
   },
 
   async getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]> {
+    if (signal?.aborted) return [];
     // Delegate to getHistoricalFees to avoid fetching the token list twice
     const fees = await this.getHistoricalFees(wallet);
     return fees.filter((f) => safeBigInt(f.totalUnclaimed) > 0n);

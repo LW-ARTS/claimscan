@@ -3,10 +3,10 @@ import dynamic from 'next/dynamic';
 import { SearchBar } from './components/SearchBar';
 import { PlatformIcon } from './components/PlatformIcon';
 import { PLATFORM_CONFIG } from '@/lib/constants';
-import TrueFocus from './components/TrueFocus';
 import { HeroReveal } from './components/HeroReveal';
 
 // Lazy-load decorative / animation-heavy components (auto code-split)
+const TrueFocus = dynamic(() => import('./components/TrueFocus'));
 const OrbitingLogos = dynamic(
   () => import('./components/OrbitingLogos').then((m) => ({ default: m.OrbitingLogos })),
 );
@@ -18,7 +18,7 @@ export default function Home() {
 
   return (
     <HeroReveal>
-    <div className="flex min-h-0 flex-col items-center pt-4 pb-8 sm:min-h-[calc(75vh-4rem)] sm:justify-center sm:pt-0 sm:pb-0">
+    <div data-page="home" className="flex min-h-0 flex-col items-center pt-4 pb-8 sm:min-h-[calc(75vh-4rem)] sm:justify-center sm:pt-0 sm:pb-0">
       {/* Orbiting logos — homepage only, hidden on mobile */}
       <div className="fixed pointer-events-none -z-10 opacity-50 hidden md:block md:bottom-0 md:left-0 md:-translate-x-1/3 md:translate-y-1/3 md:w-[500px] md:h-[500px]">
         <OrbitingLogos />
@@ -49,7 +49,8 @@ export default function Home() {
         </div>
 
         {/* Main heading — animated TrueFocus */}
-        <div className="animate-fade-in-up delay-100 flex flex-col items-center gap-1 sm:gap-2">
+        <h1 className="sr-only">Track your creator revenue across 9 DeFi launchpads</h1>
+        <div aria-hidden="true" className="animate-fade-in-up delay-100 flex flex-col items-center gap-1 sm:gap-2">
           <div className="flex items-center justify-center gap-2 sm:gap-3">
             <span className="text-3xl font-black uppercase tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">Track your</span>
             <MoneyFaceEmoji size={64} className="size-7 sm:size-10 md:size-14 lg:size-[72px]" />
@@ -81,27 +82,32 @@ export default function Home() {
             {platformEntries.map(([key, p]) => (
               <span
                 key={key}
-                className="inline-flex cursor-default items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-all duration-200 hover:border-foreground/20 hover:text-foreground"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground"
               >
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: p.color }}
+                  aria-hidden
+                />
                 <PlatformIcon platform={key} className="h-3 w-3 opacity-50" aria-hidden />
                 <span>{p.name}</span>
               </span>
             ))}
           </div>
-          {/* Value prop strip */}
+          {/* Value prop strip — compact to not compete with hero heading */}
           <div className="shimmer mt-4 overflow-hidden rounded-2xl border border-foreground/[0.08] glass-strong">
             <div className="grid grid-cols-3 divide-x divide-foreground/[0.08]">
-              <div className="px-2 py-4 sm:p-6 text-center">
-                <p className="text-2xl font-black tabular-nums tracking-tighter sm:text-4xl md:text-5xl text-foreground">~40%</p>
-                <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground sm:mt-1.5 sm:text-[10px]">Go Unclaimed</p>
+              <div className="px-2 py-3 sm:px-4 sm:py-5 text-center">
+                <p className="text-xl font-black tabular-nums tracking-tighter sm:text-2xl md:text-3xl text-foreground">~40%</p>
+                <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground sm:text-[10px]">Go Unclaimed</p>
               </div>
-              <div className="px-2 py-4 sm:p-6 text-center">
-                <p className="text-2xl font-black tabular-nums tracking-tighter sm:text-4xl md:text-5xl text-foreground">&lt;30s</p>
-                <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground sm:mt-1.5 sm:text-[10px]">Scan Time</p>
+              <div className="px-2 py-3 sm:px-4 sm:py-5 text-center">
+                <p className="text-xl font-black tabular-nums tracking-tighter sm:text-2xl md:text-3xl text-foreground">&lt;30s</p>
+                <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground sm:text-[10px]">Scan Time</p>
               </div>
-              <div className="px-2 py-4 sm:p-6 text-center">
-                <p className="text-2xl font-black tabular-nums tracking-tighter sm:text-4xl md:text-5xl text-foreground">$0</p>
-                <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground sm:mt-1.5 sm:text-[10px]">Always Free</p>
+              <div className="px-2 py-3 sm:px-4 sm:py-5 text-center">
+                <p className="text-xl font-black tabular-nums tracking-tighter sm:text-2xl md:text-3xl text-foreground">$0</p>
+                <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground sm:text-[10px]">Always Free</p>
               </div>
             </div>
           </div>

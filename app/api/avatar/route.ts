@@ -8,13 +8,14 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(req: NextRequest) {
   const handle = req.nextUrl.searchParams.get('handle');
   if (!handle || !/^[a-zA-Z0-9_]{1,50}$/.test(handle)) {
-    return new NextResponse(null, { status: 400 });
+    return NextResponse.json({ error: 'Invalid handle' }, { status: 400 });
   }
 
   try {
     const res = await fetch(`https://unavatar.io/x/${handle}`, {
       signal: AbortSignal.timeout(4000),
       headers: { 'User-Agent': 'ClaimScan/1.0' },
+      redirect: 'error',
     });
 
     if (!res.ok) {
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Allowlist content types to prevent proxying HTML/JS from upstream
-    const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/avif']);
+    const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif']);
     const rawCt = res.headers.get('content-type') ?? 'image/jpeg';
     const ct = ALLOWED_IMAGE_TYPES.has(rawCt.split(';')[0].trim()) ? rawCt : 'image/jpeg';
 
