@@ -159,19 +159,29 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
 
     {/* Desktop: table layout — 1:1 match with Pencil design */}
     <div className="hidden md:block overflow-x-auto">
-      <table className="w-full" style={{ fontFamily: 'var(--font-mono)' }} aria-label="Creator fee records by token">
+      <table className="w-full table-fixed" style={{ fontFamily: 'var(--font-mono)', minWidth: connectedWallet && onClaimToken ? '1096px' : '950px' }} aria-label="Creator fee records by token">
         <caption className="sr-only">Fee records showing earned, claimed, and unclaimed amounts per token</caption>
+        <colgroup>
+          <col style={{ width: 200 }} />
+          <col style={{ width: 110 }} />
+          <col style={{ width: 120 }} />
+          <col style={{ width: 120 }} />
+          <col style={{ width: 120 }} />
+          <col style={{ width: 130 }} />
+          <col style={{ width: 150 }} />
+          {connectedWallet && onClaimToken && <col style={{ width: 146 }} />}
+        </colgroup>
         <thead>
           <tr className="bg-[#f5f5f5]">
-            <th scope="col" className="w-[200px] py-3 pl-2 pr-0 text-left text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Token</th>
-            <th scope="col" className="w-[110px] py-3 text-left text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Platform</th>
-            <th scope="col" className="w-[120px] py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Earned</th>
-            <th scope="col" className="w-[120px] py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Claimed</th>
-            <th scope="col" className="w-[120px] py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Unclaimed</th>
-            <th scope="col" className="w-[130px] py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">USD</th>
-            <th scope="col" className="w-[150px] py-3 text-center text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Status</th>
+            <th scope="col" className="py-3 pl-2 pr-0 text-left text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Token</th>
+            <th scope="col" className="py-3 text-left text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Platform</th>
+            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Earned</th>
+            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Claimed</th>
+            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Unclaimed</th>
+            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">USD</th>
+            <th scope="col" className="py-3 text-center text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Status</th>
             {connectedWallet && onClaimToken && (
-              <th scope="col" className="w-[146px] py-3 text-center text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Action</th>
+              <th scope="col" className="py-3 text-center text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Action</th>
             )}
           </tr>
         </thead>
@@ -183,7 +193,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
             const isZeroUnclaimed = safeBigInt(fee.total_unclaimed) === 0n;
             return (
               <tr key={fee.id} className="border-b border-[#ddd] transition-colors hover:bg-[#fafafa]">
-                <td className="w-[200px] py-3.5 pl-2 pr-0">
+                <td className="py-3.5 pl-2 pr-0">
                   <div className="flex items-center gap-2">
                     <span
                       className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black text-[11px] font-bold text-white"
@@ -212,22 +222,22 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                     )}
                   </div>
                 </td>
-                <td className="w-[110px] py-3.5 text-[13px] text-black">
+                <td className="py-3.5 text-[13px] text-black">
                   {platformConfig?.name ?? fee.platform}
                 </td>
-                <td className="w-[120px] py-3.5 text-right text-[13px] tabular-nums text-black">
+                <td className="py-3.5 text-right text-[13px] tabular-nums text-black">
                   {formatTokenAmount(fee.total_earned, decimals)} {chainLabel}
                 </td>
-                <td className="w-[120px] py-3.5 text-right text-[13px] tabular-nums text-black">
+                <td className="py-3.5 text-right text-[13px] tabular-nums text-black">
                   {formatTokenAmount(fee.total_claimed, decimals)} {chainLabel}
                 </td>
-                <td className={`w-[120px] py-3.5 text-right text-[13px] tabular-nums ${isZeroUnclaimed ? 'text-[#999]' : 'text-black'}`}>
+                <td className={`py-3.5 text-right text-[13px] tabular-nums ${isZeroUnclaimed ? 'text-[#999]' : 'text-black'}`}>
                   {formatTokenAmount(fee.total_unclaimed, decimals)} {chainLabel}
                 </td>
-                <td className="w-[130px] py-3.5 text-right text-[13px] font-bold tabular-nums text-black" style={{ fontFamily: 'var(--font-sans)' }}>
+                <td className="py-3.5 text-right text-[13px] font-bold tabular-nums text-black" style={{ fontFamily: 'var(--font-sans)' }}>
                   {formatUsd(usd)}
                 </td>
-                <td className="w-[150px] py-3.5 text-center">
+                <td className="py-3.5 text-center">
                   {fee.claim_status === 'claimed' ? (
                     <span className="inline-block border border-[#ddd] px-3 py-1 text-[10px] font-medium uppercase tracking-[1px] text-black">
                       CLAIMED
@@ -245,7 +255,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                   )}
                 </td>
                 {connectedWallet && onClaimToken && (
-                  <td className="w-[146px] py-3.5 text-center">
+                  <td className="py-3.5 text-center">
                     {fee.platform === 'bags' && fee.claim_status !== 'claimed' && safeBigInt(fee.total_unclaimed) > 0n && (
                       <button
                         onClick={() => onClaimToken(fee.token_address)}
