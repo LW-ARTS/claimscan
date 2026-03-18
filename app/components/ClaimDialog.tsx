@@ -118,20 +118,20 @@ export function ClaimDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent showCloseButton={false} className="max-w-[480px] border-[#ddd] bg-white p-0 shadow-xl">
-        <div className="flex flex-col gap-0 px-8 pt-8 pb-6" style={{ fontFamily: 'var(--font-sans)' }}>
+      <DialogContent showCloseButton={false} className="max-w-[calc(100%-2rem)] sm:max-w-[480px] border-[#ddd] bg-white p-0 shadow-xl max-h-[85vh] overflow-y-auto">
+        <div className="flex flex-col gap-0 px-5 pt-6 pb-5 sm:px-8 sm:pt-8 sm:pb-6" style={{ fontFamily: 'var(--font-sans)' }}>
 
           {/* ─── Header ─── */}
           <div className="flex items-start justify-between">
             <div className="flex flex-col gap-2">
-              <h2 className="text-[32px] font-bold leading-tight tracking-tight text-black" style={{ fontFamily: 'var(--font-sans)' }}>
+              <h2 className="text-2xl sm:text-[32px] font-bold leading-tight tracking-tight text-black" style={{ fontFamily: 'var(--font-sans)' }}>
                 {phase === 'idle' && 'Claim Fees'}
                 {phase === 'fetching' && 'Preparing...'}
                 {phase === 'signing' && 'Sign Transactions'}
                 {phase === 'submitting' && 'Submitting...'}
                 {phase === 'complete' && 'Claim Complete'}
               </h2>
-              <p className="text-[13px] leading-relaxed text-[#777]" style={{ fontFamily: 'var(--font-mono)', maxWidth: 340 }}>
+              <p className="text-xs sm:text-[13px] leading-relaxed text-[#777]" style={{ fontFamily: 'var(--font-mono)', maxWidth: 340 }}>
                 {phase === 'idle' && `Claim unclaimed fees from ${fees.length} token${fees.length !== 1 ? 's' : ''} on Bags.fm`}
                 {phase === 'fetching' && 'Generating claim transactions from Bags...'}
                 {phase === 'signing' && 'Please approve the transaction(s) in your wallet.'}
@@ -166,17 +166,17 @@ export function ClaimDialog({
                     const usd = toUsdValue(unclaimed, 9, solPrice);
                     return (
                       <div key={fee.id}>
-                        <div className="flex items-center justify-between py-4">
-                          <span className="text-sm font-semibold text-black" style={{ fontFamily: 'var(--font-sans)' }}>
+                        <div className="flex items-center justify-between py-3 sm:py-4">
+                          <span className="text-xs sm:text-sm font-semibold text-black truncate max-w-[100px] sm:max-w-none" style={{ fontFamily: 'var(--font-sans)' }}>
                             {fee.token_symbol
                               ? `$${fee.token_symbol.replace(/[^\w\s\-\.]/g, '').trim().slice(0, 16)}`
                               : fee.token_address.slice(0, 8) + '...'}
                           </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-black" style={{ fontFamily: 'var(--font-mono)' }}>
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <span className="text-xs sm:text-sm font-medium text-black" style={{ fontFamily: 'var(--font-mono)' }}>
                               {formatTokenAmount(fee.total_unclaimed, 9)} SOL
                             </span>
-                            <span className="text-xs font-medium text-[#999]" style={{ fontFamily: 'var(--font-mono)' }}>
+                            <span className="text-[10px] sm:text-xs font-medium text-[#999]" style={{ fontFamily: 'var(--font-mono)' }}>
                               {formatUsd(usd)}
                             </span>
                           </div>
@@ -190,12 +190,12 @@ export function ClaimDialog({
               </div>
 
               {/* Summary box */}
-              <div className="mt-5 flex flex-col gap-3 border border-[#ddd] p-5">
+              <div className="mt-4 sm:mt-5 flex flex-col gap-3 border border-[#ddd] p-4 sm:p-5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium tracking-wider text-[#777]" style={{ fontFamily: 'var(--font-mono)' }}>
                     Total unclaimed
                   </span>
-                  <span className="text-lg font-extrabold text-black" style={{ fontFamily: 'var(--font-sans)' }}>
+                  <span className="text-base sm:text-lg font-extrabold text-black" style={{ fontFamily: 'var(--font-sans)' }}>
                     {formatUsd(totalUnclaimedUsd)}
                   </span>
                 </div>
@@ -220,7 +220,7 @@ export function ClaimDialog({
               </div>
 
               {/* Warnings */}
-              <div className="mt-5 flex flex-col gap-3">
+              <div className="mt-4 sm:mt-5 flex flex-col gap-3">
                 {hasInsufficientSol && (
                   <div className="bg-[#f5f5f5] p-4">
                     <p className="text-xs leading-relaxed tracking-wide text-[#777]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -272,16 +272,16 @@ export function ClaimDialog({
               </div>
 
               {/* CTA */}
-              <div className="mt-5">
+              <div className="mt-4 sm:mt-5">
                 <button
                   onClick={handleClaim}
                   disabled={phase !== 'idle' || hasInsufficientSol || !!bagsWalletMismatch}
-                  className="flex h-14 w-full items-center justify-center gap-2.5 bg-black text-white transition-all duration-200 hover:bg-black/90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex h-12 sm:h-14 w-full items-center justify-center gap-2 sm:gap-2.5 bg-black text-white transition-all duration-200 hover:bg-black/90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <svg className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                   </svg>
-                  <span className="text-[13px] font-medium tracking-[2px]" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <span className="text-xs sm:text-[13px] font-medium tracking-[1.5px] sm:tracking-[2px]" style={{ fontFamily: 'var(--font-mono)' }}>
                     CLAIM {fees.length} TOKENS
                   </span>
                 </button>
@@ -402,7 +402,7 @@ export function ClaimDialog({
 
               <button
                 onClick={() => onOpenChange(false)}
-                className="flex h-14 w-full items-center justify-center bg-black text-[13px] font-medium tracking-[2px] text-white transition-all hover:bg-black/90 active:scale-[0.98]"
+                className="flex h-12 sm:h-14 w-full items-center justify-center bg-black text-xs sm:text-[13px] font-medium tracking-[1.5px] sm:tracking-[2px] text-white transition-all hover:bg-black/90 active:scale-[0.98]"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 DONE
