@@ -142,9 +142,14 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
               <button
                 onClick={() => onClaimToken(fee.token_address)}
                 aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
-                className="mt-3 w-full rounded-lg bg-foreground py-2 text-xs font-semibold text-background transition-all hover:opacity-90 active:scale-[0.98]"
+                className="mt-3 w-full rounded-xl bg-foreground py-2.5 text-xs font-bold uppercase tracking-wider text-background transition-all duration-200 hover:shadow-[0_0_16px_rgba(0,0,0,0.12)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]"
               >
-                Claim
+                <span className="flex items-center justify-center gap-1.5">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
+                  </svg>
+                  Claim
+                </span>
               </button>
             )}
           </div>
@@ -248,8 +253,11 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                         <button
                           onClick={() => onClaimToken(fee.token_address)}
                           aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
-                          className="rounded-md bg-foreground px-2.5 py-1 text-[11px] font-medium text-background transition-all hover:opacity-90 active:scale-95"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-background transition-all duration-200 hover:shadow-[0_0_12px_rgba(0,0,0,0.1)] hover:-translate-y-px active:translate-y-0 active:scale-95"
                         >
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
+                          </svg>
                           Claim
                         </button>
                       )}
