@@ -80,16 +80,15 @@ export default async function ProfilePage({ params }: PageProps) {
     return notFound();
   }
 
-  // Fetch creator data and native prices in parallel (independent operations)
-  const [result, prices] = await Promise.allSettled([
+  // Fetch creator data and native prices in parallel.
+  // Creator resolve uses Promise.all (errors should propagate to error boundary, not show fake "not found").
+  // Prices use a catch fallback (price failure should NOT crash the page).
+  const [creatorResult, priceResult] = await Promise.all([
     resolveAndPersistCreator(decoded),
-    getNativeTokenPrices(),
+    getNativeTokenPrices().catch(() => ({ sol: 0, eth: 0, stale: true as const })),
   ]);
 
-  const creatorResult = result.status === 'fulfilled' ? result.value : null;
-  const priceResult = prices.status === 'fulfilled' ? prices.value : { sol: 0, eth: 0, stale: true };
-
-  if (!creatorResult?.creator) {
+  if (!creatorResult.creator) {
     return (
       <div className="space-y-8">
         <SearchBar />
@@ -109,9 +108,9 @@ export default async function ProfilePage({ params }: PageProps) {
     );
   }
 
-  const creator = creatorResult!.creator;
-  const wallets = creatorResult!.wallets;
-  const feeRecords = creatorResult!.fees;
+  const creator = creatorResult.creator;
+  const wallets = creatorResult.wallets;
+  const feeRecords = creatorResult.fees;
 
   const walletsForLive = wallets.map((w) => ({
     address: w.address,
@@ -166,7 +165,7 @@ export default async function ProfilePage({ params }: PageProps) {
             handle={decoded}
             totalEarnedUsd={totalEarnedUsd}
             platformCount={platformCount}
-            resolveMs={creatorResult!.resolveMs}
+            resolveMs={creatorResult.resolveMs}
           />
         </ErrorBoundary>
       </div>
@@ -196,10 +195,10 @@ export default async function ProfilePage({ params }: PageProps) {
         </LazySection>
 
         {/* ZONE 3: Claim History */}
-        {creatorResult!.claimEvents.length > 0 && (
+        {creatorResult.claimEvents.length > 0 && (
           <LazySection minHeight={100}>
             <div className="animate-fade-in-up delay-200">
-              <ClaimHistory events={creatorResult!.claimEvents} />
+              <ClaimHistory events={creatorResult.claimEvents} />
             </div>
           </LazySection>
         )}
