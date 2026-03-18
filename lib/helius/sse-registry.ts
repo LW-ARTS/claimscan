@@ -11,6 +11,9 @@ const sseClients = new Map<string, Set<ReadableStreamDefaultController>>();
 /** Max SSE connections per wallet to prevent memory exhaustion from connection flooding. */
 const MAX_SSE_PER_WALLET = 10;
 
+/** Global cap on total SSE connections across all wallets. */
+const MAX_TOTAL_SSE_CLIENTS = 500;
+
 export function registerSSEClient(
   wallet: string,
   controller: ReadableStreamDefaultController
@@ -19,7 +22,11 @@ export function registerSSEClient(
     sseClients.set(wallet, new Set());
   }
   const set = sseClients.get(wallet)!;
-  if (set.size >= MAX_SSE_PER_WALLET) return; // Drop excess connections
+  if (set.size >= MAX_SSE_PER_WALLET) return; // Drop excess per-wallet
+  // Global cap to prevent connection flooding across many wallets
+  let totalClients = 0;
+  for (const s of sseClients.values()) totalClients += s.size;
+  if (totalClients >= MAX_TOTAL_SSE_CLIENTS) return;
   set.add(controller);
 }
 
@@ -65,7 +72,7 @@ export function pushSSEEvent(wallet: string, data: Record<string, unknown>): num
 /**
  * Get count of connected SSE clients (debug/metrics).
  */
-export function getSSEClientCount(): number {
+function getSSEClientCount(): number {
   let count = 0;
   for (const clients of sseClients.values()) {
     count += clients.size;

@@ -30,8 +30,8 @@ export function createServiceClient(): ReturnType<typeof createClient<Database>>
 
 export function verifyCronSecret(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret || secret.length === 0) {
-    console.error('CRON_SECRET is not configured');
+  if (!secret || secret.length < 32) {
+    console.error('CRON_SECRET is not configured or too short (min 32 chars)');
     return false;
   }
   const authHeader = request.headers.get('authorization');
@@ -49,5 +49,7 @@ export function verifyCronSecret(request: Request): boolean {
   actual.copy(paddedActual);
   expected.copy(paddedExpected);
 
-  return actual.length === expected.length && timingSafeEqual(paddedActual, paddedExpected);
+  // Run timingSafeEqual FIRST — the && short-circuit on length mismatch would leak secret length
+  const match = timingSafeEqual(paddedActual, paddedExpected);
+  return match && actual.length === expected.length;
 }

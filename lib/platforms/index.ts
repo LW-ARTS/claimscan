@@ -10,7 +10,6 @@ import { believeAdapter } from './believe';
 import { revshareAdapter } from './revshare';
 import { coinbarrelAdapter } from './coinbarrel';
 import { raydiumAdapter } from './raydium';
-import { heavenAdapter } from './heaven';
 
 // ═══════════════════════════════════════════════
 // Platform Registry
@@ -26,11 +25,10 @@ const adapters: Record<Platform, PlatformAdapter> = {
   revshare: revshareAdapter,
   coinbarrel: coinbarrelAdapter,
   raydium: raydiumAdapter,
-  heaven: heavenAdapter,
 };
 
 /**
- * Get a specific platform adapter.
+ * Get a specific platform adapter by name.
  */
 export function getAdapter(platform: Platform): PlatformAdapter | null {
   return adapters[platform] ?? null;
@@ -64,17 +62,3 @@ export function getHandleFeeAdapters(): PlatformAdapter[] {
   return Object.values(adapters).filter((a) => a.supportsHandleBasedFees);
 }
 
-/**
- * Register a new adapter (used for Tier 2 adapters added later).
- */
-export function registerAdapter(adapter: PlatformAdapter): void {
-  adapters[adapter.platform] = adapter;
-}
-
-export type { PlatformAdapter } from './types';
-export type {
-  ResolvedWallet,
-  CreatorToken,
-  TokenFee,
-  ClaimEvent,
-} from './types';

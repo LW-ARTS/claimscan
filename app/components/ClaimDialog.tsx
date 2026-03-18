@@ -22,6 +22,7 @@ interface ClaimDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   wallet: string;
+  bagsRegisteredWallet?: string | null;
   fees: FeeRecord[];
   solPrice: number;
   onClaimComplete: (claimedMints: string[]) => void;
@@ -31,6 +32,7 @@ export function ClaimDialog({
   open,
   onOpenChange,
   wallet,
+  bagsRegisteredWallet,
   fees,
   solPrice,
   onClaimComplete,
@@ -44,6 +46,12 @@ export function ClaimDialog({
   const tokenMints = useMemo(() => fees.map((f) => f.token_address), [fees]);
   const connectedWallet = walletAdapter.publicKey?.toBase58() ?? null;
   const walletMismatch = connectedWallet !== null && connectedWallet !== wallet;
+
+  // Check if connected wallet matches the Bags-registered wallet for this profile.
+  // Bags.fm requires the claiming wallet to be the one linked via social verification.
+  const bagsWalletMismatch = bagsRegisteredWallet
+    && connectedWallet
+    && connectedWallet !== bagsRegisteredWallet;
 
   // Detect mobile on mount (avoids SSR mismatch)
   useEffect(() => {
@@ -90,7 +98,8 @@ export function ClaimDialog({
   // ClaimScan service fee (0.85%)
   const feeLamports = totalUnclaimedLamports * BigInt(CLAIMSCAN_FEE_BPS) / 10_000n;
   const feeApplied = feeLamports >= MIN_FEE_LAMPORTS;
-  const feeSol = Number(feeLamports) / 1e9;
+  // Convert via 1000n divisor to keep microsol precision (safe up to ~9 quadrillion lamports)
+  const feeSol = Number(feeLamports * 1000n / 1_000_000_000n) / 1000;
   const feeUsd = feeSol * solPrice;
 
   // Estimated gas (~0.005 SOL per tx + fee tx if applicable)
@@ -125,6 +134,7 @@ export function ClaimDialog({
 
   const handleClose = () => {
     if (phase === 'fetching' || phase === 'signing' || phase === 'submitting') {
+      if (!window.confirm('A claim is in progress. Cancel it?')) return;
       cancel();
     }
     onOpenChange(false);
@@ -225,7 +235,23 @@ export function ClaimDialog({
                 </p>
               )}
 
-              {walletMismatch && (
+              {bagsWalletMismatch && (
+                <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-xs text-red-400 space-y-1.5">
+                  <p className="font-semibold">Wrong wallet connected</p>
+                  <p>
+                    Bags.fm requires the wallet linked to your social profile to claim fees.
+                    Connect the wallet registered with Bags:
+                  </p>
+                  <p className="font-mono text-[11px] break-all text-red-300">
+                    {bagsRegisteredWallet}
+                  </p>
+                  <p className="text-red-400/70">
+                    To link a different wallet, verify your profile at bags.fm first.
+                  </p>
+                </div>
+              )}
+
+              {!bagsWalletMismatch && walletMismatch && (
                 <p className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
                   Connected wallet differs from this profile. Claims will use your connected wallet.
                 </p>
@@ -239,7 +265,7 @@ export function ClaimDialog({
 
               <button
                 onClick={handleClaim}
-                disabled={phase !== 'idle' || hasInsufficientSol}
+                disabled={phase !== 'idle' || hasInsufficientSol || !!bagsWalletMismatch}
                 className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Claim {fees.length} Token{fees.length !== 1 ? 's' : ''}

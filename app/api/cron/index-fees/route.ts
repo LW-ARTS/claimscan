@@ -73,7 +73,8 @@ export async function GET(request: Request) {
           .from('fee_records')
           .select('token_address, platform, chain, total_claimed')
           .eq('creator_id', creator.id)
-          .in('token_address', tokenAddresses);
+          .in('token_address', tokenAddresses)
+          .limit(5000);
 
         const existingClaimedMap = new Map(
           (existingRecords ?? []).map((r) => [`${r.token_address}:${r.platform}:${r.chain}`, r.total_claimed])
@@ -82,10 +83,14 @@ export async function GET(request: Request) {
         const feeRows = fees.map((fee) => {
           const key = `${fee.tokenAddress}:${fee.platform}:${fee.chain}`;
           const existingClaimed = existingClaimedMap.get(key);
-          // Preserve the higher total_claimed to prevent regression from partial scans
           const totalClaimed = existingClaimed && safeBigInt(existingClaimed) > safeBigInt(fee.totalClaimed)
             ? existingClaimed
             : fee.totalClaimed;
+          // Recompute totalEarned when claimed was preserved to maintain invariant
+          let totalEarned = fee.totalEarned;
+          if (existingClaimed && safeBigInt(existingClaimed) > safeBigInt(fee.totalClaimed)) {
+            totalEarned = (safeBigInt(totalClaimed) + safeBigInt(fee.totalUnclaimed)).toString();
+          }
 
           return {
             creator_id: creator.id,
@@ -94,7 +99,7 @@ export async function GET(request: Request) {
             chain: fee.chain,
             token_address: fee.tokenAddress,
             token_symbol: fee.tokenSymbol,
-            total_earned: fee.totalEarned,
+            total_earned: totalEarned,
             total_claimed: totalClaimed,
             total_unclaimed: fee.totalUnclaimed,
             total_earned_usd: fee.totalEarnedUsd,
@@ -103,9 +108,9 @@ export async function GET(request: Request) {
                 ? 'partially_claimed' as const
                 : safeBigInt(fee.totalUnclaimed) > 0n
                   ? 'unclaimed' as const
-                  : safeBigInt(fee.totalEarned) > 0n
+                  : safeBigInt(totalEarned) > 0n
                     ? 'claimed' as const
-                    : 'unclaimed' as const,
+                    : 'claimed' as const,
             royalty_bps: fee.royaltyBps,
             last_synced_at: new Date().toISOString(),
           };

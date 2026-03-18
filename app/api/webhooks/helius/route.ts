@@ -10,6 +10,24 @@ import { pushSSEEvent } from '@/lib/helius/sse-registry';
 
 const WEBHOOK_SECRET = process.env.HELIUS_WEBHOOK_SECRET;
 
+// Replay protection: track processed signatures with 5-minute TTL
+const processedSignatures = new Map<string, number>();
+const DEDUP_TTL_MS = 5 * 60 * 1000;
+const DEDUP_MAX_SIZE = 5000;
+
+function isReplay(signature: string): boolean {
+  const now = Date.now();
+  // Evict stale entries periodically
+  if (processedSignatures.size > DEDUP_MAX_SIZE) {
+    for (const [sig, ts] of processedSignatures) {
+      if (now - ts > DEDUP_TTL_MS) processedSignatures.delete(sig);
+    }
+  }
+  if (processedSignatures.has(signature)) return true;
+  processedSignatures.set(signature, now);
+  return false;
+}
+
 function verifyWebhookSecret(authHeader: string | null, secret: string): boolean {
   if (!authHeader) return false;
   const expected = Buffer.from(`Bearer ${secret}`);
@@ -73,9 +91,13 @@ export async function POST(request: Request) {
     }
 
     let totalNotified = 0;
+    const MAX_TOTAL_ACCOUNTS = 1000;
+    let totalAccounts = 0;
 
     for (const event of payload) {
-      // Collect all accounts affected by this transaction
+      if (totalAccounts >= MAX_TOTAL_ACCOUNTS) break;
+      // Skip already-processed events (replay protection)
+      if (event.signature && isReplay(event.signature)) continue;
       const affectedAccounts = new Set<string>();
 
       for (const transfer of (event.nativeTransfers ?? []).slice(0, 100)) {
@@ -91,6 +113,7 @@ export async function POST(request: Request) {
       for (const data of (event.accountData ?? []).slice(0, 100)) {
         affectedAccounts.add(data.account);
       }
+      totalAccounts += affectedAccounts.size;
 
       // Push SSE update to connected clients watching these accounts
       const sseData = {

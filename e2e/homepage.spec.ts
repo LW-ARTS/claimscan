@@ -18,7 +18,7 @@ test.describe('Homepage', () => {
   test('displays platform pills with correct count', async ({ page }) => {
     await page.goto('/');
 
-    // All platform pills should be present
+    // Key platforms should be present
     const platforms = ['Bags.fm', 'Clanker', 'Pump.fun', 'Zora', 'Bankr', 'Believe', 'RevShare'];
     for (const name of platforms) {
       await expect(page.getByText(name, { exact: true })).toBeVisible();
@@ -28,11 +28,10 @@ test.describe('Homepage', () => {
   test('displays stats strip with launchpad count', async ({ page }) => {
     await page.goto('/');
 
-    // Stats strip values
-    await expect(page.getByText('8')).toBeVisible();
-    await expect(page.getByText('Launchpads')).toBeVisible();
-    await expect(page.getByText('Chains')).toBeVisible();
-    await expect(page.getByText('Live')).toBeVisible();
+    // Stats strip — 9 launchpads (dynamic from PLATFORM_CONFIG)
+    await expect(page.getByText('9 launchpads').first()).toBeVisible();
+    await expect(page.getByText('2 chains').first()).toBeVisible();
+    await expect(page.getByText('live').first()).toBeVisible();
   });
 
   test('search navigates to profile page', async ({ page }) => {

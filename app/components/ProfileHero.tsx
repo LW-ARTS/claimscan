@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 import { PlatformIcon } from './PlatformIcon';
 import { ShareButton } from './ShareButton';
 import { PLATFORM_CONFIG, LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
 import { safeBigInt, formatUsd, toUsdValue, copyToClipboard } from '@/lib/utils';
+import { signedFetch } from '@/lib/signed-fetch';
 import type { Database, Chain, Platform } from '@/lib/supabase/types';
 
 type Creator = Database['public']['Tables']['creators']['Row'];
@@ -84,7 +86,7 @@ function CheckIcon({ className }: { className?: string }) {
 }
 
 function WalletRow({ wallet }: { wallet: Wallet }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const meta = chainMeta[wallet.chain] ?? { label: wallet.chain, color: 'text-muted-foreground', bg: 'bg-muted border-border' };
   const platformConfig = PLATFORM_CONFIG[wallet.source_platform as keyof typeof PLATFORM_CONFIG];
@@ -96,11 +98,11 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
   const handleCopy = useCallback(async () => {
     if (timerRef.current) clearTimeout(timerRef.current);
     const ok = await copyToClipboard(wallet.address);
-    if (ok) {
-      setCopied(true);
-      timerRef.current = setTimeout(() => setCopied(false), 2000);
-    }
+    setCopyState(ok ? 'copied' : 'failed');
+    timerRef.current = setTimeout(() => setCopyState('idle'), 2000);
   }, [wallet.address]);
+
+  const copied = copyState === 'copied';
 
   return (
     <div className="group flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50">
@@ -108,21 +110,23 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
         {wallet.chain}
       </span>
       <span className="min-w-0 flex-1 overflow-hidden">
-        <span className="block truncate font-mono text-[11px] leading-relaxed text-foreground/80 sm:text-xs">
+        <span className="block truncate font-mono text-[11px] leading-relaxed text-foreground/80 sm:text-xs" title={wallet.address}>
           {wallet.address}
         </span>
       </span>
       <button
         onClick={handleCopy}
-        aria-label={copied ? 'Copied!' : 'Copy address'}
-        title={copied ? 'Copied!' : 'Copy address'}
+        aria-label={copyState === 'copied' ? 'Copied!' : copyState === 'failed' ? 'Copy failed' : 'Copy address'}
+        title={copyState === 'copied' ? 'Copied!' : copyState === 'failed' ? 'Failed to copy' : 'Copy address'}
         className={`inline-flex shrink-0 items-center justify-center rounded-md p-1 transition-all ${
-          copied
+          copyState === 'copied'
             ? 'text-emerald-400'
-            : 'text-muted-foreground/40 hover:bg-muted hover:text-foreground/70'
+            : copyState === 'failed'
+              ? 'text-red-400'
+              : 'text-muted-foreground/40 hover:bg-muted hover:text-foreground/70'
         }`}
       >
-        {copied ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
+        {copyState === 'copied' ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
       </button>
       <span className="hidden shrink-0 items-center gap-1 text-[11px] text-muted-foreground/50 sm:flex">
         via
@@ -175,7 +179,7 @@ export function ProfileHero({
      */
     async function streamLiveFees() {
       try {
-        const res = await fetch('/api/fees/live-stream', {
+        const res = await signedFetch('/api/fees/live-stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ wallets: JSON.parse(walletsKey) }),
@@ -231,7 +235,7 @@ export function ProfileHero({
     /** Fallback: traditional JSON fetch (subject to 10s Vercel limit). */
     async function pollLiveFees() {
       try {
-        const res = await fetch('/api/fees/live', {
+        const res = await signedFetch('/api/fees/live', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ wallets: JSON.parse(walletsKey) }),
@@ -377,7 +381,7 @@ export function ProfileHero({
   // Daily cache buster ensures browser doesn't serve stale avatars after profile pic changes
   const avatarHandle = handle || creator.twitter_handle;
   const isValidHandle = avatarHandle && /^[a-zA-Z0-9_]{1,50}$/.test(avatarHandle);
-  const cacheBuster = new Date().toISOString().slice(0, 10);
+  const cacheBuster = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const avatarUrl = isValidHandle ? `https://unavatar.io/x/${avatarHandle}?_cb=${cacheBuster}` : null;
 
   return (
@@ -391,9 +395,9 @@ export function ProfileHero({
             {/* Avatar */}
             <div className="relative shrink-0">
               {avatarUrl && !avatarError ? (
-                <img
+                <Image
                   src={avatarUrl}
-                  alt={displayName}
+                  alt=""
                   width={72}
                   height={72}
                   className="h-14 w-14 rounded-full border-2 border-border object-cover sm:h-[72px] sm:w-[72px]"
@@ -454,8 +458,9 @@ export function ProfileHero({
                   {formatUsd(displayClaimedUsd)} claimed
                 </span>
                 <span className="h-3 w-px bg-border" aria-hidden="true" />
-                <span className="text-xs tabular-nums font-semibold text-foreground">
-                  {formatUsd(displayUnclaimedUsd)} unclaimed
+                <span className="text-xs tabular-nums font-bold text-foreground">
+                  {formatUsd(displayUnclaimedUsd)}
+                  <span className="ml-0.5 font-semibold text-foreground/70">unclaimed</span>
                 </span>
               </div>
             )}
@@ -474,7 +479,7 @@ export function ProfileHero({
           <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 sm:min-w-[100px]">
             <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Platforms</p>
             <p className="mt-0.5 text-lg font-bold tabular-nums tracking-tight">
-              {platformCount > 0 ? platformCount : '—'}
+              {platformCount > 0 ? platformCount : '\u2014'}
             </p>
           </div>
           {resolveMs > 0 && (

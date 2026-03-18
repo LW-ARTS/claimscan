@@ -6,6 +6,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+
 /**
  * Copy text to clipboard with fallback for older browsers.
  * Returns true if copy succeeded, false otherwise.
@@ -62,6 +63,7 @@ export function formatUsd(value: number): string {
  * Uses BigInt division for large values to avoid Number precision loss.
  */
 export function formatTokenAmount(raw: string, decimals: number): string {
+  if (decimals < 0 || decimals > 78) return '0';
   const bigVal = safeBigInt(raw);
   if (bigVal === 0n) return '0';
 
@@ -103,7 +105,7 @@ export const VALID_PLATFORMS = new Set(Object.keys(PLATFORM_CONFIG));
  * Validate that a value is a valid non-negative integer string (safe for BigInt storage).
  * Rejects negative numbers, decimals, strings > 78 digits (uint256 max), and non-numeric chars.
  */
-export function sanitizeAmountString(val: unknown): string {
+function sanitizeAmountString(val: unknown): string {
   if (typeof val !== 'string') return '0';
   const trimmed = val.trim();
   if (trimmed.length === 0 || trimmed.length > 78) return '0';
@@ -116,7 +118,27 @@ export function sanitizeAmountString(val: unknown): string {
       if (Number.isFinite(num) && num >= 0 && num <= Number.MAX_SAFE_INTEGER) {
         return Math.floor(num).toString();
       }
-    } catch { /* fall through */ }
+      // For scientific notation > MAX_SAFE_INTEGER, use BigInt arithmetic
+      const lower = trimmed.toLowerCase();
+      const [mantissa, expStr] = lower.split('e');
+      const exp = parseInt(expStr, 10);
+      if (mantissa.includes('.')) {
+        // e.g. "1.5e20" → whole=1, frac="5", fracDigits=1, result = 15 * 10^(20-1) = 1.5e20
+        const [wholePart, fracPart] = mantissa.split('.');
+        const fracDigits = fracPart.length;
+        const combined = BigInt(wholePart + fracPart);
+        const adjustedExp = exp - fracDigits;
+        const result = adjustedExp >= 0
+          ? combined * (10n ** BigInt(adjustedExp))
+          : combined / (10n ** BigInt(-adjustedExp));
+        if (result >= 0n) return result.toString();
+      } else {
+        const result = BigInt(mantissa) * (10n ** BigInt(exp));
+        if (result >= 0n) return result.toString();
+      }
+    } catch (err) {
+      console.warn(`[utils] sanitizeAmountString: BigInt conversion failed for "${trimmed}":`, err instanceof Error ? err.message : err);
+    }
     return '0';
   }
   // Accept decimal strings by truncating to integer part (some APIs return formatted values)
@@ -139,8 +161,9 @@ export function sanitizeTokenSymbol(val: unknown): string | null {
  */
 export function sanitizeTokenName(val: unknown): string | null {
   if (typeof val !== 'string') return null;
+  // Strip control chars + Unicode bidi/invisible characters (prevents phishing via invisible chars)
   // eslint-disable-next-line no-control-regex
-  return val.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 100) || null;
+  return val.replace(/[\x00-\x1f\x7f\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g, '').trim().slice(0, 100) || null;
 }
 
 /**
@@ -162,7 +185,7 @@ const NATIVE_TOKEN_FEE_PLATFORMS = new Set([
  * Compute USD value for a fee record.
  * Prefers DB-stored total_earned_usd; falls back to amount × native token price
  * ONLY for platforms that denominate fees in the native token.
- * For non-native token platforms (RevShare, Clanker, Believe, Heaven),
+ * For non-native token platforms (RevShare, Clanker, Believe),
  * returns 0 when total_earned_usd is not available to avoid wrong USD values.
  */
 export function computeFeeUsd(
@@ -229,13 +252,19 @@ export function toUsdValue(
 export function isValidWalletInput(w: unknown): w is { address: string; chain: string; sourcePlatform: string } {
   if (!w || typeof w !== 'object') return false;
   const obj = w as Record<string, unknown>;
-  return (
-    typeof obj.address === 'string' &&
-    obj.address.length >= 2 &&
-    obj.address.length <= 128 &&
-    typeof obj.chain === 'string' &&
-    VALID_CHAINS.has(obj.chain) &&
-    typeof obj.sourcePlatform === 'string' &&
-    VALID_PLATFORMS.has(obj.sourcePlatform)
-  );
+  if (
+    typeof obj.address !== 'string' ||
+    typeof obj.chain !== 'string' ||
+    !VALID_CHAINS.has(obj.chain) ||
+    typeof obj.sourcePlatform !== 'string' ||
+    !VALID_PLATFORMS.has(obj.sourcePlatform)
+  ) return false;
+
+  const addr = obj.address;
+  // Validate address format per chain
+  if (obj.chain === 'sol') {
+    return addr.length >= 32 && addr.length <= 44 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(addr);
+  }
+  // EVM chains (base, eth)
+  return addr.length === 42 && /^0x[a-fA-F0-9]{40}$/.test(addr);
 }

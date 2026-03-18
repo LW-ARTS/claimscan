@@ -46,9 +46,13 @@ function sanitizePrice(raw: unknown): number | null {
 // Native Token Prices (SOL, ETH)
 // ═══════════════════════════════════════════════
 
+// Stale-while-revalidate cache for native prices
+let lastKnownNativePrices: { sol: number; eth: number; fetchedAt: number } | null = null;
+
 export async function getNativeTokenPrices(): Promise<{
   sol: number;
   eth: number;
+  stale: boolean;
 }> {
   try {
     const res = await fetchWithTimeout(
@@ -57,13 +61,20 @@ export async function getNativeTokenPrices(): Promise<{
     );
     if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
     const data = await res.json();
-    return {
+    const prices = {
       sol: sanitizePrice(data.solana?.usd) ?? 0,
       eth: sanitizePrice(data.ethereum?.usd) ?? 0,
     };
+    lastKnownNativePrices = { ...prices, fetchedAt: Date.now() };
+    return { ...prices, stale: false };
   } catch (err) {
     console.error('[prices] CoinGecko fetch failed:', err instanceof Error ? err.message : err);
-    return { sol: 0, eth: 0 };
+    if (lastKnownNativePrices) {
+      const ageMin = Math.round((Date.now() - lastKnownNativePrices.fetchedAt) / 60_000);
+      console.warn(`[prices] Returning stale native prices (${ageMin}min old)`);
+      return { sol: lastKnownNativePrices.sol, eth: lastKnownNativePrices.eth, stale: true };
+    }
+    return { sol: 0, eth: 0, stale: true };
   }
 }
 
@@ -72,11 +83,11 @@ export async function getNativeTokenPrices(): Promise<{
 // ═══════════════════════════════════════════════
 
 async function fetchDexScreenerPrice(
-  chain: 'sol' | 'base',
+  chain: 'sol' | 'base' | 'eth',
   tokenAddress: string
 ): Promise<number | null> {
   try {
-    const CHAIN_SLUG_MAP: Record<string, string> = { sol: 'solana', base: 'base' };
+    const CHAIN_SLUG_MAP: Record<string, string> = { sol: 'solana', base: 'base', eth: 'ethereum' };
     const chainSlug = CHAIN_SLUG_MAP[chain];
     if (!chainSlug) return null;
     const res = await fetchWithTimeout(
@@ -125,7 +136,7 @@ async function fetchJupiterPrice(
       return null;
     }
     const data = await res.json();
-    const price = data.data?.[tokenAddress]?.usdPrice ?? data.data?.[tokenAddress]?.price;
+    const price = data.data?.[tokenAddress]?.usdPrice;
     return sanitizePrice(price);
   } catch (err) {
     console.warn('[prices] Jupiter fetch failed:', err instanceof Error ? err.message : err);
@@ -137,19 +148,24 @@ export async function getTokenPriceWithSource(
   chain: 'sol' | 'base' | 'eth',
   tokenAddress: string
 ): Promise<{ price: number; source: TokenPrice['source'] }> {
-  // DexScreener only supports sol and base; eth tokens on Base use 'base' slug
-  const dexChain = chain === 'eth' ? 'base' : chain;
-  const dexPrice = await fetchDexScreenerPrice(dexChain, tokenAddress);
+  // Fire DexScreener + Jupiter in parallel (prefer DexScreener)
+  const jupiterPromise = chain === 'sol'
+    ? fetchJupiterPrice(tokenAddress)
+    : Promise.resolve(null);
+
+  const [dexResult, jupResult] = await Promise.allSettled([
+    fetchDexScreenerPrice(chain, tokenAddress),
+    jupiterPromise,
+  ]);
+
+  const dexPrice = dexResult.status === 'fulfilled' ? dexResult.value : null;
   if (dexPrice !== null) {
     return { price: dexPrice, source: 'dexscreener' };
   }
 
-  // Jupiter fallback for Solana SPL tokens only
-  if (chain === 'sol') {
-    const jupPrice = await fetchJupiterPrice(tokenAddress);
-    if (jupPrice !== null) {
-      return { price: jupPrice, source: 'jupiter' };
-    }
+  const jupPrice = jupResult.status === 'fulfilled' ? jupResult.value : null;
+  if (jupPrice !== null) {
+    return { price: jupPrice, source: 'jupiter' };
   }
 
   return { price: 0, source: 'none' };
@@ -190,7 +206,3 @@ export async function batchGetTokenPrices(
   return fulfilled;
 }
 
-// Re-export toUsdValue from utils for backward compatibility.
-// The canonical definition lives in lib/utils to avoid bundling server-side
-// fetch code into client components that only need the conversion helper.
-export { toUsdValue } from '@/lib/utils';

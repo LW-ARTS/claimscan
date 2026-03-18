@@ -62,6 +62,7 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
     <div className="space-y-3">
       <button
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="flex w-full cursor-pointer items-center justify-between text-left group"
       >
         <h3 className="text-sm font-semibold tracking-tight">
@@ -121,7 +122,7 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
                     href={getExplorerTxUrl(event.tx_hash, event.chain)!}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-muted-foreground/40 transition-colors hover:text-foreground"
+                    className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] text-muted-foreground/60 transition-colors hover:text-foreground"
                     aria-label={`View on ${getExplorerName(event.chain)}`}
                     title={`View on ${getExplorerName(event.chain)}`}
                   >

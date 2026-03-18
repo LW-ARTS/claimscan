@@ -37,26 +37,17 @@ function isEnumerating(ip: string, handle: string): boolean {
   return entry.handles.size > ENUM_MAX_UNIQUE;
 }
 
-/**
- * Evict the oldest half of rate limit entries to prevent unbounded memory growth.
- * Uses LRU-style eviction instead of clearing the entire map — prevents an attacker
- * from triggering a full reset by flooding with unique IPs.
- */
 function evictStaleEntries(): void {
   const now = Date.now();
-
-  // First pass: remove genuinely expired entries
   for (const [key, entry] of rateLimitMap) {
     if (now > entry.resetAt) rateLimitMap.delete(key);
   }
-
-  // If still over threshold after expiry sweep, evict oldest half
   if (rateLimitMap.size > 10_000) {
-    const entries = Array.from(rateLimitMap.entries())
-      .sort((a, b) => a[1].resetAt - b[1].resetAt);
-    const toDelete = Math.floor(entries.length / 2);
+    // Evict by staleness (earliest resetAt first), not insertion order
+    const sorted = [...rateLimitMap.entries()].sort((a, b) => a[1].resetAt - b[1].resetAt);
+    const toDelete = Math.floor(sorted.length / 2);
     for (let i = 0; i < toDelete; i++) {
-      rateLimitMap.delete(entries[i][0]);
+      rateLimitMap.delete(sorted[i][0]);
     }
   }
 }
@@ -124,16 +115,18 @@ const MAX_BODY_SIZE = 4096;
 /** Stricter rate limit for the search endpoint (most valuable to scrapers) */
 const SEARCH_RATE_LIMIT_MAX = 10; // 10 searches per minute per IP
 
-/** Known scraper/bot User-Agent substrings (lowercase) */
-const SCRAPER_UA_PATTERNS = [
-  'python-requests', 'python-urllib', 'scrapy', 'httpclient',
-  'go-http-client', 'java/', 'libwww-perl', 'wget', 'curl/',
-  'postmanruntime', 'insomnia/', 'httpie/', 'axios/',
-  'node-fetch', 'undici', 'got/', 'superagent',
-  'selenium', 'phantomjs', 'headlesschrome', 'puppeteer',
-  'bytespider', 'petalbot', 'semrushbot', 'ahrefsbot', 'dotbot',
-  'mj12bot', 'barkrowler', 'dataforseobot',
-];
+const SCRAPER_UA_RE = new RegExp(
+  [
+    'python-requests', 'python-urllib', 'scrapy', 'httpclient',
+    'go-http-client', 'java/', 'libwww-perl', 'wget', 'curl/',
+    'postmanruntime', 'insomnia/', 'httpie/', 'axios/',
+    'node-fetch', 'undici', 'got/', 'superagent',
+    'selenium', 'phantomjs', 'headlesschrome', 'puppeteer',
+    'bytespider', 'petalbot', 'semrushbot', 'ahrefsbot', 'dotbot',
+    'mj12bot', 'barkrowler', 'dataforseobot',
+  ].map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+  'i'
+);
 
 /** Allowed origins for API POST requests (anti-scraping) */
 const ALLOWED_API_ORIGINS = new Set([
@@ -162,6 +155,21 @@ const TARPIT_INDICATORS = [
 /** Pattern to match /{handle} routes (single path segment, not /api, /docs, /_next, etc.) */
 const HANDLE_ROUTE_RE = /^\/([a-zA-Z0-9_\-\.]{1,64})$/;
 
+const CSP_HEADER = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://challenges.cloudflare.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://pbs.twimg.com https://abs.twimg.com https://avatars.githubusercontent.com https://imagedelivery.net https://ipfs.io https://unavatar.io",
+  "font-src 'self' https://fonts.gstatic.com",
+  "connect-src 'self' https://*.supabase.co https://api.coingecko.com https://api.dexscreener.com https://api.jup.ag https://*.ingest.sentry.io https://*.helius-rpc.com wss://*.helius-rpc.com https://api.mainnet-beta.solana.com",
+  "frame-src 'self' https://challenges.cloudflare.com",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "upgrade-insecure-requests",
+].join('; ');
+
 function getTarpitDelayMs(request: NextRequest): number {
   let suspicionScore = 0;
   for (const check of TARPIT_INDICATORS) {
@@ -189,23 +197,7 @@ export async function middleware(request: NextRequest) {
     'Permissions-Policy',
     'camera=(), microphone=(), geolocation=(), payment=()'
   );
-  response.headers.set(
-    'Content-Security-Policy',
-    [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://challenges.cloudflare.com",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://pbs.twimg.com https://abs.twimg.com https://avatars.githubusercontent.com https://imagedelivery.net https://ipfs.io https://unavatar.io",
-      "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self' https://*.supabase.co https://api.coingecko.com https://api.dexscreener.com https://api.jup.ag https://*.ingest.sentry.io https://*.helius-rpc.com wss://*.helius-rpc.com https://api.mainnet-beta.solana.com",
-      "frame-src 'self' https://challenges.cloudflare.com",
-      "frame-ancestors 'none'",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "upgrade-insecure-requests",
-    ].join('; ')
-  );
+  response.headers.set('Content-Security-Policy', CSP_HEADER);
   // Only set HSTS in production to avoid issues with local dev
   if (process.env.NODE_ENV === 'production') {
     response.headers.set(
@@ -214,10 +206,10 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  // CORS — fail closed to production URL; never reflect attacker-controlled origin
+  // CORS — reflect request Origin only if it's in our allowlist (not attacker-controlled)
   const ALLOWED_ORIGINS = new Set(['https://claimscan.tech', 'https://www.claimscan.tech']);
-  const rawOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  const allowedOrigin = rawOrigin && ALLOWED_ORIGINS.has(rawOrigin) ? rawOrigin : 'https://claimscan.tech';
+  const requestOrigin = request.headers.get('origin');
+  const allowedOrigin = requestOrigin && ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : 'https://claimscan.tech';
   response.headers.set('Access-Control-Allow-Origin', allowedOrigin);
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Request-Sig');
@@ -249,7 +241,7 @@ export async function middleware(request: NextRequest) {
   // Block known scraper User-Agents on API routes
   if (pathname.startsWith('/api/')) {
     const ua = request.headers.get('user-agent')?.toLowerCase() ?? '';
-    if (SCRAPER_UA_PATTERNS.some((pattern) => ua.includes(pattern))) {
+    if (SCRAPER_UA_RE.test(ua)) {
       return NextResponse.json(
         { error: 'Automated access is not permitted' },
         { status: 403 }
@@ -271,6 +263,7 @@ export async function middleware(request: NextRequest) {
     request.method === 'POST' &&
     pathname.startsWith('/api/') &&
     !pathname.startsWith('/api/cron') &&
+    !pathname.startsWith('/api/webhooks') &&
     process.env.NODE_ENV !== 'development'
   ) {
     const origin = request.headers.get('origin');
@@ -337,7 +330,9 @@ export async function middleware(request: NextRequest) {
     // create a per-request pseudo-key from available headers to avoid a shared bucket.
     // In dev (no Vercel IP injection), use localhost fallback.
     const rateLimitKey = ip
-      || `anon:${request.headers.get('user-agent')?.slice(0, 64) ?? 'none'}:${request.headers.get('accept-language')?.slice(0, 16) ?? 'none'}`;
+      || (process.env.NODE_ENV === 'production'
+        ? 'anon:unknown'
+        : `anon:${request.headers.get('user-agent')?.slice(0, 64) ?? 'none'}:${request.headers.get('accept-language')?.slice(0, 16) ?? 'none'}`);
 
     // Use Upstash Redis (persistent across serverless instances) when configured,
     // otherwise fall back to in-memory rate limiting (best-effort per-instance).
@@ -382,7 +377,8 @@ export async function middleware(request: NextRequest) {
           { status: 411 }
         );
       }
-      if (parseInt(contentLength, 10) > MAX_BODY_SIZE) {
+      const parsedLength = parseInt(contentLength, 10);
+      if (isNaN(parsedLength) || parsedLength > MAX_BODY_SIZE) {
         return NextResponse.json(
           { error: 'Request body too large' },
           { status: 413 }

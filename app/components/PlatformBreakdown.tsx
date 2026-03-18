@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useId, useMemo, useCallback, useEffect, Component, type ReactNode } from 'react';
+import { useState, useId, useMemo, useCallback, useEffect, useRef, Component, type ReactNode } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import dynamic from 'next/dynamic';
 import { TokenFeeTable } from './TokenFeeTable';
@@ -41,10 +41,13 @@ type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 /** Ordered list of all platforms to always show in tabs */
 const ALL_PLATFORMS = Object.keys(PLATFORM_CONFIG) as Platform[];
 
+type Wallet = Database['public']['Tables']['wallets']['Row'];
+
 interface PlatformBreakdownProps {
   fees: FeeRecord[];
   solPrice?: number;
   ethPrice?: number;
+  wallets?: Wallet[];
 }
 
 interface ChainSummary {
@@ -55,15 +58,22 @@ interface ChainSummary {
   partialCount: number;
 }
 
-export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: PlatformBreakdownProps) {
+export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = [] }: PlatformBreakdownProps) {
   const [activeTab, setActiveTab] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unclaimed' | 'claimed' | 'partial'>('all');
   const tabsId = useId();
   const { publicKey } = useWallet();
   const [mounted, setMounted] = useState(false);
+  const tabPanelRef = useRef<HTMLDivElement>(null);
   useEffect(() => setMounted(true), []);
   // Only expose wallet after client mount to avoid SSR issues
   const connectedWallet = mounted ? (publicKey?.toBase58() ?? null) : null;
+
+  // Extract the Bags-registered wallet for claim verification
+  const bagsRegisteredWallet = useMemo(() => {
+    const bagsWallet = wallets.find((w) => w.source_platform === 'bags' && w.chain === 'sol');
+    return bagsWallet?.address ?? null;
+  }, [wallets]);
 
   // Claim dialog state
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
@@ -128,6 +138,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
     }
     if (newIdx !== idx) {
       setActiveTab(tabKeys[newIdx]);
+      // Per WAI-ARIA tabs: focus stays on the tab, user presses Tab to enter panel
       document.getElementById(`${tabsId}-tab-${tabKeys[newIdx]}`)?.focus();
     }
   }
@@ -299,13 +310,30 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
       ))}
 
       {/* Status filter */}
-      <div className="flex items-center gap-0.5 rounded-xl bg-muted/50 p-1">
-        {(['all', 'unclaimed', 'claimed', ...(totalPartial > 0 ? ['partial'] as const : [])] as const).map((status) => {
+      <div
+        role="radiogroup"
+        aria-label="Filter by claim status"
+        className="flex items-center gap-0.5 rounded-xl bg-muted/50 p-1"
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+          e.preventDefault();
+          const items = e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+          const idx = Array.from(items).indexOf(e.target as HTMLButtonElement);
+          if (idx === -1) return;
+          const next = e.key === 'ArrowRight' ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
+          items[next].focus();
+          items[next].click();
+        }}
+      >
+        {(['all', 'unclaimed', 'claimed', ...(totalPartial > 0 ? ['partial'] as const : [])] as const).map((status, i) => {
           const count = statusCounts[status as keyof typeof statusCounts] ?? 0;
           const isActive = statusFilter === status;
           return (
             <button
               key={status}
+              role="radio"
+              aria-checked={isActive}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => setStatusFilter(status as typeof statusFilter)}
               className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 isActive
@@ -315,7 +343,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
             >
               {status}
               <span className={`tabular-nums text-[10px] ${
-                isActive ? 'text-background/60' : 'text-muted-foreground/50'
+                isActive ? 'text-background/60' : 'text-muted-foreground/60'
               }`}>
                 {count}
               </span>
@@ -341,6 +369,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
 
       {/* Tab panel */}
       <div
+        ref={tabPanelRef}
         role="tabpanel"
         id={`${tabsId}-panel`}
         aria-labelledby={`${tabsId}-tab-${activeTab}`}
@@ -377,6 +406,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0 }: Platform
             open={claimDialogOpen}
             onOpenChange={setClaimDialogOpen}
             wallet={connectedWallet}
+            bagsRegisteredWallet={bagsRegisteredWallet}
             fees={displayFees.filter((f) => selectedForClaim.includes(f.token_address) && f.platform === 'bags')}
             solPrice={solPrice}
             onClaimComplete={handleClaimComplete}
