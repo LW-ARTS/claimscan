@@ -385,57 +385,54 @@ export function ProfileHero({
   const avatarUrl = isValidHandle ? `https://unavatar.io/x/${avatarHandle}?_cb=${cacheBuster}` : null;
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
-      {/* Main hero section */}
-      <div className="p-5 sm:p-8">
-        {/* Desktop: side-by-side | Mobile: stacked */}
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          {/* Left: identity */}
-          <div className="flex items-start gap-3.5 sm:gap-5">
-            {/* Avatar */}
+    <div className="overflow-hidden rounded-2xl border border-[#ddd] bg-white">
+      <div className="px-5 py-6 sm:px-14 sm:py-12">
+        {/* Hero: side-by-side on desktop, stacked on mobile */}
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          {/* Left: avatar + name + badges */}
+          <div className="flex items-center gap-4 sm:gap-6">
             <div className="relative shrink-0">
               {avatarUrl && !avatarError ? (
                 <Image
                   src={avatarUrl}
                   alt=""
-                  width={72}
-                  height={72}
-                  className="h-14 w-14 rounded-full border-2 border-border object-cover sm:h-[72px] sm:w-[72px]"
+                  width={100}
+                  height={100}
+                  className="h-14 w-14 rounded-full object-cover sm:h-[100px] sm:w-[100px]"
                   onError={() => setAvatarError(true)}
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border bg-muted text-xl font-black text-foreground sm:h-[72px] sm:w-[72px] sm:text-2xl">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-black text-xl font-black text-white sm:h-[100px] sm:w-[100px] sm:text-4xl">
                   {displayName[0]?.toUpperCase()}
                 </div>
               )}
             </div>
 
-            {/* Name + badges */}
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">
+            <div className="min-w-0 space-y-2 sm:space-y-3">
+              <h1 className="truncate text-xl font-bold tracking-tight text-black sm:text-[32px]">
                 {displayName}
               </h1>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 {creator.twitter_handle && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-xs text-muted-foreground">
-                    <XIcon className="h-3 w-3" />
+                  <span className="inline-flex items-center gap-1.5 border border-[#ddd] px-2 py-1 text-xs text-black sm:px-3 sm:py-1.5 sm:text-[13px]">
+                    <XIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     @{creator.twitter_handle}
                   </span>
                 )}
                 {creator.github_handle && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5 border border-[#ddd] px-2 py-1 text-xs text-[#777] sm:px-3 sm:py-1.5 sm:text-[13px]">
                     {creator.github_handle}
                   </span>
                 )}
                 {chains.map((chain) => {
-                  const meta = chainMeta[chain] ?? { label: chain, color: 'text-muted-foreground', bg: 'bg-muted border-border' };
+                  const meta = chainMeta[chain] ?? { label: chain, color: '', bg: '' };
                   return (
                     <span
                       key={chain}
-                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${meta.bg} ${meta.color}`}
+                      className="inline-flex items-center gap-1.5 border border-[#ddd] px-2 py-1 text-[11px] text-[#777] sm:px-3 sm:py-1.5 sm:text-xs"
                     >
-                      <PulsingDot className="h-1 w-1" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-black" aria-hidden="true" />
                       {meta.label}
                     </span>
                   );
@@ -444,23 +441,18 @@ export function ProfileHero({
             </div>
           </div>
 
-          {/* Right: hero total (desktop) / centered (mobile) */}
-          <div className="text-center sm:text-right sm:shrink-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+          {/* Right: TOTAL EARNED */}
+          <div className="shrink-0 text-center sm:text-right">
+            <p className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#777]">
               Total Earned
             </p>
-            <p className="mt-1 text-4xl font-black tabular-nums tracking-tighter sm:text-6xl">
+            <p className="mt-1 text-4xl font-black tabular-nums tracking-tighter text-black sm:text-6xl">
               {formatUsd(totalEarnedUsd)}
             </p>
             {totalEarnedUsd > 0 && (
-              <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-1.5">
-                <span className="text-xs tabular-nums font-medium text-muted-foreground">
+              <div className="mt-2 inline-flex items-center border border-[#ddd] px-3 py-1.5 sm:mt-3 sm:px-4 sm:py-2">
+                <span className="font-mono text-xs text-[#777] sm:text-[13px]">
                   {formatUsd(displayClaimedUsd)} claimed
-                </span>
-                <span className="h-3 w-px bg-border" aria-hidden="true" />
-                <span className="text-xs tabular-nums font-bold text-foreground">
-                  {formatUsd(displayUnclaimedUsd)}
-                  <span className="ml-0.5 font-semibold text-foreground/70">unclaimed</span>
                 </span>
               </div>
             )}
@@ -468,33 +460,34 @@ export function ProfileHero({
         </div>
 
         {/* Stats row */}
-        <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
-          <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 sm:min-w-[120px]">
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Unclaimed</p>
-            <p className="mt-0.5 text-lg font-bold tabular-nums tracking-tight" aria-live="polite" aria-atomic>
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:flex sm:gap-3">
+          <div className="border border-[#ddd] px-4 py-4 sm:px-6 sm:py-5">
+            <p className="font-mono text-[10px] font-normal uppercase tracking-[1px] text-[#777] sm:text-[11px]">Unclaimed</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-black sm:mt-1.5 sm:text-[26px]" aria-live="polite" aria-atomic>
               {formatUsd(displayUnclaimedUsd)}
-              {loading && <PulsingDot className="ml-1.5 inline-flex h-1.5 w-1.5 text-foreground" />}
+              {loading && <PulsingDot className="ml-1.5 inline-flex h-1.5 w-1.5 text-black" />}
             </p>
           </div>
-          <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 sm:min-w-[100px]">
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Platforms</p>
-            <p className="mt-0.5 text-lg font-bold tabular-nums tracking-tight">
+          <div className="border border-[#ddd] px-4 py-4 sm:px-6 sm:py-5">
+            <p className="font-mono text-[10px] font-normal uppercase tracking-[1px] text-[#777] sm:text-[11px]">Platforms</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-black sm:mt-1.5 sm:text-[26px]">
               {platformCount > 0 ? platformCount : '\u2014'}
             </p>
           </div>
           {resolveMs > 0 && (
-            <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 sm:min-w-[110px]">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Scanned in</p>
-              <p className="mt-0.5 text-lg font-bold tabular-nums tracking-tight">
+            <div className="border border-[#ddd] px-4 py-4 sm:px-6 sm:py-5">
+              <p className="font-mono text-[10px] font-normal uppercase tracking-[1px] text-[#777] sm:text-[11px]">Scanned In</p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-black sm:mt-1.5 sm:text-[26px]">
                 {(resolveMs / 1000).toFixed(1)}s
               </p>
             </div>
           )}
         </div>
 
-        {/* Share buttons */}
+        {/* Divider + Action buttons */}
         {totalEarnedUsd > 0 && (
-          <div className="mt-5 pt-5 border-t border-border/40">
+          <div className="mt-8 space-y-4 sm:mt-10">
+            <div className="h-px bg-[#ddd]" />
             <ShareButton
               handle={handle}
               totalEarnedUsd={totalEarnedUsd}
@@ -506,29 +499,29 @@ export function ProfileHero({
 
       {/* Wallets section */}
       {wallets.length > 0 && (
-        <div className="border-t border-border/40 px-5 py-3 sm:px-8">
+        <div className="px-5 pb-5 sm:px-14 sm:pb-6">
           {!showAllWallets ? (
             <button
               onClick={() => setShowAllWallets(true)}
-              className="flex w-full items-center justify-between rounded-lg px-1 py-1 text-[11px] transition-colors hover:bg-muted/40 group"
+              className="group flex w-full cursor-pointer items-center justify-between py-2 transition-colors"
             >
-              <span className="font-medium uppercase tracking-wider text-muted-foreground/40 group-hover:text-muted-foreground">
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[2px] text-[#999] sm:text-[11px]">
                 Resolved Wallets
               </span>
-              <span className="flex items-center gap-1.5 tabular-nums text-muted-foreground/30 group-hover:text-muted-foreground">
+              <span className="flex items-center gap-2 font-mono text-xs text-[#999] sm:text-[13px]">
                 {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                 </svg>
               </span>
             </button>
           ) : (
             <>
-              <div className="mb-2.5 flex items-center justify-between px-1">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/40">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="font-mono text-[10px] font-medium uppercase tracking-[2px] text-[#999] sm:text-[11px]">
                   Resolved Wallets
                 </p>
-                <p className="text-[11px] tabular-nums text-muted-foreground/30">
+                <p className="font-mono text-xs tabular-nums text-[#999] sm:text-[13px]">
                   {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -539,7 +532,7 @@ export function ProfileHero({
               </div>
               <button
                 onClick={() => setShowAllWallets(false)}
-                className="mt-2 w-full rounded-lg py-1.5 text-center text-[11px] font-medium text-muted-foreground/50 transition-colors hover:bg-muted/40 hover:text-muted-foreground"
+                className="mt-3 w-full cursor-pointer py-2 text-center font-mono text-[11px] font-medium text-[#999] transition-colors hover:text-black"
               >
                 Hide wallets
               </button>

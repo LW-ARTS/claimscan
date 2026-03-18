@@ -159,7 +159,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
 
     {/* Desktop: table layout — 1:1 match with Pencil design */}
     <div className="hidden md:block overflow-x-auto">
-      <table className="w-full table-fixed" style={{ fontFamily: 'var(--font-mono)', minWidth: connectedWallet && onClaimToken ? '1096px' : '950px' }} aria-label="Creator fee records by token">
+      <table className="w-full table-fixed font-mono" style={{ minWidth: connectedWallet && onClaimToken ? '1096px' : '950px' }} aria-label="Creator fee records by token">
         <caption className="sr-only">Fee records showing earned, claimed, and unclaimed amounts per token</caption>
         <colgroup>
           <col style={{ width: 200 }} />
@@ -197,12 +197,11 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                   <div className="flex items-center gap-2">
                     <span
                       className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black text-[11px] font-bold text-white"
-                      style={{ fontFamily: 'var(--font-sans)' }}
-                      aria-hidden="true"
+                                           aria-hidden="true"
                     >
                       {badge}
                     </span>
-                    <span className="text-sm font-semibold text-black" style={{ fontFamily: 'var(--font-sans)' }}>
+                    <span className="font-sans text-sm font-semibold text-black">
                       {label}
                     </span>
                     {fee.token_address && (
@@ -234,7 +233,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                 <td className={`py-3.5 text-right text-[13px] tabular-nums ${isZeroUnclaimed ? 'text-[#999]' : 'text-black'}`}>
                   {formatTokenAmount(fee.total_unclaimed, decimals)} {chainLabel}
                 </td>
-                <td className="py-3.5 text-right text-[13px] font-bold tabular-nums text-black" style={{ fontFamily: 'var(--font-sans)' }}>
+                <td className="py-3.5 text-right font-sans text-[13px] font-bold tabular-nums text-black">
                   {formatUsd(usd)}
                 </td>
                 <td className="py-3.5 text-center">
@@ -261,8 +260,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                         onClick={() => onClaimToken(fee.token_address)}
                         aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
                         className="inline-flex items-center gap-1.5 bg-black px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[1px] text-white transition-all hover:bg-black/90 active:scale-95"
-                        style={{ fontFamily: 'var(--font-sans)' }}
-                      >
+                                             >
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                         </svg>
