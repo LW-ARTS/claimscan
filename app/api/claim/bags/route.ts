@@ -9,6 +9,11 @@ import { CLAIMSCAN_FEE_BPS, MIN_FEE_LAMPORTS } from '@/lib/constants';
 export const maxDuration = 10;
 
 export async function POST(request: Request) {
+  const contentType = request.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    return NextResponse.json({ error: 'Content-Type must be application/json' }, { status: 415 });
+  }
+
   // Fail fast if HMAC secret is not configured
   try { generateConfirmToken('_test', '_test'); } catch {
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
@@ -115,6 +120,8 @@ export async function POST(request: Request) {
   });
 
   if (mintsToInsert.length > 0) {
+    // TODO: Create partial unique index for true atomic locking:
+    // CREATE UNIQUE INDEX idx_claim_attempts_active ON claim_attempts (wallet_address, token_address) WHERE status IN ('pending','signing','submitted');
     // Step 2: Bulk insert all available mints (1 INSERT)
     const rows = mintsToInsert.map((mint) => ({
       wallet_address: wallet,

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { createServiceClient } from '@/lib/supabase/service';
+import { createClient } from '@supabase/supabase-js';
 
 // Regenerate sitemap at most once per hour (ISR)
 export const revalidate = 3600;
@@ -21,7 +21,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   try {
-    const supabase = createServiceClient();
+    // Use anon key (not service role) -- sitemap is public, no need to bypass RLS
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false } }
+    );
 
     // Query creators with any known handle (twitter, github, or farcaster)
     const { data } = await supabase
@@ -44,8 +49,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         });
       }
     }
-  } catch {
+  } catch (err) {
     // Return at least the root URL on error
+    console.error('[sitemap] Failed to generate full sitemap:', err instanceof Error ? err.message : err);
   }
 
   return entries;

@@ -155,10 +155,14 @@ const Grainient: React.FC<GrainientProps> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Skip animation loop for users who prefer reduced motion
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
     let raf = 0;
     let ro: ResizeObserver | null = null;
     let canvasEl: HTMLCanvasElement | null = null;
     let visHandler: (() => void) | null = null;
+    let idleCleanup: (() => void) | null = null;
     const container = containerRef.current;
 
     import('ogl').then(({ Renderer, Program, Mesh, Triangle }) => {
@@ -226,7 +230,7 @@ const Grainient: React.FC<GrainientProps> = ({
       };
 
       ro = new ResizeObserver(() => {
-        // Skip height-only changes — iOS Safari address bar show/hide during scroll
+        // Skip height-only changes -- iOS Safari address bar show/hide during scroll
         const w = Math.max(1, Math.floor(container.getBoundingClientRect().width));
         if (lastW > 0 && w === lastW) return;
         setSize();
@@ -236,12 +240,38 @@ const Grainient: React.FC<GrainientProps> = ({
 
       const t0 = performance.now();
       let paused = false;
+      let idleTimer: ReturnType<typeof setTimeout> | null = null;
+      let idlePaused = false;
+      const IDLE_TIMEOUT_MS = 5000;
+      const isTouchDevice = window.matchMedia('(hover: none)').matches;
+
       const loop = (t: number) => {
-        if (paused) return;
+        if (paused || idlePaused) return;
         (program.uniforms.iTime as { value: number }).value = (t - t0) * 0.001;
         renderer.render({ scene: mesh });
         raf = requestAnimationFrame(loop);
       };
+
+      // Idle detection: pause after 5s of no interaction, resume on activity
+      const resetIdle = () => {
+        if (idlePaused) {
+          idlePaused = false;
+          if (!paused) raf = requestAnimationFrame(loop);
+        }
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          idlePaused = true;
+          cancelAnimationFrame(raf);
+        }, isTouchDevice ? IDLE_TIMEOUT_MS / 2 : IDLE_TIMEOUT_MS);
+      };
+      const idleEvents = ['scroll', 'mousemove', 'touchstart', 'keydown'] as const;
+      idleEvents.forEach((e) => window.addEventListener(e, resetIdle, { passive: true }));
+      idleCleanup = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleEvents.forEach((e) => window.removeEventListener(e, resetIdle as EventListener));
+      };
+      resetIdle();
+
       raf = requestAnimationFrame(loop);
 
       // Pause animation when tab is hidden to save GPU/battery
@@ -251,7 +281,7 @@ const Grainient: React.FC<GrainientProps> = ({
           cancelAnimationFrame(raf);
         } else {
           paused = false;
-          raf = requestAnimationFrame(loop);
+          if (!idlePaused) raf = requestAnimationFrame(loop);
         }
       };
       document.addEventListener('visibilitychange', visHandler);
@@ -263,6 +293,7 @@ const Grainient: React.FC<GrainientProps> = ({
       cancelAnimationFrame(raf);
       ro?.disconnect();
       if (visHandler) document.removeEventListener('visibilitychange', visHandler);
+      idleCleanup?.();
       if (canvasEl) {
         try {
           container.removeChild(canvasEl);

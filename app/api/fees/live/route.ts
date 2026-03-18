@@ -50,6 +50,8 @@ async function fetchAndRespond(validated: ResolvedWallet[]) {
   }
 }
 
+// GET is deprecated — use POST to benefit from origin validation and request signing.
+// Kept for backward compatibility but rate-limited more aggressively.
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const walletsParam = searchParams.get('wallets');
@@ -58,6 +60,14 @@ export async function GET(request: Request) {
     return NextResponse.json(
       { error: 'wallets parameter required (JSON array)' },
       { status: 400 }
+    );
+  }
+
+  // Limit URL-encoded JSON size to prevent oversized query strings
+  if (walletsParam.length > 2048) {
+    return NextResponse.json(
+      { error: 'wallets parameter too large — use POST instead' },
+      { status: 413 }
     );
   }
 

@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { SearchBar } from './components/SearchBar';
 
+export const metadata = { title: 'Page Not Found' };
+
 export default function NotFound() {
   return (
     <div className="space-y-8">

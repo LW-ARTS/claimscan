@@ -160,7 +160,7 @@ const PAGE_SIZE = 100;
  */
 export async function fetchVaultClaimTotal(
   vaultAddress: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<bigint> {
   if (!isHeliusAvailable()) return 0n;
 
@@ -188,8 +188,9 @@ export async function fetchVaultClaimTotal(
           transfer.fromUserAccount === vaultAddress &&
           transfer.amount > 0
         ) {
-          // Convert via string to avoid Number precision loss for values > 2^53
-          total += BigInt(transfer.amount.toFixed(0));
+          // Note: Helius returns amount as JS number — precision loss for > 2^53 lamports (~9000 SOL).
+          // Use Math.trunc to avoid toFixed rounding, then convert to BigInt.
+          total += BigInt(Math.trunc(transfer.amount));
         }
       }
     }
@@ -244,8 +245,8 @@ export async function fetchTokenClaimTotal(
           transfer.mint === tokenMint &&
           transfer.tokenAmount > 0
         ) {
-          // Convert via string to avoid Number precision loss for large token amounts
-          total += BigInt(transfer.tokenAmount.toFixed(0));
+          // Note: Helius returns tokenAmount as JS number — precision loss for > 2^53.
+          total += BigInt(Math.trunc(transfer.tokenAmount));
         }
       }
     }

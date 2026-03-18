@@ -27,6 +27,7 @@ export const pumpAdapter: PlatformAdapter = {
   supportsIdentityResolution: false,
   supportsLiveFees: true,
   supportsHandleBasedFees: false,
+  historicalCoversLive: false,
 
   async resolveIdentity(
     _handle: string,

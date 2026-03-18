@@ -32,6 +32,8 @@ export async function GET(request: Request) {
     );
   }
 
+  const truncated = (fees?.length ?? 0) >= 500;
+
   // Aggregate totals
   let totalEarnedUsd = 0;
   let totalClaimedCount = 0;
@@ -54,6 +56,7 @@ export async function GET(request: Request) {
       claimedCount: totalClaimedCount,
       unclaimedCount: totalUnclaimedCount,
       partiallyClaimedCount: totalPartialCount,
+      truncated,
     },
   });
 }

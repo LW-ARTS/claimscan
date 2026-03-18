@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
 import { createServiceClient } from '@/lib/supabase/service';
 import { invalidatePositionsCache } from '@/lib/platforms/bags-api';
-import { generateConfirmToken, verifyConfirmToken } from '@/lib/claim/hmac';
+import { verifyConfirmToken } from '@/lib/claim/hmac';
 import { CLAIMSCAN_FEE_WALLET } from '@/lib/constants';
 import type { ClaimAttemptStatus } from '@/lib/supabase/types';
 
@@ -28,6 +28,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const TX_SIG_RE = /^[1-9A-HJ-NP-Za-km-z]{86,88}$/;
 
 export async function POST(request: Request) {
+  const contentType = request.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    return NextResponse.json({ error: 'Content-Type must be application/json' }, { status: 415 });
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -57,13 +62,8 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json({ ok: true }); // Silent ignore unauthenticated
     }
-    try {
-      const expectedFeeToken = generateConfirmToken(feeAttemptId, feeWallet);
-      if (!verifyConfirmToken(feeConfirmToken, expectedFeeToken)) {
-        return NextResponse.json({ ok: true }); // Silent ignore invalid token
-      }
-    } catch {
-      return NextResponse.json({ ok: true }); // HMAC not configured
+    if (!verifyConfirmToken(feeConfirmToken, feeAttemptId, feeWallet)) {
+      return NextResponse.json({ ok: true });
     }
     let feeLamports: string = rawFeeLamports;
     const parsedFee = BigInt(feeLamports);
@@ -98,10 +98,22 @@ export async function POST(request: Request) {
       }
       verified = actualDelta > 0n;
     } catch (rpcErr) {
-      // RPC failure — skip insert entirely rather than trusting client-supplied amount.
-      // The fee can be reconciled later via cron or manual verification.
-      console.warn(`[claim/confirm] Fee verification RPC failed, skipping insert for sig=${feeSig}:`, rpcErr instanceof Error ? rpcErr.message : rpcErr);
-      return NextResponse.json({ ok: true });
+      // RPC failure — insert with fee_lamports='0' to track the attempt.
+      // Actual amount will be reconciled via cron once RPC is available.
+      // Never trust client-supplied rawFeeLamports for unverified records.
+      console.error(`[claim/confirm] FEE_VERIFICATION_FAILED: sig=${feeSig} wallet=${feeWallet} lamports=${rawFeeLamports} — inserting unverified record with amount=0`);
+      try {
+        const svc = createServiceClient();
+        await svc.from('claim_fees').insert({
+          wallet_address: feeWallet,
+          tx_signature: feeSig,
+          fee_lamports: '0',
+          verified: false,
+        });
+      } catch (insertErr) {
+        console.error('[claim/confirm] Failed to insert unverified fee record:', insertErr instanceof Error ? insertErr.message : insertErr);
+      }
+      return NextResponse.json({ ok: true, pendingVerification: true });
     }
 
     // Skip insert if on-chain verification found zero transfer (avoids CHECK constraint violation)
@@ -153,13 +165,7 @@ export async function POST(request: Request) {
   }
 
   // Verify HMAC token — constant-time comparison prevents timing attacks
-  let expectedToken: string;
-  try {
-    expectedToken = generateConfirmToken(claimAttemptId, wallet);
-  } catch {
-    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
-  }
-  if (!verifyConfirmToken(confirmToken, expectedToken)) {
+  if (!verifyConfirmToken(confirmToken, claimAttemptId, wallet)) {
     return NextResponse.json({ error: 'Invalid confirm token' }, { status: 403 });
   }
 
@@ -219,7 +225,7 @@ export async function POST(request: Request) {
   if (txSignature) updateData.tx_signature = txSignature;
   if (errorReason && typeof errorReason === 'string') {
     // eslint-disable-next-line no-control-regex
-    updateData.error_reason = errorReason.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 500);
+    updateData.error_reason = errorReason.replace(/[\x00-\x1f\x7f\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g, '').trim().slice(0, 500);
   }
 
   // Optimistic lock: only update if status hasn't changed since we read it

@@ -87,7 +87,14 @@ export async function bagsFetch<T>(
       return null;
     }
     if (!res.ok) {
-      console.warn(`[bags] fetch ${path} returned HTTP ${res.status}`);
+      if (res.status === 401 || res.status === 403) {
+        const keyIdx = keys.indexOf(apiKey);
+        console.error(`[bags] CRITICAL: API key #${keyIdx} returned HTTP ${res.status} for ${path} — possible key revocation`);
+      } else if (res.status >= 500) {
+        console.error(`[bags] fetch ${path} returned HTTP ${res.status} (server error)`);
+      } else {
+        console.warn(`[bags] fetch ${path} returned HTTP ${res.status}`);
+      }
       return null;
     }
     return await res.json() as T;
@@ -101,20 +108,29 @@ export async function bagsFetch<T>(
 // Short-lived positions cache
 // ═══════════════════════════════════════════════
 
+/** Bags API returns lamport amounts as strings for BigInt precision.
+ * Accept string | number to handle both formats gracefully. */
 interface BagsClaimablePosition {
   baseMint: string;
   quoteMint?: string | null;
-  totalClaimableLamportsUserShare: number;
-  claimableDisplayAmount?: number | null;
+  totalClaimableLamportsUserShare: string | number;
+  claimableDisplayAmount?: string | number | null;
   userBps?: number | null;
   isMigrated?: boolean;
   isCustomFeeVault?: boolean;
   virtualPool?: string;
   virtualPoolAddress?: string | null;
   dammPoolAddress?: string | null;
-  virtualPoolClaimableLamportsUserShare?: number | null;
-  dammPoolClaimableLamportsUserShare?: number | null;
-  userVaultClaimableLamportsUserShare?: number | null;
+  virtualPoolClaimableLamportsUserShare?: string | number | null;
+  dammPoolClaimableLamportsUserShare?: string | number | null;
+  userVaultClaimableLamportsUserShare?: string | number | null;
+  programId?: string | null;
+  customFeeVaultBalance?: string | number | null;
+  customFeeVaultBps?: number | null;
+  customFeeVaultClaimerSide?: string | null;
+  customFeeVaultClaimerA?: string | null;
+  customFeeVaultClaimerB?: string | null;
+  claimerIndex?: number | null;
 }
 
 interface BagsApiResponse<T> {
@@ -125,11 +141,13 @@ interface BagsApiResponse<T> {
 const positionsCache = new Map<string, { data: BagsClaimablePosition[]; ts: number }>();
 const POSITIONS_CACHE_TTL_MS = 30_000;
 
-export async function getClaimablePositionsCached(wallet: string): Promise<BagsClaimablePosition[]> {
+export async function getClaimablePositionsCached(wallet: string, signal?: AbortSignal): Promise<BagsClaimablePosition[]> {
   const cached = positionsCache.get(wallet);
   if (cached && Date.now() - cached.ts < POSITIONS_CACHE_TTL_MS) {
     return cached.data;
   }
+
+  if (signal?.aborted) return cached?.data ?? [];
 
   const res = await bagsFetch<BagsApiResponse<BagsClaimablePosition[]>>(
     `/token-launch/claimable-positions?wallet=${encodeURIComponent(wallet)}`

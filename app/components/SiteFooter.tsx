@@ -1,18 +1,12 @@
-'use client';
-
-import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 
+/**
+ * Site footer. Always renders as a server component.
+ * Hidden on the homepage via CSS (see globals.css `.home-page ~ .site-footer`).
+ */
 export function SiteFooter() {
-  const pathname = usePathname();
-
-  // Hide footer on homepage (has its own layout)
-  if (pathname === '/') {
-    return null;
-  }
-
   return (
-    <footer className="border-t border-border/50 bg-background/60 backdrop-blur-sm" aria-label="Site footer">
+    <footer className="site-footer border-t border-border bg-background/60 backdrop-blur-sm" aria-label="Site footer">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
           {/* Brand + tagline */}
@@ -28,16 +22,16 @@ export function SiteFooter() {
               </div>
               <span className="text-sm font-semibold text-foreground">ClaimScan</span>
             </div>
-            <p className="text-[11px] text-muted-foreground/40">
+            <p className="text-[11px] text-muted-foreground/60">
               Track and claim creator fees across Solana and Base
             </p>
           </div>
 
-          {/* Right side — links + social */}
+          {/* Right side -- links + social */}
           <div className="flex items-center gap-2">
             <Link
               href="/docs"
-              className="inline-flex items-center px-2 py-2 text-[11px] text-muted-foreground/50 transition-colors hover:text-foreground"
+              className="inline-flex items-center px-2 py-2 text-[11px] text-muted-foreground/60 transition-colors hover:text-foreground"
             >
               Docs
             </Link>
@@ -46,7 +40,7 @@ export function SiteFooter() {
               href="https://x.com/lwartss"
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex items-center gap-1.5 px-2 py-2 text-[11px] text-muted-foreground/50 transition-colors hover:text-foreground"
+              className="group inline-flex items-center gap-1.5 px-2 py-2 text-[11px] text-muted-foreground/60 transition-colors hover:text-foreground"
               aria-label="Follow LW ARTS on X (Twitter)"
             >
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -55,7 +49,7 @@ export function SiteFooter() {
               <span className="hidden sm:inline">@lwartss</span>
             </a>
             <span className="h-3 w-px bg-border/50" aria-hidden="true" />
-            <p className="text-[10px] tabular-nums text-muted-foreground/30">
+            <p className="text-[10px] tabular-nums text-muted-foreground/50">
               Solana · Base · 9 platforms
             </p>
           </div>

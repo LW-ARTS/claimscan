@@ -121,7 +121,7 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
         ).maybeSingle();
         creatorId = data?.creator_id ?? null;
       } else {
-        const lc = decoded.toLowerCase();
+        const lc = decoded.toLowerCase().replace(/[(),."'\\]/g, '');
         const { data } = await supabase
           .from('creators')
           .select('id')
@@ -136,7 +136,8 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
           supabase
             .from('fee_records')
             .select('total_earned_usd, total_earned, total_unclaimed, chain, platform')
-            .eq('creator_id', creatorId),
+            .eq('creator_id', creatorId)
+            .limit(500),
           fetchPrices(),
         ]);
 
@@ -194,7 +195,9 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
           for (let i = 0; i < bytes.length; i++) {
             binary += String.fromCharCode(bytes[i]);
           }
-          const ct = res.headers.get('content-type') || 'image/png';
+          const ALLOWED_OG_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif']);
+          const rawCt = (res.headers.get('content-type') || 'image/png').split(';')[0].trim();
+          const ct = ALLOWED_OG_IMAGE_TYPES.has(rawCt) ? rawCt : 'image/png';
           avatarSrc = `data:${ct};base64,${btoa(binary)}`;
         }
       }

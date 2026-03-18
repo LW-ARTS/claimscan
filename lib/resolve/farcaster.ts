@@ -284,8 +284,9 @@ export async function resolveFarcasterWallets(
       }
     }
 
-    // Require minimum score to avoid false positives
-    if (!bestUser || bestScore < 5) return [];
+    // Require minimum score — but allow exact username matches regardless of score
+    const isExactUsernameMatch = bestUser && normalize(bestUser.username || '') === normalize(handle);
+    if (!bestUser || (!isExactUsernameMatch && bestScore < 15)) return [];
 
     // Get verified ETH + Solana addresses from Farcaster Hub
     const verifiedAddresses = await getVerifiedAddresses(bestUser.fid);
@@ -300,7 +301,10 @@ export async function resolveFarcasterWallets(
         wallets.push({
           address: verified.address,
           chain: verified.chain,
-          sourcePlatform: verified.chain === 'sol' ? 'pump' : 'clanker',
+          // Use 'bags' for SOL wallets (Bags.fm primary for Solana fees),
+          // 'clanker' for EVM wallets (Clanker primary for Base fees).
+          // Matches the source_platform values used by existing DB records.
+          sourcePlatform: verified.chain === 'sol' ? 'bags' : 'clanker',
         });
       }
     }

@@ -11,9 +11,6 @@ import Link from 'next/link';
 const GrainientBackground = dynamic(
   () => import('./components/GrainientBackground').then((m) => ({ default: m.GrainientBackground })),
 );
-const AntiCopy = dynamic(
-  () => import('./components/AntiCopy').then((m) => ({ default: m.AntiCopy })),
-);
 const Providers = dynamic(
   () => import('./_providers').then((m) => ({ default: m.Providers })),
 );
@@ -129,10 +126,12 @@ export default function RootLayout({
         <JsonLd />
       </head>
       <body
-        className={`${exo2.variable} ${jetbrainsMono.variable} font-sans antialiased min-h-screen bg-background text-foreground select-none`}
+        className={`${exo2.variable} ${jetbrainsMono.variable} font-sans antialiased min-h-screen bg-background text-foreground`}
       >
         <Providers>
-          <AntiCopy />
+          <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-lg focus:bg-foreground focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-background">
+            Skip to main content
+          </a>
           <div className="relative min-h-screen flex flex-col">
             {/* Animated grain background */}
             <GrainientBackground />
@@ -160,7 +159,7 @@ export default function RootLayout({
             </header>
 
             {/* Main content */}
-            <main className="relative mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12 flex-grow">
+            <main id="main-content" className="relative mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12 flex-grow">
               {children}
             </main>
 

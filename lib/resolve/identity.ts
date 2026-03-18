@@ -57,6 +57,12 @@ export function parseSearchQuery(query: string): ParsedQuery {
     if (match) return { value: match[1].toLowerCase(), provider: 'twitter' };
   }
 
+  // Farcaster/Warpcast URL pattern
+  if (handle.includes('warpcast.com/')) {
+    const match = handle.match(/warpcast\.com\/([a-zA-Z0-9][a-zA-Z0-9_\-\.]{0,20})/);
+    if (match) return { value: match[1].toLowerCase(), provider: 'farcaster' };
+  }
+
   // Default: treat as Twitter handle
   return { value: handle.toLowerCase(), provider: 'twitter' };
 }
@@ -158,9 +164,14 @@ export async function fetchAllFees(
   const taskMeta: Array<{ platform: string; wallet: string; type: string }> = [];
   const tasks: Promise<TokenFee[]>[] = [];
 
+  // Zora queries both Base + ETH mainnet internally, so also dispatch for ETH wallets
+  const CROSS_CHAIN_EVM: Set<string> = new Set(['zora']);
+
   for (const wallet of wallets) {
     for (const adapter of allAdapters) {
-      if (adapter.chain !== wallet.chain) continue;
+      const chainMatch = adapter.chain === wallet.chain
+        || (CROSS_CHAIN_EVM.has(adapter.platform) && wallet.chain === 'eth' && adapter.chain === 'base');
+      if (!chainMatch) continue;
       taskMeta.push({ platform: adapter.platform, wallet: wallet.address, type: 'historical' });
       tasks.push(adapter.getHistoricalFees(wallet.address));
     }
@@ -170,22 +181,14 @@ export async function fetchAllFees(
   // Many adapters (pump, zora, etc.) have stub getHistoricalFees but working
   // getLiveUnclaimedFees — this ensures their fees appear in the platform tabs.
   //
-  // Skip adapters where getHistoricalFees and getLiveUnclaimedFees return equivalent
-  // data (one delegates to the other, or both call the same underlying API).
-  // The historical pass above already covers them — calling both wastes RPC/API calls.
-  const HISTORICAL_COVERS_LIVE: ReadonlySet<string> = new Set([
-    'raydium',    // historical → getLiveUnclaimedFees
-    'coinbarrel', // historical → getLiveUnclaimedFees
-    'believe',    // historical → getLiveUnclaimedFees
-    'clanker',    // live → getHistoricalFees
-    'bankr',      // live and historical both call searchLaunchesPaginated+Doppler
-    'bags',       // both call getClaimablePositionsCached (30s cache)
-  ]);
-
+  // Skip adapters where historicalCoversLive is true — getHistoricalFees and
+  // getLiveUnclaimedFees return equivalent data, so calling both wastes RPC/API calls.
   for (const wallet of wallets) {
     for (const adapter of liveAdapters) {
-      if (adapter.chain !== wallet.chain) continue;
-      if (HISTORICAL_COVERS_LIVE.has(adapter.platform)) continue;
+      const chainMatch = adapter.chain === wallet.chain
+        || (CROSS_CHAIN_EVM.has(adapter.platform) && wallet.chain === 'eth' && adapter.chain === 'base');
+      if (!chainMatch) continue;
+      if (adapter.historicalCoversLive) continue;
       taskMeta.push({ platform: adapter.platform, wallet: wallet.address, type: 'live' });
       tasks.push(adapter.getLiveUnclaimedFees(wallet.address));
     }
@@ -315,10 +318,16 @@ export async function fetchLiveUnclaimedFees(
   // from lingering after the response is sent.
   const controller = new AbortController();
 
+  // Zora queries both Base + ETH mainnet, so also dispatch for ETH wallets
+  const LIVE_CROSS_CHAIN_EVM: Set<string> = new Set(['zora']);
+
   const taskMeta: Array<{ platform: string; wallet: string }> = [];
   const tasks = wallets.flatMap((wallet) =>
     adapters
-      .filter((a) => a.chain === wallet.chain)
+      .filter((a) => {
+        if (a.chain === wallet.chain) return true;
+        return LIVE_CROSS_CHAIN_EVM.has(a.platform) && wallet.chain === 'eth' && a.chain === 'base';
+      })
       .map((adapter) => {
         taskMeta.push({ platform: adapter.platform, wallet: wallet.address });
         return adapter.getLiveUnclaimedFees(wallet.address, controller.signal);
@@ -349,9 +358,10 @@ export async function fetchLiveUnclaimedFees(
     if (err instanceof Error && err.message === 'LIVE_AGGREGATION_TIMEOUT') {
       console.warn(`[fees] live aggregation timed out after ${LIVE_AGGREGATION_TIMEOUT_MS}ms — aborting pending adapters`);
       controller.abort();
-      // Collect results from tasks that already settled
+      // Collect results from tasks that already settled.
+      // 50ms delay gives abort signals time to propagate before we snapshot.
       results = await Promise.allSettled(
-        tasks.map((t) => Promise.race([t, new Promise<TokenFee[]>((r) => setTimeout(() => r([]), 0))]))
+        tasks.map((t) => Promise.race([t, new Promise<TokenFee[]>((r) => setTimeout(() => r([]), 50))]))
       );
     } else {
       throw err;

@@ -102,8 +102,10 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             className={`absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 ${isLarge ? 'h-5 w-5' : 'h-4 w-4'
               }`}
           />
+          <label htmlFor="claimscan-search" className="sr-only">Search by handle, username, or wallet</label>
           <input
             ref={inputRef}
+            id="claimscan-search"
             type="search"
             name="query"
             autoComplete="off"
