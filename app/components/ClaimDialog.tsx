@@ -47,20 +47,16 @@ export function ClaimDialog({
   const connectedWallet = walletAdapter.publicKey?.toBase58() ?? null;
   const walletMismatch = connectedWallet !== null && connectedWallet !== wallet;
 
-  // Check if connected wallet matches the Bags-registered wallet for this profile.
-  // Bags.fm requires the claiming wallet to be the one linked via social verification.
   const bagsWalletMismatch = bagsRegisteredWallet
     && connectedWallet
     && connectedWallet !== bagsRegisteredWallet;
 
-  // Detect mobile on mount (avoids SSR mismatch)
   useEffect(() => {
     setIsMobile(window.innerWidth < 768);
   }, []);
 
   const [balanceError, setBalanceError] = useState(false);
 
-  // Fetch SOL balance for gas check — use CONNECTED wallet, not profile wallet
   useEffect(() => {
     if (!open || !connectedWallet) return;
     let cancelled = false;
@@ -76,7 +72,6 @@ export function ClaimDialog({
     return () => { cancelled = true; };
   }, [open, connectedWallet, connection]);
 
-  // Total unclaimed in USD
   const totalUnclaimedUsd = useMemo(() => {
     let total = 0;
     for (const fee of fees) {
@@ -88,31 +83,25 @@ export function ClaimDialog({
     return total;
   }, [fees, solPrice]);
 
-  // Total unclaimed in lamports (for fee calculation)
   const totalUnclaimedLamports = useMemo(() => {
     let total = 0n;
     for (const fee of fees) total += safeBigInt(fee.total_unclaimed);
     return total;
   }, [fees]);
 
-  // ClaimScan service fee (0.85%)
   const feeLamports = totalUnclaimedLamports * BigInt(CLAIMSCAN_FEE_BPS) / 10_000n;
   const feeApplied = feeLamports >= MIN_FEE_LAMPORTS;
-  // Convert via 1000n divisor to keep microsol precision (safe up to ~9 quadrillion lamports)
   const feeSol = Number(feeLamports * 1000n / 1_000_000_000n) / 1000;
   const feeUsd = feeSol * solPrice;
 
-  // Estimated gas: ~0.000005 SOL base fee per tx + ~0.0001 SOL priority fee buffer
-  // Bags claim txs are simple (no CU-heavy compute), so priority fees are minimal
   const txCount = fees.length + (feeApplied ? 1 : 0);
   const estimatedGas = txCount * 0.00015;
   const hasInsufficientSol = solBalance !== null && solBalance < estimatedGas;
 
-  // Trigger onClaimComplete exactly once when claim finishes
   const completeFiredRef = useRef(false);
   useEffect(() => {
     if (phase === 'fetching') {
-      completeFiredRef.current = false; // Reset at start of new claim session
+      completeFiredRef.current = false;
     }
     if (phase === 'complete' && !completeFiredRef.current) {
       completeFiredRef.current = true;
@@ -144,17 +133,26 @@ export function ClaimDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md border-border bg-card">
+      <DialogContent className="max-w-md border-white/[0.08] bg-[#0c0c0e]/95 backdrop-blur-xl shadow-2xl shadow-black/40">
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold">
+          <DialogTitle className="text-base font-semibold tracking-tight text-white/90">
             {phase === 'idle' && 'Claim Fees'}
             {phase === 'fetching' && 'Preparing Transactions...'}
             {phase === 'signing' && 'Sign Transactions'}
             {phase === 'submitting' && 'Submitting Transactions'}
             {phase === 'complete' && 'Claim Complete'}
           </DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground">
-            {phase === 'idle' && `Claim unclaimed fees from ${fees.length} token${fees.length !== 1 ? 's' : ''} on Bags.fm`}
+          <DialogDescription className="text-xs text-white/40">
+            {phase === 'idle' && (
+              <>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  Bags.fm
+                </span>
+                <span className="mx-1.5 text-white/20">|</span>
+                {fees.length} token{fees.length !== 1 ? 's' : ''} unclaimed
+              </>
+            )}
             {phase === 'fetching' && 'Generating claim transactions from Bags...'}
             {phase === 'signing' && 'Please approve the transaction(s) in your wallet.'}
             {phase === 'submitting' && 'Confirming transactions on Solana...'}
@@ -166,29 +164,30 @@ export function ClaimDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
-          {/* Preview state */}
+        <div className="space-y-3 pt-1">
+          {/* ─── Preview state ─── */}
           {phase === 'idle' && (
             <>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
+              {/* Token list */}
+              <div className="space-y-1 max-h-44 overflow-y-auto pr-1 scrollbar-thin">
                 {fees.map((fee) => {
                   const unclaimed = safeBigInt(fee.total_unclaimed);
                   const usd = toUsdValue(unclaimed, 9, solPrice);
                   return (
                     <div
                       key={fee.id}
-                      className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2"
+                      className="flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-white/[0.03]"
                     >
-                      <span className="font-mono text-sm">
+                      <span className="font-mono text-xs text-white/70">
                         {fee.token_symbol
-                          ? `$${fee.token_symbol.replace(/[^\w\s\-\.]/g, '').trim().slice(0, 20)}`
+                          ? `$${fee.token_symbol.replace(/[^\w\s\-\.]/g, '').trim().slice(0, 16)}`
                           : fee.token_address.slice(0, 8) + '...'}
                       </span>
-                      <div className="text-right">
-                        <span className="text-sm font-medium tabular-nums">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-mono text-xs font-medium tabular-nums text-white/90">
                           {formatTokenAmount(fee.total_unclaimed, 9)} SOL
                         </span>
-                        <span className="ml-2 text-xs text-muted-foreground tabular-nums">
+                        <span className="font-mono text-[10px] tabular-nums text-white/30">
                           {formatUsd(usd)}
                         </span>
                       </div>
@@ -197,78 +196,88 @@ export function ClaimDialog({
                 })}
               </div>
 
-              <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total unclaimed</span>
-                  <span className="font-semibold">{formatUsd(totalUnclaimedUsd)}</span>
+              {/* Divider */}
+              <div className="h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+
+              {/* Summary */}
+              <div className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white/40">Total unclaimed</span>
+                  <span className="text-sm font-semibold tabular-nums text-white">
+                    {formatUsd(totalUnclaimedUsd)}
+                  </span>
                 </div>
                 {feeApplied && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">ClaimScan fee (0.85%)</span>
-                    <span className="font-mono tabular-nums">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-white/40">ClaimScan fee (0.85%)</span>
+                    <span className="font-mono text-xs tabular-nums text-white/60">
                       {feeSol.toFixed(4)} SOL
-                      <span className="ml-1 text-muted-foreground/60">{formatUsd(feeUsd)}</span>
+                      <span className="ml-1 text-white/30">{formatUsd(feeUsd)}</span>
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Estimated gas</span>
-                  <span className="font-mono tabular-nums">~{estimatedGas.toFixed(4)} SOL</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white/40">Estimated gas</span>
+                  <span className="font-mono text-xs tabular-nums text-white/60">
+                    ~{estimatedGas.toFixed(4)} SOL
+                  </span>
                 </div>
                 {solBalance !== null && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Your SOL balance</span>
-                    <span className={`font-mono tabular-nums ${hasInsufficientSol ? 'text-red-400' : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-white/40">Your balance</span>
+                    <span className={`font-mono text-xs tabular-nums ${hasInsufficientSol ? 'text-red-400' : 'text-white/60'}`}>
                       {solBalance.toFixed(4)} SOL
                     </span>
                   </div>
                 )}
               </div>
 
+              {/* Alerts */}
               {hasInsufficientSol && (
-                <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                <Alert variant="error">
                   Insufficient SOL for gas fees. You need at least ~{estimatedGas.toFixed(4)} SOL.
-                </p>
+                </Alert>
               )}
 
               {balanceError && (
-                <p className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
+                <Alert variant="warning">
                   Unable to check SOL balance. Ensure you have enough SOL for gas fees before claiming.
-                </p>
+                </Alert>
               )}
 
               {bagsWalletMismatch && (
-                <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-xs text-red-400 space-y-1.5">
-                  <p className="font-semibold">Wrong wallet connected</p>
-                  <p>
+                <div className="space-y-2 rounded-xl border border-red-500/10 bg-red-500/[0.04] px-4 py-3">
+                  <p className="text-xs font-medium text-red-400/90">Wrong wallet connected</p>
+                  <p className="text-[11px] leading-relaxed text-red-400/60">
                     Bags.fm requires the wallet linked to your social profile to claim fees.
                     Connect the wallet registered with Bags:
                   </p>
-                  <p className="font-mono text-[11px] break-all text-red-300">
+                  <p className="font-mono text-[10px] break-all text-red-400/40 select-all">
                     {bagsRegisteredWallet}
                   </p>
-                  <p className="text-red-400/70">
+                  <p className="text-[11px] text-red-400/40">
                     To link a different wallet, verify your profile at bags.fm first.
                   </p>
                 </div>
               )}
 
               {!bagsWalletMismatch && walletMismatch && (
-                <p className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
+                <Alert variant="warning">
                   Connected wallet differs from this profile. Claims will use your connected wallet.
-                </p>
+                </Alert>
               )}
 
               {isMobile && (
-                <p className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                <p className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-2.5 text-[11px] text-white/30">
                   You&apos;ll be redirected to your wallet app to sign. Return to this browser after signing.
                 </p>
               )}
 
+              {/* CTA */}
               <button
                 onClick={handleClaim}
                 disabled={phase !== 'idle' || hasInsufficientSol || !!bagsWalletMismatch}
-                className="group relative w-full overflow-hidden rounded-xl bg-foreground px-6 py-3.5 text-sm font-bold uppercase tracking-wider text-background transition-all duration-200 hover:shadow-[0_0_20px_rgba(0,0,0,0.15)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+                className="group relative w-full overflow-hidden rounded-xl bg-white px-6 py-3.5 text-sm font-bold uppercase tracking-wider text-black transition-all duration-200 hover:shadow-[0_0_24px_rgba(255,255,255,0.08)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
               >
                 <span className="relative z-10 flex items-center justify-center gap-2">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -276,123 +285,113 @@ export function ClaimDialog({
                   </svg>
                   Claim {fees.length} Token{fees.length !== 1 ? 's' : ''}
                 </span>
-                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-background/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
               </button>
             </>
           )}
 
-          {/* Fetching state */}
+          {/* ─── Fetching state ─── */}
           {phase === 'fetching' && (
-            <div className="flex flex-col items-center gap-3 py-6">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-              <p className="text-sm text-muted-foreground">Preparing claim transactions...</p>
+            <div className="flex flex-col items-center gap-4 py-8">
+              <div className="relative h-10 w-10">
+                <div className="absolute inset-0 animate-spin rounded-full border-2 border-white/10 border-t-white/60" />
+                <div className="absolute inset-1 animate-spin rounded-full border border-white/5 border-b-white/30" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
+              </div>
+              <p className="text-xs text-white/40">Preparing claim transactions...</p>
             </div>
           )}
 
-          {/* Signing state */}
+          {/* ─── Signing state ─── */}
           {phase === 'signing' && (
-            <div className="flex flex-col items-center gap-3 py-6">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Waiting for wallet approval...
-              </p>
+            <div className="flex flex-col items-center gap-4 py-8">
+              <div className="relative h-10 w-10">
+                <div className="absolute inset-0 animate-ping rounded-full bg-white/5" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <svg className="h-6 w-6 text-white/50" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.864 4.243A7.5 7.5 0 0 1 19.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 0 0 4.5 10.5a48.667 48.667 0 0 0-6 0c0 1.97-.147 3.915-.43 5.824M7.5 10.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0Z" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-xs text-white/40">Waiting for wallet approval...</p>
               <button
                 onClick={cancel}
-                className="rounded-lg border border-border px-4 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                className="rounded-lg border border-white/[0.06] px-4 py-1.5 text-[11px] text-white/30 transition-colors hover:border-white/10 hover:text-white/50"
               >
                 Cancel
               </button>
             </div>
           )}
 
-          {/* Submitting state */}
+          {/* ─── Submitting state ─── */}
           {phase === 'submitting' && (
             <div className="space-y-3">
-              <Progress value={progressPercent} className="h-2" />
-              <p className="text-center text-xs text-muted-foreground tabular-nums">
-                {results.filter((r) => r.status !== 'pending').length} / {progress.total} tokens processed
+              <Progress value={progressPercent} className="h-1.5" />
+              <p className="text-center text-[11px] text-white/30 tabular-nums">
+                {processed} / {progress.total} tokens processed
               </p>
 
-              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
                 {results.map((r) => (
                   <div
                     key={r.claimAttemptId || r.tokenMint}
-                    className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-1.5 text-xs"
+                    className="flex items-center justify-between rounded-lg px-3 py-1.5 text-xs"
                   >
-                    <span className="font-mono truncate max-w-[120px]">
+                    <span className="font-mono text-[11px] text-white/40 truncate max-w-[120px]">
                       {r.tokenMint.slice(0, 8)}...
                     </span>
-                    <span className={
-                      r.status === 'confirmed' ? 'text-emerald-500 font-medium' :
-                      r.status === 'failed' ? 'text-red-400' :
-                      r.status === 'submitted' ? 'text-yellow-500' :
-                      'text-muted-foreground'
-                    }>
-                      {r.status === 'confirmed' && 'Confirmed'}
-                      {r.status === 'failed' && 'Failed'}
-                      {r.status === 'submitted' && 'Confirming...'}
-                      {r.status === 'pending' && 'Pending'}
-                    </span>
+                    <StatusBadge status={r.status} />
                   </div>
                 ))}
               </div>
 
               <button
                 onClick={cancel}
-                className="w-full rounded-lg border border-border px-4 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                className="w-full rounded-lg border border-white/[0.06] py-2 text-[11px] text-white/30 transition-colors hover:border-white/10 hover:text-white/50"
               >
                 Cancel Remaining
               </button>
             </div>
           )}
 
-          {/* Complete state */}
+          {/* ─── Complete state ─── */}
           {phase === 'complete' && (
             <div className="space-y-3">
               {progress.completed > 0 && (
-                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center">
-                  <p className="text-sm font-medium text-emerald-500">
+                <div className="flex items-center justify-center gap-2 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.04] py-3">
+                  <svg className="h-4 w-4 text-emerald-500/80" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                  <p className="text-xs font-medium text-emerald-500/80">
                     {progress.completed} claim{progress.completed !== 1 ? 's' : ''} confirmed
                   </p>
                 </div>
               )}
 
               {progress.failed > 0 && (
-                <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-center">
-                  <p className="text-xs text-red-400">
-                    {progress.failed} claim{progress.failed !== 1 ? 's' : ''} failed
-                  </p>
-                </div>
+                <Alert variant="error">
+                  {progress.failed} claim{progress.failed !== 1 ? 's' : ''} failed
+                </Alert>
               )}
 
-              {error && (
-                <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
-                  {error}
-                </p>
-              )}
+              {error && <Alert variant="error">{error}</Alert>}
 
-              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
                 {results.map((r) => (
                   <div
                     key={r.claimAttemptId || r.tokenMint}
-                    className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-1.5 text-xs"
+                    className="flex items-center justify-between rounded-lg px-3 py-1.5 text-xs"
                   >
-                    <span className="font-mono truncate max-w-[120px]">
+                    <span className="font-mono text-[11px] text-white/40 truncate max-w-[120px]">
                       {r.tokenMint.slice(0, 8)}...
                     </span>
                     <div className="flex items-center gap-2">
-                      <span className={
-                        r.status === 'confirmed' ? 'text-emerald-500 font-medium' :
-                        'text-red-400'
-                      }>
-                        {r.status === 'confirmed' ? 'Confirmed' : 'Failed'}
-                      </span>
+                      <StatusBadge status={r.status} />
                       {r.txSignature && /^[1-9A-HJ-NP-Za-km-z]{86,88}$/.test(r.txSignature) && (
                         <a
                           href={`https://solscan.io/tx/${r.txSignature}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground"
+                          className="text-white/20 transition-colors hover:text-white/50"
                         >
                           <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
@@ -406,7 +405,7 @@ export function ClaimDialog({
 
               <button
                 onClick={() => onOpenChange(false)}
-                className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90 active:scale-[0.98]"
+                className="w-full rounded-xl bg-white py-3 text-sm font-semibold text-black transition-all duration-200 hover:shadow-[0_0_20px_rgba(255,255,255,0.06)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]"
               >
                 Done
               </button>
@@ -416,4 +415,29 @@ export function ClaimDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+/* ─── Reusable sub-components ─── */
+
+function Alert({ variant, children }: { variant: 'error' | 'warning'; children: React.ReactNode }) {
+  const styles = {
+    error: 'border-red-500/10 bg-red-500/[0.04] text-red-400/70',
+    warning: 'border-amber-500/10 bg-amber-500/[0.04] text-amber-400/70',
+  };
+  return (
+    <p className={`rounded-xl border px-4 py-2.5 text-[11px] leading-relaxed ${styles[variant]}`}>
+      {children}
+    </p>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const config: Record<string, { text: string; className: string }> = {
+    confirmed: { text: 'Confirmed', className: 'text-emerald-500/80' },
+    failed: { text: 'Failed', className: 'text-red-400/70' },
+    submitted: { text: 'Confirming...', className: 'text-amber-400/70' },
+    pending: { text: 'Pending', className: 'text-white/20' },
+  };
+  const c = config[status] ?? config.pending;
+  return <span className={`text-[11px] font-medium ${c.className}`}>{c.text}</span>;
 }
