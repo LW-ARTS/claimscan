@@ -22,10 +22,9 @@ import { fetchClaimHistory } from '@/lib/helius/transactions';
 const inFlight = new Map<string, Promise<ResolveResult>>();
 
 /** Timeout for the entire resolve operation to prevent hung promises in inFlight map.
- *  8s keeps within Vercel Hobby's 10s maxDuration. Large creators rely on
- *  cached data from cron jobs; first-visit may show partial results.
+ *  55s fits within Vercel Hobby's default 60s function limit.
  *  Override via RESOLVE_TIMEOUT_MS env var for non-Vercel runtimes (e.g. bot on VPS). */
-const RESOLVE_TIMEOUT_MS = parseInt(process.env.RESOLVE_TIMEOUT_MS ?? '8000', 10);
+const RESOLVE_TIMEOUT_MS = parseInt(process.env.RESOLVE_TIMEOUT_MS ?? '55000', 10);
 
 type Creator = Database['public']['Tables']['creators']['Row'];
 type Wallet = Database['public']['Tables']['wallets']['Row'];
