@@ -1,36 +1,118 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ClaimScan
+
+Track and claim creator fees across 9 DeFi launchpads on Solana and Base.
+
+Paste any Twitter handle, wallet address, GitHub username, or Farcaster handle — ClaimScan resolves your identity, aggregates earned fees from Pump.fun, Bags.fm, Clanker, Zora, Bankr, Believe, RevShare, Coinbarrel, and Raydium, and lets you claim directly from the UI.
+
+**Live:** [claimscan.tech](https://claimscan.tech)
+
+---
+
+## Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 16.2, React 19, TypeScript |
+| Styling | Tailwind CSS 4, Radix UI, Motion 12 |
+| Solana | @solana/web3.js, wallet-adapter, spl-token |
+| EVM | Viem 2.47 |
+| Database | Supabase (PostgreSQL + RLS) |
+| Cache | Upstash Redis |
+| Security | Sentry, Cloudflare Turnstile, HMAC signing |
+| Deploy | Vercel |
+
+---
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 20+
+- A Supabase project
+- Solana and Base RPC endpoints
+
+### Install
+
+```bash
+git clone https://github.com/screwk/claimscan.git
+cd claimscan
+npm install
+```
+
+### Configure
+
+```bash
+cp .env.example .env.local
+```
+
+Minimum required variables:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+SOLANA_RPC_URL=
+NEXT_PUBLIC_SOLANA_RPC_URL=
+BASE_RPC_URL=
+CRON_SECRET=
+```
+
+See `.env.example` for the full list.
+
+### Database
+
+```bash
+npx supabase db push
+```
+
+### Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Documentation
 
-## Learn More
+| Doc | Description |
+|-----|-------------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, data flows, key decisions |
+| [docs/API.md](docs/API.md) | Full API reference with request/response examples |
+| [docs/ONBOARDING.md](docs/ONBOARDING.md) | Developer onboarding guide |
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Operational runbook (crons, incidents, rollback) |
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/                  # Next.js App Router (pages + API routes)
+lib/
+  platforms/          # 9 launchpad adapters
+  chains/             # Solana, Base, ETH RPC
+  resolve/            # Identity resolution
+  prices/             # Price waterfall (DexScreener → Jupiter → CoinGecko)
+  claim/              # HMAC claim tokens
+  services/           # Creator resolution + persistence
+  supabase/           # DB clients
+proxy.ts              # Security middleware (~450 lines)
+supabase/migrations/  # 12 SQL migration files
+e2e/                  # Playwright tests
+```
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run dev           # Dev server
+npm run build         # Production build
+npm run test:e2e      # Playwright E2E tests
+```
+
+---
+
+## Built by [LW ARTS](https://lwdesigns.art)
