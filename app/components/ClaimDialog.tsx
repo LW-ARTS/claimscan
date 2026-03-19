@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
 import {
   Dialog,
   DialogContent,
@@ -58,16 +57,17 @@ export function ClaimDialog({
     if (!open || !connectedWallet) return;
     let cancelled = false;
     setBalanceError(false);
-    connection
-      .getBalance(new PublicKey(connectedWallet))
-      .then((bal) => { if (!cancelled) setSolBalance(bal / 1e9); })
+    // Use server-side RPC (has Helius key) instead of client-side public RPC
+    fetch(`/api/balance?wallet=${encodeURIComponent(connectedWallet)}`)
+      .then((res) => res.ok ? res.json() : Promise.reject(new Error(`${res.status}`)))
+      .then((data: { sol: number }) => { if (!cancelled) setSolBalance(data.sol); })
       .catch(() => {
         if (cancelled) return;
         setSolBalance(null);
         setBalanceError(true);
       });
     return () => { cancelled = true; };
-  }, [open, connectedWallet, connection]);
+  }, [open, connectedWallet]);
 
   const totalUnclaimedUsd = useMemo(() => {
     let total = 0;
@@ -238,17 +238,17 @@ export function ClaimDialog({
                 )}
 
                 {bagsWalletMismatch && (
-                  <div className="flex flex-col gap-2 bg-black px-5 py-4">
-                    <p className="text-sm font-semibold text-white" style={{ fontFamily: 'var(--font-sans)' }}>
+                  <div className="flex flex-col gap-2 border border-[#ddd] bg-[#f5f5f5] px-5 py-4">
+                    <p className="text-sm font-semibold text-black">
                       Wrong wallet connected
                     </p>
-                    <p className="text-xs leading-relaxed text-white/70" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <p className="font-mono text-xs leading-relaxed text-[#555]">
                       Bags.fm requires the wallet linked to your social profile to claim fees. Connect the wallet registered with Bags:
                     </p>
-                    <p className="break-all text-[11px] text-white/50" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <p className="break-all font-mono text-[11px] font-medium text-black">
                       {bagsRegisteredWallet}
                     </p>
-                    <p className="text-[11px] leading-relaxed text-white/50" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <p className="font-mono text-[11px] leading-relaxed text-[#777]">
                       To link a different wallet, verify your profile at bags.fm first.
                     </p>
                   </div>
