@@ -17,6 +17,8 @@ import type {
   TokenFee,
   ClaimEvent,
 } from './types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('revshare');
 
 // ═══════════════════════════════════════════════
 // RevShare Adapter
@@ -100,10 +102,7 @@ export const revshareAdapter: PlatformAdapter = {
         imageUrl: null,
       }));
     } catch (err) {
-      console.warn(
-        '[revshare] getCreatorTokens failed:',
-        err instanceof Error ? err.message : err
-      );
+      log.warn('getCreatorTokens failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },
@@ -138,7 +137,7 @@ export const revshareAdapter: PlatformAdapter = {
         if (signal?.aborted) break;
         if (Date.now() - batchStart > BATCH_WALLCLOCK_MS) {
           const remaining = mintAddresses.length - i;
-          console.warn(`[revshare] wallclock guard: skipping ${remaining} mints after ${BATCH_WALLCLOCK_MS}ms (${fees.length} collected)`);
+          log.warn(`wallclock guard: skipping ${remaining} mints after ${BATCH_WALLCLOCK_MS}ms (${fees.length} collected)`);
           break;
         }
         const batch = mintAddresses.slice(i, i + BATCH_SIZE);
@@ -181,17 +180,14 @@ export const revshareAdapter: PlatformAdapter = {
           if (result.status === 'fulfilled' && result.value) {
             fees.push(result.value);
           } else if (result.status === 'rejected') {
-            console.warn('[revshare] mint read failed:', result.reason instanceof Error ? result.reason.message : result.reason);
+            log.warn('mint read failed', { error: result.reason instanceof Error ? result.reason.message : String(result.reason) });
           }
         }
       }
 
       return enrichSolanaTokenSymbols(fees);
     } catch (err) {
-      console.warn(
-        '[revshare] getLiveUnclaimedFees failed:',
-        err instanceof Error ? err.message : err
-      );
+      log.warn('getLiveUnclaimedFees failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },
@@ -248,16 +244,10 @@ async function findMintsByWithdrawAuthority(wallet: string, signal?: AbortSignal
         try {
           return await fetchGpaStandard(rpcUrl, filters, signal);
         } catch (fallbackErr) {
-          console.warn(
-            `[revshare] findMintsByWithdrawAuthority standard GPA failed on RPC #${rpcIdx + 1}:`,
-            fallbackErr instanceof Error ? fallbackErr.message : fallbackErr
-          );
+          log.warn(`findMintsByWithdrawAuthority standard GPA failed on RPC #${rpcIdx + 1}`, { error: fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr) });
         }
       } else {
-        console.warn(
-          `[revshare] findMintsByWithdrawAuthority failed on RPC #${rpcIdx + 1}:`,
-          msg
-        );
+        log.warn(`findMintsByWithdrawAuthority failed on RPC #${rpcIdx + 1}`, { error: msg });
       }
     }
   }

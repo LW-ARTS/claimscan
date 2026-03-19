@@ -16,6 +16,8 @@ import type {
   TokenFee,
   ClaimEvent,
 } from './types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('coinbarrel');
 
 // ═══════════════════════════════════════════════
 // Coinbarrel Adapter
@@ -107,7 +109,7 @@ async function findBondingCurvesByCreator(
       const rewards = readU64LE(data, BONDING_CURVE_OFFSETS.ACCUMULATED_HOLDER_REWARDS_SOL);
       results.push({ tokenMint, accumulatedHolderRewards: rewards });
     } catch (err) {
-      console.warn('[coinbarrel] malformed bonding curve account:', err instanceof Error ? err.message : err);
+      log.warn('malformed bonding curve account', { error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -155,7 +157,7 @@ async function findPoolsByCreator(
       const creatorFeesB = readU64LE(data, POOL_OFFSETS.ACCUMULATED_CREATOR_TRADER_FEES_B);
       results.push({ poolAddress: pubkey.toBase58(), tokenMint, creatorFeesA, creatorFeesB });
     } catch (err) {
-      console.warn('[coinbarrel] malformed pool account:', err instanceof Error ? err.message : err);
+      log.warn('malformed pool account', { error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -210,10 +212,7 @@ export const coinbarrelAdapter: PlatformAdapter = {
         imageUrl: null,
       }));
     } catch (err) {
-      console.warn(
-        '[coinbarrel] getCreatorTokens failed:',
-        err instanceof Error ? err.message : err
-      );
+      log.warn('getCreatorTokens failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },
@@ -312,10 +311,7 @@ export const coinbarrelAdapter: PlatformAdapter = {
 
       return fees;
     } catch (err) {
-      console.warn(
-        '[coinbarrel] getLiveUnclaimedFees failed:',
-        err instanceof Error ? err.message : err
-      );
+      log.warn('getLiveUnclaimedFees failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },

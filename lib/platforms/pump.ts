@@ -16,6 +16,8 @@ import type {
   TokenFee,
   ClaimEvent,
 } from './types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('pump');
 
 // ═══════════════════════════════════════════════
 // Pump.fun Adapter
@@ -76,7 +78,7 @@ export const pumpAdapter: PlatformAdapter = {
       if (pumpFees.status === 'fulfilled') {
         pumpBalance = pumpFees.value;
       } else {
-        console.warn('[pump] getUnclaimedPumpFees failed:', pumpFees.reason instanceof Error ? pumpFees.reason.message : pumpFees.reason);
+        log.warn('getUnclaimedPumpFees failed', { error: pumpFees.reason instanceof Error ? pumpFees.reason.message : String(pumpFees.reason) });
       }
       const pumpClaimedTotal = pumpClaimed.status === 'fulfilled' ? pumpClaimed.value : 0n;
 
@@ -98,7 +100,7 @@ export const pumpAdapter: PlatformAdapter = {
       if (pumpSwapFees.status === 'fulfilled') {
         swapBalance = pumpSwapFees.value;
       } else {
-        console.warn('[pump] getUnclaimedPumpSwapFees failed:', pumpSwapFees.reason instanceof Error ? pumpSwapFees.reason.message : pumpSwapFees.reason);
+        log.warn('getUnclaimedPumpSwapFees failed', { error: pumpSwapFees.reason instanceof Error ? pumpSwapFees.reason.message : String(pumpSwapFees.reason) });
       }
       const swapClaimedTotal = swapClaimed.status === 'fulfilled' ? swapClaimed.value : 0n;
 
@@ -118,7 +120,7 @@ export const pumpAdapter: PlatformAdapter = {
 
       return fees;
     } catch (err) {
-      console.warn('[pump] getLiveUnclaimedFees failed:', err instanceof Error ? err.message : err);
+      log.warn('getLiveUnclaimedFees failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },

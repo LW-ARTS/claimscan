@@ -12,6 +12,8 @@ import type {
   TokenFee,
   ClaimEvent,
 } from './types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('bags');
 
 /** Convert a Bags API lamport value (string | number | null) to BigInt.
  * Handles string values directly to avoid Number precision loss for values > 2^53. */
@@ -27,7 +29,7 @@ function toLamports(val: string | number | null | undefined): bigint {
     const result = BigInt(trimmed.split('.')[0]);
     return result < 0n ? 0n : result;
   } catch {
-    console.warn(`[bags] toLamports: invalid value "${trimmed}", returning 0`);
+    log.warn(`toLamports: invalid value "${trimmed}", returning 0`);
     return 0n;
   }
 }
@@ -184,7 +186,7 @@ export const bagsAdapter: PlatformAdapter = {
     try {
       return await enrichSolanaTokenSymbols(fees);
     } catch (enrichErr) {
-      console.warn('[bags] enrichSolanaTokenSymbols failed, returning fees without symbols:', enrichErr instanceof Error ? enrichErr.message : enrichErr);
+      log.warn('enrichSolanaTokenSymbols failed, returning fees without symbols', { error: enrichErr instanceof Error ? enrichErr.message : String(enrichErr) });
       return fees;
     }
   },
@@ -226,7 +228,7 @@ export const bagsAdapter: PlatformAdapter = {
 
       return enrichSolanaTokenSymbols(fees);
     } catch (err) {
-      console.warn('[bags] getHistoricalFees failed:', err instanceof Error ? err.message : err);
+      log.warn('getHistoricalFees failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },
@@ -245,7 +247,7 @@ export const bagsAdapter: PlatformAdapter = {
 
       return enrichSolanaTokenSymbols(fees);
     } catch (err) {
-      console.warn('[bags] getLiveUnclaimedFees failed:', err instanceof Error ? err.message : err);
+      log.warn('getLiveUnclaimedFees failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },
@@ -295,12 +297,12 @@ export const bagsAdapter: PlatformAdapter = {
         else failedCount++;
       }
       if (failedCount > 0) {
-        console.warn(`[bags] getClaimHistory: ${failedCount}/${results.length} token event fetches failed`);
+        log.warn(`getClaimHistory: ${failedCount}/${results.length} token event fetches failed`);
       }
 
       return events.sort((a, b) => b.claimedAt.localeCompare(a.claimedAt)).slice(0, 50);
     } catch (err) {
-      console.warn('[bags] getClaimHistory failed:', err instanceof Error ? err.message : err);
+      log.warn('getClaimHistory failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },

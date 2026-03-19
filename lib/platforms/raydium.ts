@@ -11,6 +11,8 @@ import type {
   TokenFee,
   ClaimEvent,
 } from './types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('raydium');
 
 const RAYDIUM_LAUNCHLAB_PROGRAM = new PublicKey(RAYDIUM_LAUNCHLAB_PROGRAM_ID);
 
@@ -65,13 +67,13 @@ async function fetchCreatorTokens(
     );
     clearTimeout(timeout);
     if (!res.ok) {
-      console.warn(`[raydium] fetchCreatorTokens returned HTTP ${res.status}`);
+      log.warn(`fetchCreatorTokens returned HTTP ${res.status}`);
       return [];
     }
     const data = (await res.json()) as LaunchLabResponse;
     return data.data?.rows ?? [];
   } catch (err) {
-    console.warn('[raydium] fetchCreatorTokens failed:', err instanceof Error ? err.message : err);
+    log.warn('fetchCreatorTokens failed', { error: err instanceof Error ? err.message : String(err) });
     return [];
   }
 }
@@ -109,7 +111,7 @@ export const raydiumAdapter: PlatformAdapter = {
         imageUrl: (t.imageUri ?? t.image ?? '').startsWith('https://') ? (t.imageUri ?? t.image ?? null) : null,
       })).filter((t) => t.tokenAddress.length > 0);
     } catch (err) {
-      console.warn('[raydium] getCreatorTokens failed:', err instanceof Error ? err.message : err);
+      log.warn('getCreatorTokens failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },
@@ -162,7 +164,7 @@ export const raydiumAdapter: PlatformAdapter = {
         royaltyBps: null,
       }];
     } catch (err) {
-      console.warn('[raydium] getLiveUnclaimedFees failed:', err instanceof Error ? err.message : err);
+      log.warn('getLiveUnclaimedFees failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },

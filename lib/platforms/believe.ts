@@ -13,6 +13,8 @@ import type {
   TokenFee,
   ClaimEvent,
 } from './types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('believe');
 
 // ═══════════════════════════════════════════════
 // Believe.app Adapter
@@ -44,7 +46,7 @@ function bnToBigInt(bn: unknown): bigint {
   try {
     return BigInt(String(bn));
   } catch (err) {
-    console.warn('[believe] bnToBigInt conversion failed for value:', String(bn), err instanceof Error ? err.message : err);
+    log.warn('bnToBigInt conversion failed', { value: String(bn), error: err instanceof Error ? err.message : String(err) });
     return 0n;
   }
 }
@@ -136,10 +138,7 @@ export const believeAdapter: PlatformAdapter = {
           imageUrl: null,
         }));
     } catch (err) {
-      console.warn(
-        '[believe] getCreatorTokens failed:',
-        err instanceof Error ? err.message : err
-      );
+      log.warn('getCreatorTokens failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },
@@ -249,10 +248,7 @@ export const believeAdapter: PlatformAdapter = {
 
       return enrichSolanaTokenSymbols(fees);
     } catch (err) {
-      console.warn(
-        '[believe] getLiveUnclaimedFees failed:',
-        err instanceof Error ? err.message : err
-      );
+      log.warn('getLiveUnclaimedFees failed', { error: err instanceof Error ? err.message : String(err) });
       return [];
     }
   },
