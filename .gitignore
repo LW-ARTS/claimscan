@@ -72,3 +72,5 @@ CAMPAIGN_ANNOUNCE.md
 DEPLOY_CHECKLIST.md
 DESIGN-CRITIQUE*.md
 FULL_AUDIT*.md
+LAUNCH-PLAYBOOK.md
+scripts/generate_whitepaper.py
