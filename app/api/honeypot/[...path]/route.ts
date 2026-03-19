@@ -15,7 +15,7 @@ function logAndReject(request: NextRequest) {
   const ua = request.headers.get('user-agent') ?? 'none';
   const path = request.nextUrl.pathname;
 
-  console.warn(`[honeypot] Scraper detected | path=${path} | ip=${ip} | ua=${ua.slice(0, 200)}`);
+  console.warn(`[honeypot] Scraper detected | path=${path.slice(0, 200)} | ip=${ip} | ua=${ua.slice(0, 200)}`);
 
   // Return a convincing 403 that doesn't reveal this is a honeypot
   return NextResponse.json(

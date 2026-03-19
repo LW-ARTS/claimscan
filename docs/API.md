@@ -378,6 +378,52 @@ pending → signing → submitted → confirmed → finalized
 
 ---
 
+### GET /api/flex
+
+Download a creator's flex card as a PNG image.
+
+**Query Parameters:**
+- `handle` (string, required): Creator handle (2-256 chars)
+- `download` (string, optional): Set `false` for inline display. Default: attachment download.
+
+**Response `200`:** PNG image binary with `Content-Disposition: attachment`.
+
+**Headers:**
+```
+Content-Type: image/png
+Content-Disposition: attachment; filename="claimscan-handle.png"
+Cache-Control: public, max-age=300, s-maxage=600
+```
+
+**Errors:**
+- `400` — Missing or invalid handle
+- `502` — OG image generation failed
+- `500` — Internal error
+
+---
+
+### GET /api/avatar
+
+Proxy avatar images from unavatar.io (Twitter profile pictures).
+
+**Query Parameters:**
+- `handle` (string, required): Twitter handle (alphanumeric + underscore, 1-50 chars)
+
+**Response `200`:** Image binary (JPEG, PNG, GIF, or WebP).
+
+**Headers:**
+```
+Content-Type: image/jpeg
+Cache-Control: public, s-maxage=86400, stale-while-revalidate=43200
+```
+
+**Errors:**
+- `400` — Invalid handle format
+- `404` — Avatar not found
+- `502` — Upstream error or oversized response (>2MB)
+
+---
+
 ## Cron Endpoints
 
 All require `Authorization: Bearer {CRON_SECRET}`.
