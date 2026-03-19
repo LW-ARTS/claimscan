@@ -362,7 +362,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
           <div className="px-8 pt-4">
             <button
               onClick={handleClaimAllBags}
-              className="flex h-12 w-full cursor-pointer items-center justify-center bg-black text-sm font-semibold uppercase tracking-[1px] text-white transition-colors hover:bg-black/90 active:scale-[0.99]"
+              className="flex h-12 w-full cursor-pointer items-center justify-center bg-black text-sm font-semibold uppercase tracking-[1px] text-white transition-all duration-200 hover:bg-black/85 hover:shadow-[0_4px_20px_rgba(0,0,0,0.15)] active:scale-[0.97]"
             >
               CLAIM ALL UNCLAIMED ({bagsUnclaimed.length} BAGS TOKEN{bagsUnclaimed.length !== 1 ? 'S' : ''})
             </button>
@@ -378,6 +378,8 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
         aria-labelledby={`${tabsId}-tab-${activeTab}`}
         tabIndex={-1}
         className="px-8 pt-4 pb-2"
+        key={`${activeTab}-${statusFilter}`}
+        style={{ animation: 'fadeIn 0.2s ease-out' }}
       >
         {filteredFees.length > 0 ? (
           <TokenFeeTable

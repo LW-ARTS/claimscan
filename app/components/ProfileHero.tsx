@@ -391,7 +391,7 @@ export function ProfileHero({
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           {/* Left: avatar + name + badges */}
           <div className="flex items-center gap-4 sm:gap-6">
-            <div className="relative shrink-0">
+            <div className="animate-scale-in relative shrink-0">
               {avatarUrl && !avatarError ? (
                 <Image
                   src={avatarUrl}
@@ -409,7 +409,7 @@ export function ProfileHero({
               )}
             </div>
 
-            <div className="min-w-0 space-y-2 sm:space-y-3">
+            <div className="animate-fade-in-up delay-100 min-w-0 space-y-2 sm:space-y-3">
               <h1 className="truncate text-xl font-bold tracking-tight text-black sm:text-[32px]">
                 {displayName}
               </h1>
@@ -442,7 +442,7 @@ export function ProfileHero({
           </div>
 
           {/* Right: TOTAL EARNED */}
-          <div className="shrink-0 text-center sm:text-right">
+          <div className="animate-fade-in-up delay-200 shrink-0 text-center sm:text-right">
             <p className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#777]">
               Total Earned
             </p>
@@ -460,7 +460,7 @@ export function ProfileHero({
         </div>
 
         {/* Stats row */}
-        <div className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:flex sm:gap-3">
+        <div className="animate-fade-in-up delay-300 mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:flex sm:gap-3">
           <div className="border border-[#ddd] px-4 py-4 sm:px-6 sm:py-5">
             <p className="font-mono text-[10px] font-normal uppercase tracking-[1px] text-[#777] sm:text-[11px]">Unclaimed</p>
             <p className="mt-1 text-lg font-bold tabular-nums text-black sm:mt-1.5 sm:text-[26px]" aria-live="polite" aria-atomic>
@@ -486,7 +486,7 @@ export function ProfileHero({
 
         {/* Divider + Action buttons */}
         {totalEarnedUsd > 0 && (
-          <div className="mt-8 space-y-4 sm:mt-10">
+          <div className="animate-fade-in-up delay-400 mt-8 space-y-4 sm:mt-10">
             <div className="h-px bg-[#ddd]" />
             <ShareButton
               handle={handle}
@@ -499,7 +499,7 @@ export function ProfileHero({
 
       {/* Wallets section */}
       {wallets.length > 0 && (
-        <div className="px-5 pb-5 sm:px-14 sm:pb-6">
+        <div className="animate-fade-in-up delay-500 px-5 pb-5 sm:px-14 sm:pb-6">
           {!showAllWallets ? (
             <button
               onClick={() => setShowAllWallets(true)}

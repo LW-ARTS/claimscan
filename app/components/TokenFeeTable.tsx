@@ -176,13 +176,17 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
           </tr>
         </thead>
         <tbody>
-          {displayedFees.map(({ fee, usd, display: { label, badge } }) => {
+          {displayedFees.map(({ fee, usd, display: { label, badge } }, idx) => {
             const platformConfig = PLATFORM_CONFIG[fee.platform];
             const decimals = fee.chain === 'sol' ? 9 : 18;
             const chainLabel = fee.chain === 'sol' ? 'SOL' : 'ETH';
             const isZeroUnclaimed = safeBigInt(fee.total_unclaimed) === 0n;
             return (
-              <tr key={fee.id} className="border-b border-[#ddd] transition-colors hover:bg-[#fafafa]">
+              <tr
+                key={fee.id}
+                className="border-b border-[#ddd] transition-colors hover:bg-[#fafafa]"
+                style={idx < 10 ? { animation: `fadeInUp 0.4s ease-out ${idx * 40}ms both` } : undefined}
+              >
                 <td className="py-3.5 pl-2 pr-0">
                   <div className="flex items-center gap-2">
                     <span
