@@ -158,19 +158,9 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
     </div>
 
     {/* Desktop: table layout — 1:1 match with Pencil design */}
-    <div className="hidden md:block overflow-x-auto">
-      <table className="w-full table-fixed font-mono" style={{ minWidth: connectedWallet && onClaimToken ? '1096px' : '950px' }} aria-label="Creator fee records by token">
+    <div className="hidden md:block">
+      <table className="w-full font-mono" aria-label="Creator fee records by token">
         <caption className="sr-only">Fee records showing earned, claimed, and unclaimed amounts per token</caption>
-        <colgroup>
-          <col style={{ width: 200 }} />
-          <col style={{ width: 110 }} />
-          <col style={{ width: 120 }} />
-          <col style={{ width: 120 }} />
-          <col style={{ width: 120 }} />
-          <col style={{ width: 130 }} />
-          <col style={{ width: 150 }} />
-          {connectedWallet && onClaimToken && <col style={{ width: 146 }} />}
-        </colgroup>
         <thead>
           <tr className="bg-[#f5f5f5]">
             <th scope="col" className="py-3 pl-2 pr-0 text-left text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Token</th>
