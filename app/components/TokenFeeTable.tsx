@@ -104,7 +104,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                     onClick={() => handleCopy(fee.id, fee.token_address!)}
                     aria-label={copiedId === fee.id ? 'Copied' : 'Copy contract address'}
                     title="Copy contract address"
-                    className="inline-flex items-center justify-center rounded p-3 -m-1.5 text-muted-foreground/60 transition-all hover:text-foreground active:scale-90"
+                    className="inline-flex cursor-pointer items-center justify-center rounded p-3 -m-1.5 text-muted-foreground/60 transition-all hover:text-foreground active:scale-90"
                   >
                     {copiedId === fee.id ? (
                       <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -142,7 +142,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
               <button
                 onClick={() => onClaimToken(fee.token_address)}
                 aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
-                className="mt-3 w-full rounded-xl bg-foreground py-2.5 text-xs font-bold uppercase tracking-wider text-background transition-all duration-200 hover:shadow-[0_0_16px_rgba(0,0,0,0.12)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]"
+                className="mt-3 w-full cursor-pointer rounded-xl bg-foreground py-2.5 text-xs font-bold uppercase tracking-wider text-background transition-all duration-200 hover:shadow-[0_0_16px_rgba(0,0,0,0.12)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]"
               >
                 <span className="flex items-center justify-center gap-1.5">
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
@@ -204,7 +204,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                         onClick={() => handleCopy(fee.id, fee.token_address!)}
                         aria-label={copiedId === fee.id ? 'Copied' : 'Copy contract address'}
                         title="Copy contract address"
-                        className="text-[#999] transition-colors hover:text-black"
+                        className="cursor-pointer text-[#999] transition-colors hover:text-black"
                       >
                         {copiedId === fee.id ? (
                           <svg className="h-3 w-3 text-black" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -253,7 +253,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                       <button
                         onClick={() => onClaimToken(fee.token_address)}
                         aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
-                        className="inline-flex items-center gap-1.5 bg-black px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[1px] text-white transition-all hover:bg-black/90 active:scale-95"
+                        className="inline-flex cursor-pointer items-center gap-1.5 bg-black px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[1px] text-white transition-all hover:bg-black/90 active:scale-95"
                                              >
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -275,7 +275,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
       <div className="mt-4 flex flex-col items-center gap-1">
         <button
           onClick={() => setVisibleCount((c) => c + LOAD_MORE_COUNT)}
-          className="rounded-lg border border-border/60 bg-card/80 px-5 py-2 text-sm font-medium text-foreground/80 transition-all hover:bg-foreground hover:text-background active:scale-95"
+          className="cursor-pointer rounded-lg border border-border/60 bg-card/80 px-5 py-2 text-sm font-medium text-foreground/80 transition-all hover:bg-foreground hover:text-background active:scale-95"
         >
           Show more ({sortedFees.length - displayedFees.length} remaining)
         </button>

@@ -26,7 +26,7 @@ export default function RootError({
         <div className="mt-6 flex gap-4">
           <button
             onClick={reset}
-            className="inline-flex items-center gap-2 rounded-lg bg-foreground px-5 py-3 text-sm font-bold uppercase tracking-wide text-background transition-all hover:bg-foreground/90"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-5 py-3 text-sm font-bold uppercase tracking-wide text-background transition-all hover:bg-foreground/90"
           >
             Try again
           </button>

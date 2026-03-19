@@ -22,7 +22,7 @@ export default function GlobalError({
           <p className="text-muted-foreground">An unexpected error occurred. Please try again.</p>
           <button
             onClick={reset}
-            className="rounded-lg bg-foreground px-6 py-2.5 text-sm font-bold text-background"
+            className="cursor-pointer rounded-lg bg-foreground px-6 py-2.5 text-sm font-bold text-background"
           >
             Try again
           </button>

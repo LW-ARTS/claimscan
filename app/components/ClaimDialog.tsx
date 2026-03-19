@@ -145,7 +145,7 @@ export function ClaimDialog({
             </div>
             <button
               onClick={handleClose}
-              className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#ddd] text-black transition-colors hover:bg-[#f5f5f5]"
+              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center border border-[#ddd] text-black transition-colors hover:bg-[#f5f5f5]"
               aria-label="Close"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -276,7 +276,7 @@ export function ClaimDialog({
                 <button
                   onClick={handleClaim}
                   disabled={phase !== 'idle' || hasInsufficientSol || !!bagsWalletMismatch}
-                  className="flex h-12 sm:h-14 w-full items-center justify-center gap-2 sm:gap-2.5 bg-black text-white transition-all duration-200 hover:bg-black/90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex h-12 sm:h-14 w-full cursor-pointer items-center justify-center gap-2 sm:gap-2.5 bg-black text-white transition-all duration-200 hover:bg-black/90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <svg className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -308,7 +308,7 @@ export function ClaimDialog({
               </p>
               <button
                 onClick={cancel}
-                className="border border-[#ddd] px-4 py-1.5 text-[11px] text-[#999] transition-colors hover:bg-[#f5f5f5] hover:text-[#777]"
+                className="cursor-pointer border border-[#ddd] px-4 py-1.5 text-[11px] text-[#999] transition-colors hover:bg-[#f5f5f5] hover:text-[#777]"
               >
                 Cancel
               </button>
@@ -338,7 +338,7 @@ export function ClaimDialog({
 
               <button
                 onClick={cancel}
-                className="mt-2 w-full border border-[#ddd] py-2 text-[11px] text-[#999] transition-colors hover:bg-[#f5f5f5] hover:text-[#777]"
+                className="mt-2 w-full cursor-pointer border border-[#ddd] py-2 text-[11px] text-[#999] transition-colors hover:bg-[#f5f5f5] hover:text-[#777]"
               >
                 Cancel Remaining
               </button>
@@ -402,7 +402,7 @@ export function ClaimDialog({
 
               <button
                 onClick={() => onOpenChange(false)}
-                className="flex h-12 sm:h-14 w-full items-center justify-center bg-black text-xs sm:text-[13px] font-medium tracking-[1.5px] sm:tracking-[2px] text-white transition-all hover:bg-black/90 active:scale-[0.98]"
+                className="flex h-12 sm:h-14 w-full cursor-pointer items-center justify-center bg-black text-xs sm:text-[13px] font-medium tracking-[1.5px] sm:tracking-[2px] text-white transition-all hover:bg-black/90 active:scale-[0.98]"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 DONE
