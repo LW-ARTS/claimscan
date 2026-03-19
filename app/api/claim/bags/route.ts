@@ -6,7 +6,7 @@ import { generateConfirmToken } from '@/lib/claim/hmac';
 import { CLAIMSCAN_FEE_BPS, MIN_FEE_LAMPORTS } from '@/lib/constants';
 
 /** Vercel Hobby hard limit is 10s. Reduced batch size (10 mints) fits within this budget. */
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const contentType = request.headers.get('content-type') ?? '';
