@@ -10,6 +10,8 @@ import type {
   TokenFee,
   ClaimEvent,
 } from './types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('zora');
 
 // ═══════════════════════════════════════════════
 // Zora Adapter
@@ -65,14 +67,14 @@ export const zoraAdapter: PlatformAdapter = {
     if (baseBalance.status === 'fulfilled') {
       baseBal = baseBalance.value;
     } else {
-      console.warn('[zora] Base ProtocolRewards query failed:', baseBalance.reason instanceof Error ? baseBalance.reason.message : baseBalance.reason);
+      log.warn('Base ProtocolRewards query failed', { error: baseBalance.reason instanceof Error ? baseBalance.reason.message : String(baseBalance.reason) });
     }
 
     let ethBal = 0n;
     if (ethBalance.status === 'fulfilled') {
       ethBal = ethBalance.value;
     } else {
-      console.warn('[zora] ETH ProtocolRewards query failed:', ethBalance.reason instanceof Error ? ethBalance.reason.message : ethBalance.reason);
+      log.warn('ETH ProtocolRewards query failed', { error: ethBalance.reason instanceof Error ? ethBalance.reason.message : String(ethBalance.reason) });
     }
 
     const baseClaimedTotal = baseClaimed.status === 'fulfilled' ? baseClaimed.value : 0n;

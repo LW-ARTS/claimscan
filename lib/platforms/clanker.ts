@@ -11,6 +11,8 @@ import type {
   TokenFee,
   ClaimEvent,
 } from './types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('clanker');
 
 // ═══════════════════════════════════════════════
 // Clanker API Types
@@ -64,12 +66,12 @@ async function clankerFetch<T>(path: string, externalSignal?: AbortSignal): Prom
     });
     clearTimeout(timeout);
     if (!res.ok) {
-      console.warn(`[clanker] fetch ${path} returned HTTP ${res.status}`);
+      log.warn(`fetch ${path} returned HTTP ${res.status}`);
       return null;
     }
     return await res.json() as T;
   } catch (err) {
-    console.warn(`[clanker] fetch ${path} failed:`, err instanceof Error ? err.message : err);
+    log.warn(`fetch ${path} failed`, { error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }
@@ -146,7 +148,7 @@ export const clankerAdapter: PlatformAdapter = {
 
     for (let page = 1; page <= MAX_PAGES; page++) {
       if (Date.now() > paginationDeadline) {
-        console.warn(`[clanker] Pagination deadline exceeded for ${wallet} at page ${page}/${MAX_PAGES}, ${allTokens.length} tokens fetched`);
+        log.warn(`Pagination deadline exceeded for ${wallet} at page ${page}/${MAX_PAGES}, ${allTokens.length} tokens fetched`);
         break;
       }
       const data = await clankerFetch<ClankerSearchCreatorResponse>(

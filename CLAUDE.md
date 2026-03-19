@@ -69,7 +69,7 @@ supabase/migrations/          # 12 migration files
 - Chain types: 'sol' | 'base' | 'eth'
 - Claim status: claimed | unclaimed | partially_claimed | auto_distributed
 - Cache TTL: 40min normal, 2h pra creators com 500+ records
-- Price waterfall: DexScreener → Jupiter → CoinGecko
+- Price waterfall: DexScreener → Jupiter (Solana only). CoinGecko somente para precos nativos (SOL/ETH)
 - Rate limiting: 30 req/min geral, 10 req/min search, 20 handles/5min anti-enumeration
 - proxy.ts (450 linhas): security headers, tarpit, honeypot, CORS, request signing — nao existe middleware.ts
 - Cron endpoints protegidos com CRON_SECRET bearer token

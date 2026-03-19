@@ -54,12 +54,14 @@ export async function checkCache(
 
   if (!data) return miss;
 
-  // Fetch fee_records separately to avoid PostgREST's 1000-row embedded limit
-  const { data: feeRecords } = await supabase
-    .from('fee_records')
-    .select('*')
-    .eq('creator_id', data.id);
+  // Fetch fee_records + claim_events in parallel (saves ~1 DB round-trip)
+  const [{ data: feeRecords }, { data: claimEvents }] = await Promise.all([
+    supabase.from('fee_records').select('*').eq('creator_id', data.id),
+    supabase.from('claim_events').select('*').eq('creator_id', data.id)
+      .order('claimed_at', { ascending: false }).limit(50),
+  ]);
   const allFeeRecords = (feeRecords ?? []) as FeeRecord[];
+  const allClaimEvents = (claimEvents ?? []) as ClaimEventRow[];
 
   // Check freshness using the most recent fee_records entry
   const maxSyncedAt = allFeeRecords.reduce((max: number, r: FeeRecord) => {
@@ -70,20 +72,13 @@ export async function checkCache(
   const isFresh = maxSyncedAt > 0 && Date.now() - maxSyncedAt < ttl;
 
   if (isFresh) {
-    const { data: claimEvents } = await supabase
-      .from('claim_events')
-      .select('*')
-      .eq('creator_id', data.id)
-      .order('claimed_at', { ascending: false })
-      .limit(50);
-
     return {
       hit: true,
       strategy: 'fresh',
       creator: { ...data, fee_records: allFeeRecords },
       wallets: data.wallets ?? [],
       fees: allFeeRecords,
-      claimEvents: (claimEvents ?? []) as ClaimEventRow[],
+      claimEvents: allClaimEvents,
       creatorId: data.id,
     };
   }
@@ -95,20 +90,13 @@ export async function checkCache(
       recordCount: allFeeRecords.length,
       lastSynced: new Date(maxSyncedAt).toISOString(),
     });
-    const { data: claimEvents } = await supabase
-      .from('claim_events')
-      .select('*')
-      .eq('creator_id', data.id)
-      .order('claimed_at', { ascending: false })
-      .limit(50);
-
     return {
       hit: true,
       strategy: 'stale_heavy',
       creator: { ...data, fee_records: allFeeRecords },
       wallets: data.wallets ?? [],
       fees: allFeeRecords,
-      claimEvents: (claimEvents ?? []) as ClaimEventRow[],
+      claimEvents: allClaimEvents,
       creatorId: data.id,
     };
   }

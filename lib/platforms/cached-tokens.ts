@@ -1,6 +1,8 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
 import type { Platform, Chain } from '@/lib/supabase/types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('cached-tokens');
 
 /**
  * Look up cached token addresses from the `creator_tokens` table.
@@ -48,7 +50,7 @@ export async function getCachedTokenAddresses(
     return tokens.map((t) => t.token_address);
   } catch (err) {
     // DB error → fall back to GPA. Log so operators can detect broken cache layer.
-    console.warn('[cached-tokens] DB query failed, falling back to GPA:', err instanceof Error ? err.message : err);
+    log.warn('DB query failed, falling back to GPA', { error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }

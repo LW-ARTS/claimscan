@@ -94,7 +94,7 @@ lib/
   platforms/          # 9 launchpad adapters
   chains/             # Solana, Base, ETH RPC
   resolve/            # Identity resolution
-  prices/             # Price waterfall (DexScreener → Jupiter → CoinGecko)
+  prices/             # Price waterfall (DexScreener → Jupiter, CoinGecko for SOL/ETH)
   claim/              # HMAC claim tokens
   services/           # Creator resolution + persistence
   supabase/           # DB clients
