@@ -76,7 +76,7 @@ CRON_SECRET, CLAIM_HMAC_SECRET
 UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
 NEXT_PUBLIC_TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY
 NEXT_PUBLIC_API_SIGN_KEY
-RESOLVE_TIMEOUT_MS (optional, default 8000 — override for VPS/bot deployments)
+RESOLVE_TIMEOUT_MS (optional, default 55000 — override for VPS/bot deployments)
 ```
 
 ## Git
@@ -94,7 +94,7 @@ npm start            # node dist/index.js
 ```
 
 ## Cuidados
-- maxDuration=10s nas pages (Vercel Hobby limit)
+- maxDuration=60s nas API routes (Vercel Hobby max), wallclock guards em crons usam 55s
 - Creators grandes (500+ fees) sao cacheados por cron, nao on-demand
 - Middleware e gigante - qualquer mudanca de security header, editar com cuidado
 - Honeypot endpoint retorna dados falsos - nao confundir com API real

@@ -4,7 +4,7 @@ import { isValidWalletInput } from '@/lib/utils';
 import type { ResolvedWallet } from '@/lib/platforms/types';
 
 /** Vercel Hobby hard limit is 10s. This tells the runtime we want the full budget. */
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 /**
  * Validate and parse a wallets array from raw input.

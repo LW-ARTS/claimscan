@@ -298,8 +298,8 @@ export async function fetchFeesByHandle(
 }
 
 /** Route-level budget for the entire live-fee aggregation.
- * Vercel Hobby hard limit = 10s. Leave 1.5s for JSON serialization + network. */
-const LIVE_AGGREGATION_TIMEOUT_MS = 8_500;
+ * Vercel Hobby hard limit = 60s. Leave 5s for JSON serialization + network. */
+const LIVE_AGGREGATION_TIMEOUT_MS = 55_000;
 
 /**
  * Fetch live unclaimed fees for wallets across all platforms.

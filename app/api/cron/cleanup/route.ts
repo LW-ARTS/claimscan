@@ -4,7 +4,7 @@ import { getNativeTokenPrices, getTokenPrice } from '@/lib/prices';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress } from '@/lib/chains/base';
 
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 /**
  * Combined cleanup + price refresh cron.
@@ -113,10 +113,10 @@ export async function GET(request: Request) {
     let tokensUpdated = 0;
 
     const elapsed = Date.now() - wallclockStart;
-    if (url.searchParams.get('also') === 'prices' && elapsed < 6_000) {
+    if (url.searchParams.get('also') === 'prices' && elapsed < 50_000) {
       try {
-        // Budget remaining time for price fetch (leave 1s buffer for DB writes)
-        const priceTimeout = Math.max(1000, 9_000 - (Date.now() - wallclockStart));
+        // Budget remaining time for price fetch (leave 5s buffer for DB writes)
+        const priceTimeout = Math.max(1000, 55_000 - (Date.now() - wallclockStart));
         const nativePrices = await Promise.race([
           getNativeTokenPrices(),
           new Promise<never>((_, reject) =>
@@ -142,7 +142,7 @@ export async function GET(request: Request) {
         ]);
 
         // Fetch a few token prices if time allows
-        if (Date.now() - wallclockStart < 7_000) {
+        if (Date.now() - wallclockStart < 50_000) {
           const { data: tokens } = await supabase
             .from('fee_records')
             .select('chain, token_address, token_symbol')
