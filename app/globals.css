@@ -190,11 +190,16 @@
   .animate-fade-in-down {
     animation: fadeInDown 0.5s ease-out both;
   }
+  .animate-scale-in {
+    animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
   .delay-100 { animation-delay: 100ms; }
   .delay-150 { animation-delay: 150ms; }
   .delay-200 { animation-delay: 200ms; }
   .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
   .delay-500 { animation-delay: 500ms; }
+  .delay-600 { animation-delay: 600ms; }
 
   .shimmer {
     position: relative;
@@ -361,6 +366,10 @@ main:has([data-page="home"]) ~ .site-footer {
 @keyframes fadeInDown {
   from { opacity: 0; transform: translateY(-12px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
 }
 @keyframes shimmerSweep {
   0% { background-position: 200% 0; }

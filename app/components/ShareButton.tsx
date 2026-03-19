@@ -84,7 +84,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
         href={tweetIntentUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex h-14 w-full items-center justify-center gap-3 bg-black text-base font-semibold text-white transition-colors hover:bg-black/90"
+        className="flex h-14 w-full items-center justify-center gap-3 bg-black text-base font-semibold text-white transition-all duration-200 hover:bg-black/85 hover:shadow-[0_4px_20px_rgba(0,0,0,0.15)] active:scale-[0.98]"
 
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
