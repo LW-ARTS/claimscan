@@ -75,6 +75,7 @@ supabase/migrations/          # 12 migration files
 - Cron endpoints protegidos com CRON_SECRET bearer token
 
 ## Env (principais)
+- .env.example existe na raiz — usar como base pra setup local
 ```
 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 SOLANA_RPC_URL, NEXT_PUBLIC_SOLANA_RPC_URL, BASE_RPC_URL
@@ -90,6 +91,7 @@ RESOLVE_TIMEOUT_MS (optional, default 55000 — override para deploys externos)
 ## Git
 - origin: https://github.com/screwk/claimscan.git
 - moinho: https://github.com/LW-ARTS/ClaimScan-Moinho.git
+- .github/PULL_REQUEST_TEMPLATE.md e CODEOWNERS configurados
 
 ## Scripts
 ```
@@ -104,3 +106,4 @@ npm run test:e2e         # Playwright tests
 - Middleware e gigante - qualquer mudanca de security header, editar com cuidado
 - Honeypot endpoint retorna dados falsos - nao confundir com API real
 - Wallet adapter auto-discovers wallets via Wallet Standard (sem imports explicitos)
+- Sentry org: lw-52.sentry.io (project: claimscan, team: #lw)
