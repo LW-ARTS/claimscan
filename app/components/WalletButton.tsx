@@ -81,7 +81,7 @@ function WalletButtonInner() {
       <button
         onClick={() => setVisible(true)}
         disabled={connecting}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:border-foreground/20 hover:text-foreground hover:shadow-[0_0_12px_rgba(255,255,255,0.06)] hover:-translate-y-px active:scale-[0.97] active:shadow-none disabled:opacity-50 disabled:hover:translate-y-0 disabled:active:scale-100"
+        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:border-foreground/20 hover:text-foreground hover:shadow-[0_0_12px_rgba(255,255,255,0.06)] hover:-translate-y-px active:scale-[0.97] active:shadow-none disabled:cursor-wait disabled:opacity-50 disabled:hover:translate-y-0 disabled:active:scale-100"
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 9m18 0V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3" />
@@ -101,7 +101,7 @@ function WalletButtonInner() {
         onClick={() => setShowMenu((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={showMenu}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:border-foreground/20 hover:text-foreground hover:shadow-[0_0_12px_rgba(255,255,255,0.06)] hover:-translate-y-px active:scale-[0.97] active:shadow-none"
+        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:border-foreground/20 hover:text-foreground hover:shadow-[0_0_12px_rgba(255,255,255,0.06)] hover:-translate-y-px active:scale-[0.97] active:shadow-none"
       >
         <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
           <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75 motion-safe:animate-ping" />
