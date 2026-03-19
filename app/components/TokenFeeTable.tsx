@@ -85,11 +85,15 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
     <>
     {/* Mobile: stacked card layout */}
     <div className="space-y-3 md:hidden">
-      {displayedFees.map(({ fee, usd, display: { label, badge } }) => {
+      {displayedFees.map(({ fee, usd, display: { label, badge } }, idx) => {
         const platformConfig = PLATFORM_CONFIG[fee.platform];
         const decimals = fee.chain === 'sol' ? 9 : 18;
         return (
-          <div key={fee.id} className="rounded-xl border border-border/40 bg-card p-3.5">
+          <div
+            key={fee.id}
+            className="rounded-xl border border-border/40 bg-card p-3.5"
+            style={idx < 8 ? { animation: `fadeInUp 0.4s ease-out ${idx * 50}ms both` } : undefined}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-bold uppercase text-muted-foreground">
