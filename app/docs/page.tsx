@@ -447,7 +447,6 @@ resolution   addresses     & USD values`}
                       'Fee recipient discovery (who gets paid)',
                       'Earnings breakdown (earned, claimed, unclaimed in USD)',
                       'Tri-state claim status (claimed, partial, unclaimed)',
-                      'Telegram Bot (paste CA in groups/DMs for instant fee data)',
                       'One-click claim expansion (Bags.fm live, Clanker & Zora next)',
                       'Additional chain support (full Ethereum L1, Arbitrum)',
                     ].map((item) => (

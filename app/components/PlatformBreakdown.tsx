@@ -41,6 +41,34 @@ type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 /** Ordered list of all platforms to always show in tabs */
 const ALL_PLATFORMS = Object.keys(PLATFORM_CONFIG) as Platform[];
 
+function TabButton({
+  active, tabsId, tabKey, onClick, children, count,
+}: {
+  active: boolean; tabsId: string; tabKey: string;
+  onClick: () => void; children: React.ReactNode; count: number;
+}) {
+  return (
+    <button
+      role="tab"
+      aria-selected={active}
+      aria-controls={`${tabsId}-panel`}
+      id={`${tabsId}-tab-${tabKey}`}
+      tabIndex={active ? 0 : -1}
+      onClick={onClick}
+      className={`inline-flex cursor-pointer items-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors ${
+        active
+          ? 'bg-foreground text-background'
+          : 'border border-border text-foreground hover:bg-muted'
+      }`}
+    >
+      {children}
+      <span className={`font-mono text-xs tabular-nums ${active ? 'text-background/60' : 'text-muted-foreground'}`}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
 type Wallet = Database['public']['Tables']['wallets']['Row'];
 
 interface PlatformBreakdownProps {
@@ -78,6 +106,17 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
   // Claim dialog state
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
   const [selectedForClaim, setSelectedForClaim] = useState<string[]>([]);
+
+  // Claim All confirmation state
+  const [confirmingClaimAll, setConfirmingClaimAll] = useState(false);
+  const confirmTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  useEffect(() => {
+    return () => { if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current); };
+  }, []);
+
+  // Wallet mismatch detection (shown before dialog opens)
+  const bagsWalletMismatch = bagsRegisteredWallet && connectedWallet && connectedWallet !== bagsRegisteredWallet;
 
   // Local optimistic updates for claimed tokens
   const [claimedMints, setClaimedMints] = useState<Set<string>>(new Set());
@@ -207,7 +246,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
   const totalPartial = chainSummaries.reduce((sum, c) => sum + c.partialCount, 0);
 
   return (
-    <div className="rounded-2xl bg-white">
+    <div className="rounded-2xl bg-card">
       {/* Top Bar Section — 1:1 Pencil design */}
       <div className="space-y-4 px-8 pt-6">
         {/* Chain summary + unclaimed/partial badges */}
@@ -216,23 +255,23 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
             <div className="flex items-center gap-4">
               {chainSummaries.map((chain) => (
                 <div key={chain.chain} className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-black" aria-hidden="true" />
-                  <span className="text-sm font-medium text-black">{chain.name}</span>
-                  <span className="text-sm font-bold tabular-nums text-black">{formatUsd(chain.totalUsd)}</span>
+                  <span className="h-2 w-2 rounded-full bg-foreground" aria-hidden="true" />
+                  <span className="text-sm font-medium text-foreground">{chain.name}</span>
+                  <span className="text-sm font-bold tabular-nums text-foreground">{formatUsd(chain.totalUsd)}</span>
                 </div>
               ))}
             </div>
             {(totalUnclaimed > 0 || totalPartial > 0) && (
               <div className="flex items-center gap-3">
                 {totalUnclaimed > 0 && (
-                  <span className="inline-flex items-center gap-1.5 bg-[#f5f5f5] px-3 py-1.5 font-mono text-xs font-medium text-black">
-                    <span className="h-1.5 w-1.5 rounded-full bg-black" />
+                  <span className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 font-mono text-xs font-medium text-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
                     {totalUnclaimed} unclaimed
                   </span>
                 )}
                 {totalPartial > 0 && (
-                  <span className="inline-flex items-center gap-1.5 bg-[#f5f5f5] px-3 py-1.5 font-mono text-xs font-medium text-[#777]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#777]" />
+                  <span className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
                     {totalPartial} partial
                   </span>
                 )}
@@ -248,48 +287,17 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
           className="flex flex-wrap gap-3"
           onKeyDown={(e) => handleTabKeyDown(e, tabKeys)}
         >
-          <button
-            role="tab"
-            aria-selected={activeTab === 'all'}
-            aria-controls={`${tabsId}-panel`}
-            id={`${tabsId}-tab-all`}
-            tabIndex={activeTab === 'all' ? 0 : -1}
-            onClick={() => setActiveTab('all')}
-            className={`inline-flex cursor-pointer items-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors ${
-              activeTab === 'all'
-                ? 'bg-black text-white'
-                : 'border border-[#ddd] text-black hover:bg-[#f5f5f5]'
-            }`}
-          >
+          <TabButton active={activeTab === 'all'} tabsId={tabsId} tabKey="all" onClick={() => setActiveTab('all')} count={displayFees.length}>
             All
-            <span className={`font-mono text-xs tabular-nums ${activeTab === 'all' ? 'text-white/60' : 'text-[#777]'}`}>
-              {displayFees.length}
-            </span>
-          </button>
+          </TabButton>
           {platformsWithData.map((platform) => {
             const config = PLATFORM_CONFIG[platform];
             const count = byPlatform.get(platform)?.length ?? 0;
             return (
-              <button
-                key={platform}
-                role="tab"
-                aria-selected={activeTab === platform}
-                aria-controls={`${tabsId}-panel`}
-                id={`${tabsId}-tab-${platform}`}
-                tabIndex={activeTab === platform ? 0 : -1}
-                onClick={() => setActiveTab(platform)}
-                className={`inline-flex cursor-pointer items-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors ${
-                  activeTab === platform
-                    ? 'bg-black text-white'
-                    : 'border border-[#ddd] text-black hover:bg-[#f5f5f5]'
-                }`}
-              >
+              <TabButton key={platform} active={activeTab === platform} tabsId={tabsId} tabKey={platform} onClick={() => setActiveTab(platform)} count={count}>
                 <PlatformIcon platform={platform} className="h-3.5 w-3.5" aria-hidden />
                 <span>{config?.name ?? platform}</span>
-                <span className={`font-mono text-xs tabular-nums ${activeTab === platform ? 'text-white/60' : 'text-[#777]'}`}>
-                  {count}
-                </span>
-              </button>
+              </TabButton>
             );
           })}
         </div>
@@ -339,12 +347,12 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
               onClick={() => setStatusFilter(status as typeof statusFilter)}
               className={`inline-flex cursor-pointer items-center gap-1.5 px-4 py-2 text-[13px] font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 isActive
-                  ? 'bg-black text-white'
-                  : 'text-[#777] hover:text-black'
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {status}
-              <span className={`font-mono text-xs tabular-nums ${isActive ? 'text-white/60' : 'text-[#999]'}`}>
+              <span className={`font-mono text-xs tabular-nums ${isActive ? 'text-background/60' : 'text-muted-foreground/60'}`}>
                 {count}
               </span>
             </button>
@@ -359,12 +367,41 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
           .filter((f) => f.platform === 'bags' && f.claim_status !== 'claimed' && safeBigInt(f.total_unclaimed) > 0n);
         if (bagsUnclaimed.length === 0) return null;
         return (
-          <div className="px-8 pt-4">
+          <div className="px-8 pt-4 space-y-3">
+            {bagsWalletMismatch && (
+              <div className="flex items-start gap-2.5 border border-border bg-muted px-4 py-3">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+                <div>
+                  <p className="text-xs font-semibold text-foreground">Wrong wallet connected</p>
+                  <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                    Bags.fm requires wallet {bagsRegisteredWallet!.slice(0, 4)}...{bagsRegisteredWallet!.slice(-4)} to claim.
+                  </p>
+                </div>
+              </div>
+            )}
             <button
-              onClick={handleClaimAllBags}
-              className="flex h-12 w-full cursor-pointer items-center justify-center bg-black text-sm font-semibold uppercase tracking-[1px] text-white transition-all duration-200 hover:bg-black/85 hover:shadow-[0_4px_20px_rgba(0,0,0,0.15)] active:scale-[0.97]"
+              onClick={() => {
+                if (confirmingClaimAll) {
+                  handleClaimAllBags();
+                  setConfirmingClaimAll(false);
+                  if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+                } else {
+                  setConfirmingClaimAll(true);
+                  if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+                  confirmTimerRef.current = setTimeout(() => setConfirmingClaimAll(false), 5000);
+                }
+              }}
+              className={`flex h-12 w-full cursor-pointer items-center justify-center text-sm font-semibold uppercase tracking-[1px] transition-all duration-200 active:scale-[0.97] ${
+                confirmingClaimAll
+                  ? 'bg-foreground/90 text-background ring-2 ring-foreground/20'
+                  : 'bg-foreground text-background hover:bg-foreground/85 hover:shadow-[0_4px_20px_rgba(0,0,0,0.15)]'
+              }`}
             >
-              CLAIM ALL UNCLAIMED ({bagsUnclaimed.length} BAGS TOKEN{bagsUnclaimed.length !== 1 ? 'S' : ''})
+              {confirmingClaimAll
+                ? `CONFIRM CLAIM ALL (${bagsUnclaimed.length} TOKEN${bagsUnclaimed.length !== 1 ? 'S' : ''})`
+                : `CLAIM ALL UNCLAIMED (${bagsUnclaimed.length} BAGS TOKEN${bagsUnclaimed.length !== 1 ? 'S' : ''})`}
             </button>
           </div>
         );
@@ -392,7 +429,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <PlatformIcon platform={activeTab} className="mb-2 h-6 w-6 text-muted-foreground/30" aria-hidden />
-            <p className="text-sm text-[#777]">
+            <p className="text-sm text-muted-foreground">
               {activeTab === 'all'
                 ? 'No fees found across any platform'
                 : `No fees found on ${PLATFORM_CONFIG[activeTab as Platform]?.name ?? activeTab}`}
