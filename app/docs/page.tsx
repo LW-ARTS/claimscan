@@ -163,11 +163,11 @@ export default function DocsPage() {
           <ol className="relative mt-8 ml-3.5 border-l border-foreground/10 pl-0">
             {[
               { step: 'Enter a handle', desc: 'Twitter, Farcaster, GitHub username, or raw wallet address.' },
-              { step: 'Identity resolution', desc: 'Social identity mapped to wallet addresses across both chains via Neynar and Twitter APIs.' },
-              { step: 'Parallel platform scan', desc: 'All 9 platforms queried simultaneously. Results update in real time as each completes.' },
+              { step: 'Identity resolution', desc: 'Social handles mapped to wallet addresses across both chains.' },
+              { step: 'Parallel platform scan', desc: 'All 9 platforms queried simultaneously. Results stream in real time as each completes.' },
               { step: 'Fee aggregation', desc: 'Earned, claimed, partially claimed, and unclaimed fees pulled per token. Duplicates filtered.' },
-              { step: 'USD conversion', desc: 'Live prices from CoinGecko, DexScreener, and Jupiter. Updated every 5 minutes.' },
-              { step: 'Live dashboard', desc: 'Platform breakdown, chain breakdown, token-level details. Auto-refreshes every 30 seconds via polling.' },
+              { step: 'USD conversion', desc: 'Live prices from multiple sources. Continuously refreshed.' },
+              { step: 'Live dashboard', desc: 'Platform breakdown, chain breakdown, token-level details. Auto-refreshes in real time.' },
             ].map((s, i) => (
               <li key={i} className="relative mb-8 last:mb-0 pl-7">
                 <span className="absolute -left-3.5 top-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-foreground text-[11px] font-bold tabular-nums text-background">
@@ -205,9 +205,9 @@ export default function DocsPage() {
             <div className="space-y-4">
               {[
                 'API fetches your claimable positions from the platform',
-                'Transaction built server-side and simulated on RPC',
+                'Transaction built server-side and simulated on-chain',
                 'You sign in your wallet (Phantom, Solflare, Backpack, etc.)',
-                'Transaction submitted and confirmed via Helius webhook',
+                'Transaction submitted and confirmed in real time',
               ].map((text, i) => (
                 <div key={i} className="relative flex items-start gap-3.5 text-[13px]">
                   <span className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-[9px] font-bold text-background">{i + 1}</span>
@@ -244,13 +244,13 @@ export default function DocsPage() {
 
           <div className="mt-6 overflow-hidden rounded-xl border border-foreground/[0.06]">
             {[
-              ['Frontend', 'Next.js 16 + React 19 + Tailwind CSS v4'],
-              ['Blockchain', '@solana/web3.js + viem (EVM/Base)'],
-              ['Database', 'Supabase (PostgreSQL)'],
-              ['Price Feeds', 'CoinGecko, DexScreener, Jupiter API'],
-              ['Identity', 'Neynar API (Farcaster), Twitter API'],
-              ['Monitoring', 'Sentry + Vercel Analytics'],
-              ['Deployment', 'Vercel Edge Network (Hobby-optimized)'],
+              ['Frontend', 'React + Tailwind CSS'],
+              ['Blockchain', 'Solana + EVM (Base)'],
+              ['Database', 'SQL database with access controls'],
+              ['Price Feeds', 'Multi-source price aggregation'],
+              ['Identity', 'Social identity resolution across platforms'],
+              ['Monitoring', 'Error tracking + analytics'],
+              ['Deployment', 'Serverless infrastructure'],
               ['Typography', 'Exo 2 (headings) + JetBrains Mono'],
             ].map(([cat, tech], i) => (
               <div
@@ -267,18 +267,6 @@ export default function DocsPage() {
             ))}
           </div>
 
-          <div className="mt-6 rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-5">
-            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/40">
-              Database Schema
-            </span>
-            <pre className="mt-3 font-mono text-[12px] leading-relaxed text-foreground/60">
-{`creators  →  wallets  →  fee_records
-    |            |            |
-identity     blockchain    per-token fees
-resolution   addresses     & USD values`}
-            </pre>
-          </div>
-
           {/* ── Key decisions ── */}
           <div className="mt-12 flex items-center gap-3">
             <h3 className="text-sm font-bold">Key Architecture Decisions</h3>
@@ -288,41 +276,32 @@ resolution   addresses     & USD values`}
           <div className="mt-6 space-y-4">
             {[
               { area: 'Streaming', items: [
-                ['Real-time updates', 'Platform results delivered as they complete. SSE streaming on Pro plan; smart polling with 30s intervals on Hobby.'],
-                ['AbortSignal propagation', 'Every HTTP/RPC call carries an AbortSignal. Navigate away mid-scan and all in-flight requests cancel instantly.'],
+                ['Real-time updates', 'Platform results delivered as they complete. No waiting for all 9 to finish.'],
+                ['Clean cancellation', 'Navigate away mid-scan and all in-flight requests cancel instantly.'],
               ]},
               { area: 'Performance', items: [
-                ['Vercel Hobby optimization', 'All routes tuned for the 10-second serverless limit. Parallel fetching, aggressive early returns, wallclock guards.'],
-                ['Wallclock guards', 'Hard budgets on every resolve path. Functions return partial results instead of dying at the edge.'],
-                ['In-flight deduplication', 'Prevents duplicate API calls for concurrent requests to the same creator.'],
-                ['Batched concurrency', 'API requests in batches of 40. Chunked EVM getLogs to avoid connection overload.'],
+                ['Optimized routing', 'All routes tuned for fast execution with parallel fetching.'],
+                ['Smart timeouts', 'Partial results returned instead of timeouts on slow platforms.'],
               ]},
               { area: 'Caching', items: [
-                ['40-min DB cache', 'Creator and fee data cached in Supabase. Fresh scans only trigger after TTL expires.'],
-                ['Doppler in-memory cache', '10-min TTL for Bankr lookups. Eliminates redundant calls to the IP-rate-limited API. ~2-3x throughput.'],
-                ['GPA caching', 'Expensive getProgramAccounts calls skipped when the cron indexer has already discovered tokens.'],
-                ['Cron token indexer', 'Background job indexes creator tokens. Keeps DB warm so live scans hit cache instead of chain.'],
+                ['Multi-layer cache', 'Fee data cached across multiple layers. Fresh scans only trigger after expiry.'],
+                ['Background indexing', 'Creator tokens pre-indexed so live scans resolve faster.'],
               ]},
               { area: 'Data', items: [
-                ['Dynamic dust filter', 'Positions below $15 unclaimed are skipped. Threshold uses live SOL price, adjusts automatically.'],
-                ['Multi-key API rotation', '10 API keys with round-robin rotation and per-key rate tracking. 10,000 req/hr for Bags.fm.'],
-                ['Helius V2 pagination', 'Cursor-based pagination for RevShare token discovery. Handles creators with 100+ assets.'],
+                ['Dynamic dust filter', 'Low-value positions filtered using live token prices.'],
+                ['Large portfolios', 'Handles creators with hundreds of tokens without result limits.'],
               ]},
               { area: 'Claim System', items: [
-                ['Zero-custody flow', 'Server builds unsigned transactions. User signs in-browser, submits to Solana RPC. No private keys leave the wallet.'],
-                ['Pre-sign simulation', 'Every transaction simulated before wallet prompt. Catches insufficient funds, pool migrations, malformed txs.'],
-                ['HMAC verification', 'Claims signed with HMAC-SHA256 using dedicated secret. Constant-time comparison via timingSafeEqual.'],
-                ['Forward-only state machine', 'Claim status: pending → signing → submitted → confirmed/failed/expired. Terminal states locked.'],
-                ['Optimistic locking', 'Partial unique index prevents duplicate active claims. Bulk insert with race condition fallback. Inline stale cleanup.'],
-                ['Chunked RPC submission', 'Signed transactions submitted in chunks of 5 via Promise.allSettled.'],
-                ['Wallet Standard discovery', 'Auto-discovers all compatible wallets (Phantom, Solflare, Backpack) without hardcoded adapters.'],
-                ['Helius webhook', 'Real-time transaction confirmation with fail-closed authentication.'],
+                ['Zero-custody flow', 'Server builds unsigned transactions. You sign in your wallet. No private keys leave the browser.'],
+                ['Pre-sign simulation', 'Every transaction simulated before wallet prompt. Catches errors before you sign.'],
+                ['Verified requests', 'All claim requests cryptographically verified end-to-end.'],
+                ['Wallet auto-discovery', 'Detects all Wallet Standard compatible wallets automatically.'],
+                ['Real-time confirmation', 'Transaction status confirmed on-chain. No manual refresh needed.'],
               ]},
               { area: 'Infrastructure', items: [
-                ['Rate-limited middleware', 'Per-route IP-based throttling + DB-based per-wallet claim limits (30 active).'],
-                ['Signal Lock animation', 'Custom loading UX with radar-style rings and platform scan sequence. Responsive 375px to 4K. Reduced-motion support.'],
-                ['Visibility-aware polling', 'Live polling stops when tab is hidden, resumes on focus.'],
-                ['Privacy-first logging', 'All search queries SHA256-hashed before storage. No raw PII.'],
+                ['Rate limiting', 'Multiple layers of abuse prevention across all endpoints.'],
+                ['Signal Lock animation', 'Custom loading UX with radar-style scan sequence. Responsive and reduced-motion friendly.'],
+                ['Privacy-first', 'No raw PII stored. Searches anonymized before logging.'],
               ]},
             ].map((group) => (
               <div key={group.area} className="rounded-xl border border-foreground/[0.06] border-l-2 border-l-foreground/20 p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.06)]">
@@ -358,12 +337,12 @@ resolution   addresses     & USD values`}
 
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               {[
-                { t: 'Private searches', d: 'All queries SHA256-hashed before logging. Nobody can see who you looked up.' },
-                { t: 'Server-side only', d: 'All sensitive operations run server-side. API keys never touch the client.' },
+                { t: 'Private searches', d: 'Your search queries are never stored in readable form. Nobody can see who you looked up.' },
+                { t: 'Server-side only', d: 'All sensitive operations run server-side. Nothing secret touches the browser.' },
                 { t: 'Zero-custody claims', d: 'Transactions built server-side, simulated before signing, submitted by your wallet.' },
-                { t: 'HMAC-signed requests', d: 'Every claim request cryptographically signed. Timing-safe comparison prevents attacks.' },
-                { t: 'Claim state machine', d: 'Forward-only status transitions enforced server-side. Terminal states locked.' },
-                { t: 'On-chain verifiable', d: 'Every fee record and claim transaction independently verifiable. Full audit trail.' },
+                { t: 'Signed requests', d: 'Every claim request is cryptographically verified end-to-end.' },
+                { t: 'Tamper-proof claims', d: 'Claim states are immutable once finalized. No rollbacks, no overwrites.' },
+                { t: 'On-chain verifiable', d: 'Every fee record and claim transaction independently verifiable on-chain.' },
               ].map((item) => (
                 <div key={item.t} className="rounded-lg border border-background/10 bg-background/[0.05] p-4 transition-colors duration-200 hover:bg-background/[0.08]">
                   <h3 className="text-[13px] font-bold text-background">{item.t}</h3>
@@ -400,29 +379,22 @@ resolution   addresses     & USD values`}
                     {[
                       '9 platform support (Solana + Base)',
                       'Multi-identity search (Twitter, GitHub, Farcaster, Wallet)',
-                      'Real-time updates (SSE on Pro, polling on Hobby)',
-                      'Signal Lock loading animation with radar-style scan UX',
-                      'Vercel Hobby optimization (10s serverless limit)',
-                      'AbortSignal propagation across all adapters',
-                      'Wallclock guards with partial result returns',
-                      'Doppler in-memory cache (2-3x Bankr throughput)',
-                      'Cron token indexer for background warm-up',
-                      'Chunked EVM getLogs + Helius V2 cursor pagination',
-                      'Real-time fee polling (30s intervals)',
-                      'Live USD conversion (CoinGecko, DexScreener, Jupiter)',
-                      'Dynamic dust filtering ($15 threshold)',
-                      'Multi-key API rotation (10,000 req/hr)',
-                      'Bags.fm direct claim (zero-custody, server-built txs)',
+                      'Real-time streaming scan results',
+                      'Signal Lock loading animation',
+                      'Optimized serverless architecture',
+                      'Smart caching with background indexing',
+                      'Large portfolio support (no result limits)',
+                      'Real-time fee polling with live updates',
+                      'Multi-source USD price aggregation',
+                      'Dynamic dust filtering',
+                      'Bags.fm direct claim (zero-custody)',
                       'Pre-sign transaction simulation',
-                      'HMAC-SHA256 claim verification',
-                      'Forward-only claim state machine with hardware wallet recovery',
+                      'Cryptographic claim verification',
                       'Wallet Standard auto-discovery',
-                      'Helius webhook for real-time claim confirmation',
-                      'Claim audit trail in Supabase',
-                      'Rate-limited middleware (IP + per-wallet)',
-                      'Base app verification for Coinbase ecosystem',
-                      'Vercel Analytics',
-                      'Privacy-preserving analytics (SHA256 hashed)',
+                      'Real-time claim confirmation',
+                      'Full claim audit trail',
+                      'Rate limiting and abuse prevention',
+                      'Privacy-preserving analytics',
                     ].map((item) => (
                       <div key={item} className="flex items-start gap-2.5 break-inside-avoid text-[12px] text-foreground/70">
                         <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
