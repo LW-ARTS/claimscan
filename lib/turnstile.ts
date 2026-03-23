@@ -42,7 +42,7 @@ export async function verifyTurnstile(token: string | null, ip: string | null): 
 
     const data = await res.json();
     if (!data.success) {
-      return { success: false, error: `Captcha failed: ${(data['error-codes'] ?? []).join(', ')}` };
+      return { success: false, error: 'Captcha verification failed' };
     }
 
     return { success: true };

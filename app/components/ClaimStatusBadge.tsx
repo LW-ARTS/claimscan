@@ -29,7 +29,7 @@ export function ClaimStatusBadge({ status }: { status: ClaimStatus }) {
   const showPulse = status === 'unclaimed' || status === 'partially_claimed';
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset ${config.className}`}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset ${config.className}`}
     >
       {showPulse && (
         <span className="relative flex h-1.5 w-1.5">

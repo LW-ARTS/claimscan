@@ -21,18 +21,21 @@ const WalletButton = dynamic(
 const exo2 = Exo_2({
   variable: '--font-sans',
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800', '900'],
   display: 'swap',
 });
 
 const jetbrainsMono = JetBrains_Mono({
   variable: '--font-mono',
   subsets: ['latin'],
+  weight: ['400', '500', '700'],
   display: 'swap',
 });
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#FAFAFA' },
     { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
@@ -42,7 +45,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL('https://claimscan.tech'),
   title: {
-    default: 'ClaimScan | Track Unclaimed Creator Fees Across DeFi',
+    default: 'ClaimScan | Find Unclaimed Creator Fees on Solana & Base',
     template: '%s | ClaimScan',
   },
   description:
@@ -137,8 +140,8 @@ export default function RootLayout({
             <GrainientBackground />
 
             {/* Navigation */}
-            <header className="animate-fade-in-down sticky top-0 z-50 border-b border-white/10 bg-background/60 backdrop-blur-md sm:bg-background/20 sm:backdrop-blur-xl shadow-sm dark:shadow-none">
-              <nav aria-label="Main navigation" className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+            <header className="animate-fade-in-down sticky top-0 z-50 border-b border-white/10 bg-background/60 backdrop-blur-md sm:bg-background/20 sm:backdrop-blur-xl shadow-sm dark:shadow-none pt-[env(safe-area-inset-top)]">
+              <nav aria-label="Main navigation" className="mx-auto flex max-w-6xl items-center justify-between px-[max(1rem,env(safe-area-inset-left))] py-3 sm:px-[max(1.5rem,env(safe-area-inset-left))]">
                 <Link href="/" className="group flex items-center gap-2.5 py-1.5" aria-label="ClaimScan home">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground p-1" aria-hidden="true">
                     <svg className="h-full w-full" viewBox="0 0 1536 1536" fill="white">
@@ -159,7 +162,7 @@ export default function RootLayout({
             </header>
 
             {/* Main content */}
-            <main id="main-content" className="relative mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12 flex-grow">
+            <main id="main-content" className="relative mx-auto w-full max-w-6xl px-[max(1rem,env(safe-area-inset-left))] py-8 sm:px-[max(1.5rem,env(safe-area-inset-left))] sm:py-12 flex-grow">
               {children}
             </main>
 

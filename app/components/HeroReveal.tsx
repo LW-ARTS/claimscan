@@ -17,9 +17,9 @@ import { useState, useEffect, useCallback, startTransition, type ReactNode } fro
  * Uses pure CSS animations instead of motion/react for smaller bundle.
  */
 
-const OVERLAY_HOLD_MS = 2000; // when overlay starts fading out
-const OVERLAY_FADE_MS = 1000; // fade-out duration
-const CONTENT_UNBLOCK_MS = 2400; // unblock child CSS animations (slightly before overlay fully gone)
+const OVERLAY_HOLD_MS = 800; // when overlay starts fading out
+const OVERLAY_FADE_MS = 500; // fade-out duration
+const CONTENT_UNBLOCK_MS = 800; // unblock child CSS animations (slightly before overlay fully gone)
 
 export function HeroReveal({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<'overlay' | 'exiting' | 'done'>('overlay');

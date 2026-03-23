@@ -2,6 +2,7 @@
 
 import { useState, useId, useMemo, useCallback, useEffect, useRef, Component, type ReactNode } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { track } from '@vercel/analytics';
 import dynamic from 'next/dynamic';
 import { TokenFeeTable } from './TokenFeeTable';
 import { PlatformIcon } from './PlatformIcon';
@@ -55,10 +56,10 @@ function TabButton({
       id={`${tabsId}-tab-${tabKey}`}
       tabIndex={active ? 0 : -1}
       onClick={onClick}
-      className={`inline-flex cursor-pointer items-center gap-2 px-4 py-2 text-[13px] font-medium transition-colors ${
+      className={`inline-flex cursor-pointer items-center gap-2 px-4 py-3 text-[13px] font-medium transition-colors sm:py-2 ${
         active
           ? 'bg-foreground text-background'
-          : 'border border-border text-foreground hover:bg-muted'
+          : 'border border-border text-foreground hover:bg-muted active:scale-[0.97]'
       }`}
     >
       {children}
@@ -141,6 +142,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
     const bagsUnclaimed = displayFees.filter(
       (f) => f.platform === 'bags' && f.claim_status !== 'claimed' && safeBigInt(f.total_unclaimed) > 0n
     );
+    track('claim_all_initiated', {
+      platform: 'bags',
+      token_count: bagsUnclaimed.length,
+    });
     setSelectedForClaim(bagsUnclaimed.map((f) => f.token_address));
     setClaimDialogOpen(true);
   }, [displayFees]);
@@ -248,10 +253,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
   return (
     <div className="rounded-2xl bg-card">
       {/* Top Bar Section — 1:1 Pencil design */}
-      <div className="space-y-4 px-8 pt-6">
+      <div className="space-y-4 px-4 pt-6 sm:px-8">
         {/* Chain summary + unclaimed/partial badges */}
         {chainSummaries.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-y-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-y-2">
             <div className="flex items-center gap-4">
               {chainSummaries.map((chain) => (
                 <div key={chain.chain} className="flex items-center gap-2">
@@ -284,7 +289,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
         <div
           role="tablist"
           aria-label="Filter by platform"
-          className="flex flex-wrap gap-3"
+          className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 sm:flex-wrap sm:gap-3 sm:overflow-visible sm:pb-0"
           onKeyDown={(e) => handleTabKeyDown(e, tabKeys)}
         >
           <TabButton active={activeTab === 'all'} tabsId={tabsId} tabKey="all" onClick={() => setActiveTab('all')} count={displayFees.length}>
@@ -345,10 +350,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
               aria-checked={isActive}
               tabIndex={isActive ? 0 : -1}
               onClick={() => setStatusFilter(status as typeof statusFilter)}
-              className={`inline-flex cursor-pointer items-center gap-1.5 px-4 py-2 text-[13px] font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              className={`inline-flex cursor-pointer items-center gap-1.5 px-4 py-3 text-[13px] font-medium capitalize transition-colors sm:py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 isActive
                   ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground'
+                  : 'text-muted-foreground hover:text-foreground active:scale-[0.97]'
               }`}
             >
               {status}
@@ -367,7 +372,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
           .filter((f) => f.platform === 'bags' && f.claim_status !== 'claimed' && safeBigInt(f.total_unclaimed) > 0n);
         if (bagsUnclaimed.length === 0) return null;
         return (
-          <div className="px-8 pt-4 space-y-3">
+          <div className="px-4 pt-4 space-y-3 sm:px-8">
             {bagsWalletMismatch && (
               <div className="flex items-start gap-2.5 border border-border bg-muted px-4 py-3">
                 <svg className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -375,7 +380,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
                 </svg>
                 <div>
                   <p className="text-xs font-semibold text-foreground">Wrong wallet connected</p>
-                  <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                  <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                     Bags.fm requires wallet {bagsRegisteredWallet!.slice(0, 4)}...{bagsRegisteredWallet!.slice(-4)} to claim.
                   </p>
                 </div>
@@ -414,7 +419,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
         id={`${tabsId}-panel`}
         aria-labelledby={`${tabsId}-tab-${activeTab}`}
         tabIndex={-1}
-        className="px-8 pt-4 pb-2"
+        className="px-4 pt-4 pb-2 sm:px-8"
         key={`${activeTab}-${statusFilter}`}
         style={{ animation: 'fadeIn 0.2s ease-out' }}
       >

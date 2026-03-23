@@ -57,9 +57,13 @@ export async function getNativeTokenPrices(): Promise<{
   stale: boolean;
 }> {
   try {
+    const headers: Record<string, string> = {};
+    if (process.env.COINGECKO_API_KEY) {
+      headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY;
+    }
     const res = await fetchWithTimeout(
       `${COINGECKO_API}/simple/price?ids=solana,ethereum&vs_currencies=usd`,
-      { next: { revalidate: 300 } }
+      { headers, next: { revalidate: 300 } }
     );
     if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
     const data = await res.json();
@@ -138,7 +142,7 @@ async function fetchJupiterPrice(
       return null;
     }
     const data = await res.json();
-    const price = data.data?.[tokenAddress]?.usdPrice;
+    const price = data?.[tokenAddress]?.usdPrice;
     return sanitizePrice(price);
   } catch (err) {
     log.warn('Jupiter fetch failed', { error: err instanceof Error ? err.message : String(err) });

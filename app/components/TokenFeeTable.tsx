@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useRef } from 'react';
+import { track } from '@vercel/analytics';
 import { ClaimStatusBadge } from './ClaimStatusBadge';
 import { PlatformIcon } from './PlatformIcon';
 import { PLATFORM_CONFIG } from '@/lib/constants';
@@ -72,7 +73,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
 
   /** Currency label based on chain — shown after formatted amounts */
   const currencyLabel = (chain: string) => (
-    <span className="ml-1 text-[10px] font-medium uppercase text-muted-foreground/60">{chain === 'sol' ? 'SOL' : 'ETH'}</span>
+    <span className="ml-1 text-[11px] font-medium uppercase text-muted-foreground/60">{chain === 'sol' ? 'SOL' : 'ETH'}</span>
   );
 
   if (sortedFees.length === 0) {
@@ -101,7 +102,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-bold uppercase text-muted-foreground">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[11px] font-bold uppercase text-muted-foreground">
                   {badge}
                 </span>
                 <span className="font-mono text-sm font-semibold">
@@ -133,19 +134,19 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Earned</p>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Earned</p>
                 <p className="font-mono tabular-nums">{formatTokenAmount(fee.total_earned, decimals)}{currencyLabel(fee.chain)}</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">USD</p>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">USD</p>
                 <p className="font-semibold tabular-nums">{formatUsd(usd)}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Unclaimed</p>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Unclaimed</p>
                 <p className="font-mono tabular-nums">{formatTokenAmount(fee.total_unclaimed, decimals)}{currencyLabel(fee.chain)}</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Claimed</p>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Claimed</p>
                 <p className="font-mono tabular-nums text-muted-foreground">{formatTokenAmount(fee.total_claimed, decimals)}{currencyLabel(fee.chain)}</p>
               </div>
             </div>
@@ -174,15 +175,15 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
         <caption className="sr-only">Fee records showing earned, claimed, and unclaimed amounts per token</caption>
         <thead>
           <tr className="bg-muted">
-            <th scope="col" className="py-3 pl-2 pr-0 text-left text-[10px] font-medium uppercase tracking-[1px] text-muted-foreground">Token</th>
-            <th scope="col" className="py-3 text-left text-[10px] font-medium uppercase tracking-[1px] text-muted-foreground">Platform</th>
-            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-muted-foreground">Earned</th>
-            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-muted-foreground">Claimed</th>
-            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-muted-foreground">Unclaimed</th>
-            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-muted-foreground">USD</th>
-            <th scope="col" className="py-3 text-center text-[10px] font-medium uppercase tracking-[1px] text-muted-foreground">Status</th>
+            <th scope="col" className="py-3 pl-2 pr-0 text-left text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Token</th>
+            <th scope="col" className="py-3 text-left text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Platform</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Earned</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Claimed</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Unclaimed</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">USD</th>
+            <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Status</th>
             {connectedWallet && onClaimToken && (
-              <th scope="col" className="py-3 text-center text-[10px] font-medium uppercase tracking-[1px] text-muted-foreground">Action</th>
+              <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Action</th>
             )}
           </tr>
         </thead>
@@ -215,7 +216,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                         onClick={() => handleCopy(fee.id, fee.token_address!)}
                         aria-label={copiedId === fee.id ? 'Copied' : 'Copy contract address'}
                         title="Copy contract address"
-                        className="cursor-pointer text-muted-foreground/60 transition-colors hover:text-foreground"
+                        className="inline-flex items-center justify-center rounded p-3 -m-2 cursor-pointer text-muted-foreground/60 transition-colors hover:text-foreground active:scale-90"
                       >
                         {copiedId === fee.id ? (
                           <svg className="h-3 w-3 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -245,18 +246,18 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                 </td>
                 <td className="py-3.5 text-center">
                   {fee.claim_status === 'claimed' ? (
-                    <span className="inline-block border border-border px-3 py-1 text-[10px] font-medium uppercase tracking-[1px] text-foreground">
+                    <span className="inline-block border border-border px-3 py-1 text-[11px] font-medium uppercase tracking-[1px] text-foreground">
                       CLAIMED
                     </span>
                   ) : fee.claim_status === 'partially_claimed' ? (
                     <span className="inline-flex items-center justify-center gap-1.5">
                       <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                      <span className="text-[10px] font-medium uppercase tracking-[1px] text-foreground">PARTIAL</span>
+                      <span className="text-[11px] font-medium uppercase tracking-[1px] text-foreground">PARTIAL</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center justify-center gap-1.5">
                       <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                      <span className="text-[10px] font-medium uppercase tracking-[1px] text-foreground">UNCLAIMED</span>
+                      <span className="text-[11px] font-medium uppercase tracking-[1px] text-foreground">UNCLAIMED</span>
                     </span>
                   )}
                 </td>
@@ -287,7 +288,10 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
     {hasMore && (
       <div className="mt-4 flex flex-col items-center gap-1">
         <button
-          onClick={() => setVisibleCount((c) => c + LOAD_MORE_COUNT)}
+          onClick={() => {
+            track('show_more_clicked', { remaining: sortedFees.length - displayedFees.length });
+            setVisibleCount((c) => c + LOAD_MORE_COUNT);
+          }}
           className="cursor-pointer rounded-lg border border-border/60 bg-card/80 px-5 py-2 text-sm font-medium text-foreground/80 transition-all hover:bg-foreground hover:text-background active:scale-95"
         >
           Show more ({sortedFees.length - displayedFees.length} remaining)

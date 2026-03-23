@@ -44,6 +44,8 @@ export async function POST(request: Request) {
         fees: [],
         cached: false,
         message: 'No wallets found for this identity',
+      }, {
+        headers: { 'Cache-Control': 'private, no-store' },
       });
     }
 
@@ -53,6 +55,8 @@ export async function POST(request: Request) {
       fees: result.fees,
       cached: result.cached,
       refreshing: false,
+    }, {
+      headers: { 'Cache-Control': 'private, no-store' },
     });
   } catch (error) {
     console.error('[search] error:', error instanceof Error ? error.message : error);

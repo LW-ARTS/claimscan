@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
+import { track } from '@vercel/analytics';
 import { PlatformIcon } from './PlatformIcon';
 import { ShareButton } from './ShareButton';
 import { PLATFORM_CONFIG, LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
@@ -106,11 +107,11 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
 
   return (
     <div className="group flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50">
-      <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${meta.bg} ${meta.color}`}>
+      <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${meta.bg} ${meta.color}`}>
         {wallet.chain}
       </span>
       <span className="min-w-0 flex-1 overflow-hidden">
-        <span className="block truncate font-mono text-[11px] leading-relaxed text-foreground/80 sm:text-xs" title={wallet.address}>
+        <span className="block truncate font-mono text-xs leading-relaxed text-foreground/80" title={wallet.address}>
           {wallet.address}
         </span>
       </span>
@@ -118,7 +119,7 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
         onClick={handleCopy}
         aria-label={copyState === 'copied' ? 'Copied!' : copyState === 'failed' ? 'Copy failed' : 'Copy address'}
         title={copyState === 'copied' ? 'Copied!' : copyState === 'failed' ? 'Failed to copy' : 'Copy address'}
-        className={`inline-flex shrink-0 items-center justify-center rounded-md p-1 transition-all ${
+        className={`inline-flex shrink-0 items-center justify-center rounded-md p-3 -m-2 transition-all ${
           copyState === 'copied'
             ? 'text-emerald-400'
             : copyState === 'failed'
@@ -158,6 +159,16 @@ export function ProfileHero({
   const [pollError, setPollError] = useState(false);
 
   const walletsKey = useMemo(() => JSON.stringify(walletsForLive), [walletsForLive]);
+
+  // Track profile load once on mount
+  useEffect(() => {
+    track('profile_loaded', {
+      handle,
+      platform_count: platformCount,
+      total_earned_usd: Math.round(totalEarnedUsd * 100) / 100,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -397,9 +408,10 @@ export function ProfileHero({
               {avatarUrl && !avatarError ? (
                 <Image
                   src={avatarUrl}
-                  alt=""
+                  alt={displayName}
                   width={100}
                   height={100}
+                  priority
                   className="h-14 w-14 rounded-full object-cover sm:h-[100px] sm:w-[100px]"
                   onError={() => setAvatarError(true)}
                   referrerPolicy="no-referrer"
@@ -432,7 +444,7 @@ export function ProfileHero({
                   return (
                     <span
                       key={chain}
-                      className="inline-flex items-center gap-1.5 border border-border px-2 py-1 text-[11px] text-muted-foreground sm:px-3 sm:py-1.5 sm:text-xs"
+                      className="inline-flex items-center gap-1.5 border border-border px-2 py-1.5 text-xs text-muted-foreground sm:px-3 sm:py-1.5"
                     >
                       <span className="h-1.5 w-1.5 rounded-full bg-foreground" aria-hidden="true" />
                       {meta.label}
@@ -445,7 +457,7 @@ export function ProfileHero({
 
           {/* Right: TOTAL EARNED */}
           <div className="animate-fade-in-up delay-200 shrink-0 text-center sm:text-right">
-            <p className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
               Total Earned
             </p>
             <p className="mt-1 text-4xl font-black tabular-nums tracking-tighter text-foreground sm:text-6xl">
@@ -462,10 +474,10 @@ export function ProfileHero({
         </div>
 
         {/* Stats row */}
-        <div className="animate-fade-in-up delay-300 mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:flex sm:gap-3">
+        <div className="animate-fade-in-up delay-300 mt-6 flex flex-wrap gap-2 sm:mt-8 sm:gap-3 *:min-w-0 *:flex-1">
           <div className="border border-border px-4 py-4 sm:px-6 sm:py-5">
-            <p className="font-mono text-[10px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-[11px]">Unclaimed</p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-foreground sm:mt-1.5 sm:text-[26px]" aria-live="polite" aria-atomic>
+            <p className="font-mono text-[11px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-xs">Unclaimed</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-foreground sm:mt-1.5 sm:text-[26px]" aria-live="polite" aria-atomic="true">
               {formatUsd(displayUnclaimedUsd)}
               {loading && <PulsingDot className="ml-1.5 inline-flex h-1.5 w-1.5 text-foreground" />}
               {pollError && !loading && (
@@ -478,14 +490,14 @@ export function ProfileHero({
             </p>
           </div>
           <div className="border border-border px-4 py-4 sm:px-6 sm:py-5">
-            <p className="font-mono text-[10px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-[11px]">Platforms</p>
+            <p className="font-mono text-[11px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-xs">Platforms</p>
             <p className="mt-1 text-lg font-bold tabular-nums text-foreground sm:mt-1.5 sm:text-[26px]">
               {platformCount > 0 ? platformCount : '\u2014'}
             </p>
           </div>
           {resolveMs > 0 && (
             <div className="border border-border px-4 py-4 sm:px-6 sm:py-5">
-              <p className="font-mono text-[10px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-[11px]">Scanned In</p>
+              <p className="font-mono text-[11px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-xs">Scanned In</p>
               <p className="mt-1 text-lg font-bold tabular-nums text-foreground sm:mt-1.5 sm:text-[26px]">
                 {(resolveMs / 1000).toFixed(1)}s
               </p>
@@ -512,9 +524,10 @@ export function ProfileHero({
           {!showAllWallets ? (
             <button
               onClick={() => setShowAllWallets(true)}
+              aria-expanded={false}
               className="group flex w-full cursor-pointer items-center justify-between py-2 transition-colors"
             >
-              <span className="font-mono text-[10px] font-medium uppercase tracking-[2px] text-muted-foreground/60 sm:text-[11px]">
+              <span className="font-mono text-[11px] font-medium uppercase tracking-[2px] text-muted-foreground/60 sm:text-xs">
                 Resolved Wallets
               </span>
               <span className="flex items-center gap-2 font-mono text-xs text-muted-foreground/60 sm:text-[13px]">
@@ -527,7 +540,7 @@ export function ProfileHero({
           ) : (
             <>
               <div className="mb-3 flex items-center justify-between">
-                <p className="font-mono text-[10px] font-medium uppercase tracking-[2px] text-muted-foreground/60 sm:text-[11px]">
+                <p className="font-mono text-[11px] font-medium uppercase tracking-[2px] text-muted-foreground/60 sm:text-xs">
                   Resolved Wallets
                 </p>
                 <p className="font-mono text-xs tabular-nums text-muted-foreground/60 sm:text-[13px]">
@@ -541,7 +554,7 @@ export function ProfileHero({
               </div>
               <button
                 onClick={() => setShowAllWallets(false)}
-                className="mt-3 w-full cursor-pointer py-2 text-center font-mono text-[11px] font-medium text-muted-foreground/60 transition-colors hover:text-foreground"
+                className="mt-3 w-full cursor-pointer py-3 text-center font-mono text-xs font-medium text-muted-foreground/60 transition-colors hover:text-foreground"
               >
                 Hide wallets
               </button>

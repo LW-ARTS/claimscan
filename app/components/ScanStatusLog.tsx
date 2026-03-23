@@ -103,7 +103,7 @@ export function ScanStatusLog({ fees, resolvedChains }: ScanStatusLogProps) {
               return (
                 <div
                   key={s.platform}
-                  className={`flex items-center gap-2 rounded-md px-2 py-1 text-[11px] ${
+                  className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-xs ${
                     isFound ? 'text-foreground/80' : 'text-muted-foreground/30'
                   }`}
                 >
@@ -118,12 +118,12 @@ export function ScanStatusLog({ fees, resolvedChains }: ScanStatusLogProps) {
                   />
                   <span className="truncate font-medium">{config.name}</span>
                   {isFound && (
-                    <span className="ml-auto tabular-nums text-[10px] font-semibold text-foreground/50">
+                    <span className="ml-auto tabular-nums text-[11px] font-semibold text-foreground/50">
                       {s.count}
                     </span>
                   )}
                   {s.result === 'no_wallet' && (
-                    <span className="ml-auto text-[10px]">no wallet</span>
+                    <span className="ml-auto text-[11px]">no wallet</span>
                   )}
                 </div>
               );
