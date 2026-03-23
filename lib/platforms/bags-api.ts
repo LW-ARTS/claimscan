@@ -16,6 +16,7 @@ try {
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (url && token) {
     // Dynamic import resolved at build time by bundler — lazy init avoids import cycle
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Redis } = require('@upstash/redis') as typeof import('@upstash/redis');
     redis = new Redis({ url, token });
   }

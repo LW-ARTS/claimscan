@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { track } from '@vercel/analytics';
 import {
   Dialog,
@@ -34,7 +34,6 @@ export function ClaimDialog({
   solPrice,
   onClaimComplete,
 }: ClaimDialogProps) {
-  const { connection } = useConnection();
   const walletAdapter = useWallet();
   const { execute, cancel, phase, progress, results, error } = useClaimBags();
   const [solBalance, setSolBalance] = useState<number | null>(null);

@@ -103,8 +103,6 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
     timerRef.current = setTimeout(() => setCopyState('idle'), 2000);
   }, [wallet.address]);
 
-  const copied = copyState === 'copied';
-
   return (
     <div className="group flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50">
       <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${meta.bg} ${meta.color}`}>
@@ -388,7 +386,7 @@ export function ProfileHero({
       total += feeToUsd(f.chain, amount);
     }
     return total;
-  }, [initialFees, solPrice, ethPrice]);
+  }, [initialFees, solPrice, ethPrice, feeToUsd]);
 
   // ── Display values ──
   const displayName = creator.display_name || creator.twitter_handle || creator.github_handle || 'Unknown';

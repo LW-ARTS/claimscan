@@ -1,6 +1,6 @@
 import { getAllAdapters } from '@/lib/platforms';
 import { isValidWalletInput } from '@/lib/utils';
-import type { ResolvedWallet, TokenFee } from '@/lib/platforms/types';
+import type { ResolvedWallet } from '@/lib/platforms/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

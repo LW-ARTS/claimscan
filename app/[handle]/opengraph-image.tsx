@@ -391,6 +391,7 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
           {avatarSrc ? (
             <img
               src={avatarSrc}
+              alt=""
               width={88}
               height={88}
               style={{
