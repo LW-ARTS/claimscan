@@ -36,6 +36,13 @@ export function SiteFooter() {
               Docs
             </Link>
             <span className="h-3 w-px bg-border/50" aria-hidden="true" />
+            <Link
+              href="/terms"
+              className="inline-flex items-center px-3 py-3 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
+            >
+              Terms
+            </Link>
+            <span className="h-3 w-px bg-border/50" aria-hidden="true" />
             <a
               href="https://x.com/lwartss"
               target="_blank"
