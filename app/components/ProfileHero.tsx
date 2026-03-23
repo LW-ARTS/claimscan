@@ -386,7 +386,7 @@ export function ProfileHero({
       total += feeToUsd(f.chain, amount);
     }
     return total;
-  }, [initialFees, solPrice, ethPrice, feeToUsd]);
+  }, [initialFees, feeToUsd]);
 
   // ── Display values ──
   const displayName = creator.display_name || creator.twitter_handle || creator.github_handle || 'Unknown';

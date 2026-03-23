@@ -29,13 +29,13 @@ async function fetchWith429Retry(
   init: RequestInit,
   label: string
 ): Promise<Response | null> {
-  let lastRes: Response | undefined;
+  let _lastRes: Response | undefined;
 
   for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
     const res = await fetch(input, init);
     if (res.status !== 429) return res;
 
-    lastRes = res;
+    _lastRes = res;
     if (attempt === MAX_429_RETRIES) break;
 
     const retryAfter = res.headers.get('Retry-After');

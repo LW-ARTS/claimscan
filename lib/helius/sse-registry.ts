@@ -72,6 +72,7 @@ export function pushSSEEvent(wallet: string, data: Record<string, unknown>): num
 /**
  * Get count of connected SSE clients (debug/metrics).
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getSSEClientCount(): number {
   let count = 0;
   for (const clients of sseClients.values()) {
