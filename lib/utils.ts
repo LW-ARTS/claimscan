@@ -112,7 +112,7 @@ export const VALID_PLATFORMS = new Set(Object.keys(PLATFORM_CONFIG));
  * Validate that a value is a valid non-negative integer string (safe for BigInt storage).
  * Rejects negative numbers, decimals, strings > 78 digits (uint256 max), and non-numeric chars.
  */
-function sanitizeAmountString(val: unknown): string {
+export function sanitizeAmountString(val: unknown): string {
   if (typeof val !== 'string') return '0';
   const trimmed = val.trim();
   if (trimmed.length === 0 || trimmed.length > 78) return '0';
