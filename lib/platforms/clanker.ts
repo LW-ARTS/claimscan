@@ -3,7 +3,7 @@ import { CLANKER_API_BASE } from '@/lib/constants';
 import { batchClankerFees, getClankerClaimLogs, isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
 import { safeBigInt, sanitizeTokenSymbol, sanitizeTokenName } from '@/lib/utils';
 import type { IdentityProvider } from '@/lib/supabase/types';
-import { getAddress, type Address } from 'viem';
+import { getAddress } from 'viem';
 import type {
   PlatformAdapter,
   ResolvedWallet,
