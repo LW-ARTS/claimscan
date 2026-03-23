@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
         varsIgnorePattern: "^_",
         caughtErrorsIgnorePattern: "^_",
       }],
+      "react-compiler/react-compiler": "warn",
     },
   },
   // Override default ignores of eslint-config-next.
