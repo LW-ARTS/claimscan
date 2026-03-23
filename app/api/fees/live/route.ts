@@ -50,8 +50,13 @@ async function fetchAndRespond(validated: ResolvedWallet[]) {
   }
 }
 
-// GET removed — was deprecated and unprotected (no origin validation, no signing).
-// All clients must use POST.
+// GET deprecated — return 410 Gone with migration guidance
+export async function GET() {
+  return NextResponse.json(
+    { error: 'GET is no longer supported. Use POST with a JSON body: { "wallets": [...] }' },
+    { status: 410 }
+  );
+}
 
 /**
  * POST handler for clients that need to send larger wallet arrays

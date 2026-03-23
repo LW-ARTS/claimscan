@@ -142,8 +142,12 @@ async function fetchJupiterPrice(
       return null;
     }
     const data = await res.json();
-    const price = data?.[tokenAddress]?.usdPrice;
-    return sanitizePrice(price);
+    const entry = data?.[tokenAddress];
+    if (!entry) {
+      log.debug('Jupiter returned no entry for token', { tokenAddress, responseKeys: Object.keys(data ?? {}).slice(0, 5) });
+      return null;
+    }
+    return sanitizePrice(entry.usdPrice);
   } catch (err) {
     log.warn('Jupiter fetch failed', { error: err instanceof Error ? err.message : String(err) });
     return null;

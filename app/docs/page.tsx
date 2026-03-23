@@ -40,7 +40,7 @@ export const metadata: Metadata = {
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/50">
+    <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/50">
       {children}
     </span>
   );
@@ -123,7 +123,7 @@ export default function DocsPage() {
     <article className="mx-auto w-full max-w-[720px] px-5 pb-24">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: faqData }}
+        dangerouslySetInnerHTML={{ __html: faqData.replace(/[<>&\u2028\u2029]/g, c => ({ '<': '\\u003c', '>': '\\u003e', '&': '\\u0026', '\u2028': '\\u2028', '\u2029': '\\u2029' })[c]!) }}
       />
 
       {/* ═══ HEADER ═══ */}
@@ -134,7 +134,7 @@ export default function DocsPage() {
               <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-foreground/30" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-foreground/60" />
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70">
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/70">
               V1.5 &middot; Live
             </span>
           </div>
@@ -172,7 +172,7 @@ export default function DocsPage() {
             ].map((s) => (
               <div key={s.l} className="flex flex-col items-center rounded-xl bg-foreground py-3.5 text-background transition-transform duration-200 hover:scale-105">
                 <span className="text-xl font-bold tracking-tight">{s.v}</span>
-                <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-background/50">{s.l}</span>
+                <span className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-background/50">{s.l}</span>
               </div>
             ))}
           </div>
@@ -194,8 +194,8 @@ export default function DocsPage() {
             {/* Solana */}
             <div className="rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.08)]">
               <div className="mb-4 flex items-center justify-between">
-                <span className="rounded-md bg-foreground px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-background">Solana</span>
-                <span className="text-[10px] font-medium text-muted-foreground">6 platforms</span>
+                <span className="rounded-md bg-foreground px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-background">Solana</span>
+                <span className="text-[11px] font-medium text-muted-foreground">6 platforms</span>
               </div>
               <div className="space-y-0 divide-y divide-foreground/[0.06]">
                 {[
@@ -217,8 +217,8 @@ export default function DocsPage() {
             {/* Base */}
             <div className="rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.08)]">
               <div className="mb-4 flex items-center justify-between">
-                <span className="rounded-md bg-foreground px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-background">Base</span>
-                <span className="text-[10px] font-medium text-muted-foreground">3 platforms</span>
+                <span className="rounded-md bg-foreground px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-background">Base</span>
+                <span className="text-[11px] font-medium text-muted-foreground">3 platforms</span>
               </div>
               <div className="space-y-0 divide-y divide-foreground/[0.06]">
                 {[
@@ -232,7 +232,7 @@ export default function DocsPage() {
                   </div>
                 ))}
               </div>
-              <div className="mt-4 rounded-lg bg-foreground/[0.03] px-3 py-2 text-[10px] text-muted-foreground">
+              <div className="mt-4 rounded-lg bg-foreground/[0.03] px-3 py-2 text-[11px] text-muted-foreground">
                 + ETH L1 (Zora live) · Arbitrum coming in V2
               </div>
             </div>
@@ -298,7 +298,7 @@ export default function DocsPage() {
                 'Transaction submitted and confirmed in real time',
               ].map((text, i) => (
                 <div key={i} className="relative flex items-start gap-3.5 text-[13px]">
-                  <span className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-[9px] font-bold text-background">{i + 1}</span>
+                  <span className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background">{i + 1}</span>
                   <span className="pt-[3px] text-foreground/80">{text}</span>
                 </div>
               ))}
@@ -347,7 +347,7 @@ export default function DocsPage() {
                   i % 2 === 0 ? 'bg-foreground/[0.03]' : ''
                 } ${i > 0 ? 'border-t border-foreground/[0.04]' : ''}`}
               >
-                <span className="w-24 shrink-0 text-[10px] font-bold uppercase tracking-wider text-foreground/40">
+                <span className="w-24 shrink-0 text-[11px] font-bold uppercase tracking-wider text-foreground/40">
                   {cat}
                 </span>
                 <span className="font-mono text-[12px] text-foreground/80">{tech}</span>
@@ -393,7 +393,7 @@ export default function DocsPage() {
               ]},
             ].map((group) => (
               <div key={group.area} className="rounded-xl border border-foreground/[0.06] border-l-2 border-l-foreground/20 p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.06)]">
-                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/40">
+                <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-foreground/40">
                   {group.area}
                 </span>
                 <div className="mt-3 space-y-2.5">
@@ -460,7 +460,7 @@ export default function DocsPage() {
                 <div className="absolute left-[9px] top-1 h-[18px] w-[18px] rounded-full border-2 border-background bg-foreground" />
                 <div className="rounded-xl border border-foreground/[0.06] p-5">
                   <div className="flex items-center gap-3">
-                    <span className="rounded-md bg-foreground px-2.5 py-1 text-[10px] font-bold text-background">V1.5</span>
+                    <span className="rounded-md bg-foreground px-2.5 py-1 text-[11px] font-bold text-background">V1.5</span>
                     <span className="text-[11px] font-medium text-muted-foreground">Current &middot; March 2026</span>
                   </div>
                   <div className="ml-1 mt-5 columns-1 gap-x-6 space-y-1.5 sm:columns-2">
@@ -498,7 +498,7 @@ export default function DocsPage() {
                 <div className="absolute left-[9px] top-1 h-[18px] w-[18px] rounded-full border-2 border-foreground/20 bg-background" />
                 <div className="rounded-xl border border-dashed border-foreground/10 p-5">
                   <div className="flex items-center gap-3">
-                    <span className="rounded-md border border-foreground/20 px-2.5 py-1 text-[10px] font-bold">V2</span>
+                    <span className="rounded-md border border-foreground/20 px-2.5 py-1 text-[11px] font-bold">V2</span>
                     <span className="text-[11px] font-medium text-muted-foreground">Coming Soon</span>
                   </div>
                   <div className="ml-1 mt-5 space-y-1.5">
@@ -524,7 +524,7 @@ export default function DocsPage() {
                 <div className="absolute left-[9px] top-1 h-[18px] w-[18px] rounded-full border-2 border-foreground/10 bg-background" />
                 <div className="rounded-xl border border-dashed border-foreground/[0.06] p-5">
                   <div className="flex items-center gap-3">
-                    <span className="rounded-md border border-foreground/10 px-2.5 py-1 text-[10px] font-bold text-muted-foreground">V3</span>
+                    <span className="rounded-md border border-foreground/10 px-2.5 py-1 text-[11px] font-bold text-muted-foreground">V3</span>
                     <span className="text-[11px] text-foreground/25">2026+</span>
                   </div>
                   <div className="ml-1 mt-5 space-y-1.5">
@@ -587,7 +587,7 @@ export default function DocsPage() {
               { code: '2204', role: 'Motion' },
             ].map((m) => (
               <div key={m.code} className="flex flex-col items-center rounded-xl border border-foreground/[0.06] py-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)]">
-                <span className="font-mono text-[10px] font-bold text-muted-foreground">LW-{m.code}</span>
+                <span className="font-mono text-[11px] font-bold text-muted-foreground">LW-{m.code}</span>
                 <span className="mt-1 text-xs font-bold">{m.role}</span>
               </div>
             ))}
@@ -606,7 +606,7 @@ export default function DocsPage() {
                 rel="noopener noreferrer"
                 className="text-center transition-opacity hover:opacity-70"
               >
-                <span className="block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">{link.label}</span>
+                <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{link.label}</span>
                 <span className="mt-0.5 text-xs font-bold">{link.text}</span>
               </a>
             ))}

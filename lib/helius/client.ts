@@ -102,7 +102,11 @@ export async function heliusDasRpc<T>(
     clearTimeout(timeout);
 
     if (!res || !res.ok) {
-      if (res) console.warn(`[helius] ${label} returned HTTP ${res.status}`);
+      if (res && (res.status === 401 || res.status === 403)) {
+        console.error(`[helius] ${label} AUTH FAILURE (HTTP ${res.status}) — check HELIUS_API_KEY`);
+      } else if (res) {
+        console.warn(`[helius] ${label} returned HTTP ${res.status}`);
+      }
       return null;
     }
 
@@ -158,7 +162,11 @@ export async function heliusRestApi<T>(
     clearTimeout(timeout);
 
     if (!res || !res.ok) {
-      if (res) console.warn(`[helius] ${label} returned HTTP ${res.status}`);
+      if (res && (res.status === 401 || res.status === 403)) {
+        console.error(`[helius] ${label} AUTH FAILURE (HTTP ${res.status}) — check HELIUS_API_KEY`);
+      } else if (res) {
+        console.warn(`[helius] ${label} returned HTTP ${res.status}`);
+      }
       return null;
     }
 

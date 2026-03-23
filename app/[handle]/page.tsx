@@ -188,8 +188,8 @@ export default async function ProfilePage({ params }: PageProps) {
         </div>
       )}
 
-      {/* SSR fee data for crawlers */}
-      <div className="sr-only" aria-hidden="true">
+      {/* SSR fee data for screen readers + crawlers */}
+      <div className="sr-only">
         <h2>All Fee Records</h2>
         <ul>
           {feeRecords.slice(0, 50).map(fee => (

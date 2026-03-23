@@ -52,7 +52,8 @@ export async function POST(request: Request) {
       !feeWallet || typeof feeWallet !== 'string' || !isValidSolanaAddress(feeWallet) ||
       !rawFeeLamports || typeof rawFeeLamports !== 'string' || !/^\d+$/.test(rawFeeLamports)
     ) {
-      return NextResponse.json({ ok: true }); // Silent ignore invalid data
+      console.warn('[claim/confirm] Fee tx rejected: invalid input fields', { hasFeeSig: !!feeSig, hasFeeWallet: !!feeWallet, hasRawFeeLamports: !!rawFeeLamports });
+      return NextResponse.json({ ok: true }); // Silent response, logged server-side
     }
     // Require HMAC authentication — fee branch must be called with a valid
     // confirmToken tied to a claimAttemptId+wallet to prevent unauthorized
@@ -61,14 +62,19 @@ export async function POST(request: Request) {
       !feeConfirmToken || typeof feeConfirmToken !== 'string' ||
       !feeAttemptId || typeof feeAttemptId !== 'string' || !UUID_RE.test(feeAttemptId)
     ) {
-      return NextResponse.json({ ok: true }); // Silent ignore unauthenticated
+      console.warn('[claim/confirm] Fee tx rejected: missing HMAC fields', { hasFeeConfirmToken: !!feeConfirmToken, hasFeeAttemptId: !!feeAttemptId });
+      return NextResponse.json({ ok: true });
     }
     if (!verifyConfirmToken(feeConfirmToken, feeAttemptId, feeWallet)) {
+      console.warn('[claim/confirm] Fee tx rejected: HMAC verification failed', { feeAttemptId, feeWallet });
       return NextResponse.json({ ok: true });
     }
     let feeLamports: string = rawFeeLamports;
     const parsedFee = BigInt(feeLamports);
-    if (parsedFee <= 0n) return NextResponse.json({ ok: true });
+    if (parsedFee <= 0n) {
+      console.warn('[claim/confirm] Fee tx rejected: zero/negative fee', { feeLamports, feeAttemptId });
+      return NextResponse.json({ ok: true });
+    }
 
     // Verify the fee tx actually exists on-chain and transferred to the treasury.
     // Verify on-chain via RPC. Mark as verified only if check passes.
@@ -134,7 +140,7 @@ export async function POST(request: Request) {
       console.error('[claim/confirm] Fee log insert FAILED (revenue loss):', insertError.message, { sig: feeSig, wallet: feeWallet });
       trackClaimEvent('failure', { reason: 'fee_insert_error', wallet: feeWallet ?? '', feeLamports });
     } else {
-      trackFeeCollection(true, feeLamports, 0);
+      trackFeeCollection(true, feeLamports);
       trackClaimEvent('fee_collected', { wallet: feeWallet ?? '', feeLamports });
     }
     return NextResponse.json({ ok: true });

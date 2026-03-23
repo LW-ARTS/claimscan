@@ -10,6 +10,15 @@ interface ProfileJsonLdProps {
   walletAddresses: string[];
 }
 
+/** Only allow HTTPS URLs in structured data to prevent javascript: URI injection */
+function isSafeUrl(url: string): boolean {
+  try {
+    return new URL(url).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function ProfileJsonLd({
   handle,
   displayName,
@@ -37,7 +46,7 @@ export function ProfileJsonLd({
         '@id': `${profileUrl}#person`,
         name: displayName,
         url: profileUrl,
-        ...(avatarUrl ? { image: avatarUrl } : {}),
+        ...(avatarUrl && isSafeUrl(avatarUrl) ? { image: avatarUrl } : {}),
         ...(walletAddresses.length > 0
           ? {
               identifier: walletAddresses.map((addr) => ({
@@ -67,7 +76,7 @@ export function ProfileJsonLd({
         ],
       },
     ],
-  }).replace(/[<>&]/g, c => ({ '<': '\\u003c', '>': '\\u003e', '&': '\\u0026' })[c]!);
+  }).replace(/[<>&\u2028\u2029]/g, c => ({ '<': '\\u003c', '>': '\\u003e', '&': '\\u0026', '\u2028': '\\u2028', '\u2029': '\\u2029' })[c]!);
 
   return (
     <script

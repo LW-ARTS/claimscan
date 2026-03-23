@@ -18,7 +18,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ lamports: balance, sol: balance / 1e9 }, {
       headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },
     });
-  } catch {
+  } catch (err) {
+    console.error('[balance] RPC call failed', { wallet, error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json({ error: 'RPC error' }, { status: 502 });
   }
 }
