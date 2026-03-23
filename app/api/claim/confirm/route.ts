@@ -236,7 +236,6 @@ export async function POST(request: Request) {
   };
   if (txSignature) updateData.tx_signature = txSignature;
   if (errorReason && typeof errorReason === 'string') {
-    // eslint-disable-next-line no-control-regex
     updateData.error_reason = errorReason.replace(/[\x00-\x1f\x7f\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g, '').trim().slice(0, 500);
   }
 

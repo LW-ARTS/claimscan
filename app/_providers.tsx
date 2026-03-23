@@ -18,6 +18,7 @@ import '@solana/wallet-adapter-react-ui/styles.css';
 export function Providers({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
+  // eslint-disable-next-line react-compiler/react-compiler -- hydration guard pattern
   useEffect(() => {
     setMounted(true);
   }, []);
