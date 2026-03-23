@@ -1,14 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const isCI = !!process.env.CI;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  forbidOnly: isCI,
+  retries: isCI ? 2 : 0,
+  workers: isCI ? 1 : undefined,
+  reporter: isCI ? 'github' : 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: isCI ? 'http://localhost:3000' : 'http://localhost:3001',
     trace: 'on-first-retry',
   },
   projects: [
@@ -16,15 +18,20 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    {
-      name: 'mobile',
-      use: { ...devices['iPhone 14'] },
-    },
+    // Mobile project uses WebKit — skip in CI to avoid installing extra browsers
+    ...(!isCI
+      ? [
+          {
+            name: 'mobile',
+            use: { ...devices['iPhone 14'] },
+          },
+        ]
+      : []),
   ],
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    command: isCI ? 'npm run start' : 'npm run dev -- -p 3001',
+    url: isCI ? 'http://localhost:3000' : 'http://localhost:3001',
+    reuseExistingServer: !isCI,
     timeout: 30_000,
   },
 });

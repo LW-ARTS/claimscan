@@ -4,7 +4,7 @@ import { getAllAdapters } from '@/lib/platforms';
 import type { ResolvedWallet } from '@/lib/platforms/types';
 import type { Platform, Chain } from '@/lib/supabase/types';
 
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 /** Platforms that use heavy GPA queries for token discovery and benefit from DB caching. */
 const GPA_PLATFORMS = new Set(['coinbarrel', 'believe', 'revshare']);
@@ -23,8 +23,8 @@ export async function GET(request: Request) {
 
   const supabase = createServiceClient();
   const wallclockStart = Date.now();
-  // Leave 2s margin within the 10s Hobby limit
-  const WALLCLOCK_BUDGET_MS = 8_000;
+  // Leave 5s margin within the 60s maxDuration budget
+  const WALLCLOCK_BUDGET_MS = 55_000;
 
   try {
     // Fetch creators who haven't been token-indexed recently.

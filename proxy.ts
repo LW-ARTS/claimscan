@@ -24,10 +24,19 @@ async function verifyRequestSignature(sig: string | null, path: string): Promise
   try {
     const mod = await import('@/lib/request-signing');
     return mod.verifyRequestSignature(sig, path);
-  } catch {
-    return true; // fail open if module can't load in Edge
+  } catch (err) {
+    // Fail-closed: if the signing module can't load, reject the request in production.
+    // In dev mode, allow through since Edge bundling issues are common locally.
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[middleware] CRITICAL: request-signing module failed to load in Edge', err);
+      return false;
+    }
+    return true;
   }
 }
+
+// Track whether we've already warned about missing Upstash (once per instance)
+let _warnedMissingUpstash = false;
 
 // Simple in-memory rate limiter — fallback when Upstash is not configured.
 // NOTE: In serverless/Edge environments, each instance has its own map.
@@ -210,7 +219,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const response = NextResponse.next();
   const pathname = request.nextUrl.pathname;
 
@@ -362,8 +371,21 @@ export async function middleware(request: NextRequest) {
 
     // Use Upstash Redis (persistent across serverless instances) when configured,
     // otherwise fall back to in-memory rate limiting (best-effort per-instance).
+    // WARNING: In-memory fallback is NOT reliable in serverless — each cold start resets.
     const { generalLimiter, searchLimiter } = await getRateLimiters();
     const upstashLimiter = pathname === '/api/search' ? searchLimiter : generalLimiter;
+
+    // Fail-closed in production: if Upstash isn't configured, the in-memory
+    // fallback provides almost no protection in serverless. Log once per instance
+    // so ops can detect the misconfiguration via Sentry/Vercel logs.
+    if (!upstashLimiter && process.env.NODE_ENV === 'production' && !_warnedMissingUpstash) {
+      _warnedMissingUpstash = true;
+      console.error(
+        '[middleware] CRITICAL: Upstash Redis not configured in production. ' +
+        'Rate limiting is per-instance only and effectively bypassed in serverless.'
+      );
+    }
+
     if (upstashLimiter) {
       const { success, remaining } = await upstashLimiter.limit(rateLimitKey);
       if (!success) {
@@ -380,8 +402,12 @@ export async function middleware(request: NextRequest) {
       }
       response.headers.set('X-RateLimit-Remaining', String(remaining));
     } else {
-      // Fallback: in-memory rate limiting
-      const effectiveLimit = pathname === '/api/search' ? SEARCH_RATE_LIMIT_MAX : RATE_LIMIT_MAX;
+      // Fallback: in-memory rate limiting (per-instance, not reliable in serverless).
+      // Use tighter limits than Upstash since each cold start resets the counter,
+      // meaning an attacker gets a fresh allowance per instance.
+      const inMemorySearchLimit = process.env.NODE_ENV === 'production' ? 5 : SEARCH_RATE_LIMIT_MAX;
+      const inMemoryGeneralLimit = process.env.NODE_ENV === 'production' ? 15 : RATE_LIMIT_MAX;
+      const effectiveLimit = pathname === '/api/search' ? inMemorySearchLimit : inMemoryGeneralLimit;
       const limitKey = pathname === '/api/search' ? `search:${rateLimitKey}` : rateLimitKey;
       if (isRateLimited(limitKey, effectiveLimit)) {
         return NextResponse.json(

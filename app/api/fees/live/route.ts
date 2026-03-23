@@ -4,7 +4,7 @@ import { isValidWalletInput } from '@/lib/utils';
 import type { ResolvedWallet } from '@/lib/platforms/types';
 
 /** Vercel Hobby hard limit is 10s. This tells the runtime we want the full budget. */
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 /**
  * Validate and parse a wallets array from raw input.
@@ -50,40 +50,12 @@ async function fetchAndRespond(validated: ResolvedWallet[]) {
   }
 }
 
-// GET is deprecated — use POST to benefit from origin validation and request signing.
-// Kept for backward compatibility but rate-limited more aggressively.
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const walletsParam = searchParams.get('wallets');
-
-  if (!walletsParam) {
-    return NextResponse.json(
-      { error: 'wallets parameter required (JSON array)' },
-      { status: 400 }
-    );
-  }
-
-  // Limit URL-encoded JSON size to prevent oversized query strings
-  if (walletsParam.length > 2048) {
-    return NextResponse.json(
-      { error: 'wallets parameter too large — use POST instead' },
-      { status: 413 }
-    );
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(walletsParam);
-  } catch {
-    return NextResponse.json(
-      { error: 'Invalid wallets parameter — must be valid JSON array' },
-      { status: 400 }
-    );
-  }
-
-  const result = validateWallets(parsed);
-  if (result instanceof NextResponse) return result;
-  return fetchAndRespond(result);
+// GET deprecated — return 410 Gone with migration guidance
+export async function GET() {
+  return NextResponse.json(
+    { error: 'GET is no longer supported. Use POST with a JSON body: { "wallets": [...] }' },
+    { status: 410 }
+  );
 }
 
 /**

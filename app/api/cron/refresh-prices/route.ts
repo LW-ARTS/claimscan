@@ -4,7 +4,7 @@ import { getNativeTokenPrices, getTokenPrice } from '@/lib/prices';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress } from '@/lib/chains/base';
 
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 /**
  * Validate that a token address is well-formed for its chain

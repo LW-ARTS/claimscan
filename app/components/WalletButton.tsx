@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { track } from '@vercel/analytics';
 import { copyToClipboard } from '@/lib/utils';
 
 export function WalletButton() {
@@ -16,7 +17,7 @@ export function WalletButton() {
 }
 
 function WalletButtonInner() {
-  const { publicKey, disconnect, connecting, connected } = useWallet();
+  const { publicKey, disconnect, connecting, connected, wallet } = useWallet();
   const { setVisible } = useWalletModal();
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -24,10 +25,21 @@ function WalletButtonInner() {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const firstItemRef = useRef<HTMLButtonElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const prevConnectedRef = useRef(false);
 
   useEffect(() => {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, []);
+
+  // Track wallet connect/disconnect transitions
+  useEffect(() => {
+    if (connected && publicKey && !prevConnectedRef.current) {
+      track('wallet_connected', {
+        wallet_name: wallet?.adapter.name ?? 'unknown',
+      });
+    }
+    prevConnectedRef.current = connected;
+  }, [connected, publicKey, wallet]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -73,6 +85,7 @@ function WalletButtonInner() {
 
   const handleDisconnect = useCallback(async () => {
     setShowMenu(false);
+    track('wallet_disconnected');
     await disconnect();
   }, [disconnect]);
 
@@ -128,7 +141,7 @@ function WalletButtonInner() {
           ref={firstItemRef}
           role="menuitem"
           onClick={handleCopy}
-          className="flex w-full items-center gap-2 rounded-t-xl px-3 py-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex w-full items-center gap-2 rounded-t-xl px-3 py-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           {copied ? (
             <>
@@ -146,7 +159,7 @@ function WalletButtonInner() {
         <button
           role="menuitem"
           onClick={handleDisconnect}
-          className="flex w-full items-center gap-2 rounded-b-xl px-3 py-2.5 text-xs text-red-400 transition-colors hover:bg-muted"
+          className="flex w-full items-center gap-2 rounded-b-xl px-3 py-3 text-xs text-red-400 transition-colors hover:bg-muted"
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
           Disconnect

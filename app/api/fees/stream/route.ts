@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 /** Vercel Hobby hard limit — SSE connections are killed after 10s.
  * On Vercel Pro this should be increased to 300 for long-lived SSE. */
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

@@ -5,7 +5,7 @@ import { safeBigInt } from '@/lib/utils';
 import type { ResolvedWallet } from '@/lib/platforms/types';
 import type { Platform, Chain } from '@/lib/supabase/types';
 
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   if (!verifyCronSecret(request)) {
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
     let indexed = 0;
     // Wallclock guard — stop processing before maxDuration to avoid hard timeout
-    const deadline = Date.now() + 8_000; // 8s of 10s budget
+    const deadline = Date.now() + 55_000; // 55s of 60s budget
 
     for (const creator of staleCreators) {
       if (Date.now() > deadline) {

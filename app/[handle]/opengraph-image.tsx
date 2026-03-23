@@ -60,9 +60,13 @@ function computeUsd(amount: bigint, decimals: number, priceUsd: number): number 
 
 async function fetchPrices(): Promise<{ sol: number; eth: number }> {
   try {
+    const headers: Record<string, string> = {};
+    if (process.env.COINGECKO_API_KEY) {
+      headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY;
+    }
     const res = await fetch(
       'https://api.coingecko.com/api/v3/simple/price?ids=solana,ethereum&vs_currencies=usd',
-      { signal: AbortSignal.timeout(4000), next: { revalidate: 300 } },
+      { signal: AbortSignal.timeout(4000), next: { revalidate: 300 }, headers },
     );
     if (!res.ok) return { sol: 0, eth: 0 };
     const data = await res.json();

@@ -4,9 +4,10 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { generateBatchClaimTransactions } from '@/lib/platforms/bags-claim';
 import { generateConfirmToken } from '@/lib/claim/hmac';
 import { CLAIMSCAN_FEE_BPS, MIN_FEE_LAMPORTS } from '@/lib/constants';
+import { trackClaimEvent, trackPerformance, trackFeeCollection } from '@/lib/monitoring';
 
 /** Vercel Hobby hard limit is 10s. Reduced batch size (10 mints) fits within this budget. */
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const contentType = request.headers.get('content-type') ?? '';
@@ -184,7 +185,9 @@ export async function POST(request: Request) {
   }
 
   // Generate claim transactions — wrapped in try/finally to clean up locks on failure
+  trackClaimEvent('initiated', { wallet, platform: 'bags', mintCount: lockedMints.length });
   let results;
+  const txGenStart = performance.now();
   try {
     results = await generateBatchClaimTransactions(wallet, lockedMints);
   } catch (err) {
@@ -201,8 +204,10 @@ export async function POST(request: Request) {
         .in('id', idsToClean);
       if (cleanupErr) console.error('[claim/bags] Lock cleanup after tx failure failed:', cleanupErr.message);
     }
+    trackClaimEvent('failure', { reason: 'tx_generation_error', wallet, platform: 'bags', mintCount: lockedMints.length });
     return NextResponse.json({ error: 'Failed to generate claim transactions' }, { status: 500 });
   }
+  trackPerformance('bags_batch_tx_generation', performance.now() - txGenStart, 8000);
 
   const transactions: Array<{
     tokenMint: string;
@@ -290,6 +295,13 @@ export async function POST(request: Request) {
       const fee = totalUnclaimed * BigInt(CLAIMSCAN_FEE_BPS) / 10_000n;
       if (fee >= MIN_FEE_LAMPORTS) feeLamports = fee.toString();
     }
+  }
+
+  // Track fee collection decision
+  const feeCollected = feeLamports !== '0';
+  trackFeeCollection(feeCollected, feeLamports);
+  if (!feeCollected && transactions.length > 0) {
+    trackClaimEvent('fee_skipped', { wallet, platform: 'bags', mintCount: transactions.length });
   }
 
   return NextResponse.json({

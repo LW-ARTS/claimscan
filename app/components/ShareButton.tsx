@@ -1,19 +1,13 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { track } from '@vercel/analytics';
 import { formatUsd, copyToClipboard } from '@/lib/utils';
 
 interface ShareButtonProps {
   handle: string;
   totalEarnedUsd: number;
   platformCount: number;
-}
-
-function saveButtonStyle({ saveFailed, saved, saving }: { saveFailed: boolean; saved: boolean; saving: boolean }) {
-  if (saveFailed) return 'border-red-500/30 bg-red-500/10 text-red-400';
-  if (saved) return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
-  if (saving) return 'border-border bg-muted/60 text-muted-foreground/50 cursor-wait';
-  return 'border-border bg-muted/40 text-muted-foreground cursor-pointer hover:bg-muted hover:border-foreground/20 hover:text-foreground';
 }
 
 export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButtonProps) {
@@ -42,15 +36,17 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
 
   const handleCopyLink = useCallback(async () => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    track('share_copy_link', { handle });
     const ok = await copyToClipboard(profileUrl);
     if (ok) {
       setCopied(true);
       timerRef.current = setTimeout(() => setCopied(false), 2000);
     }
-  }, [profileUrl]);
+  }, [profileUrl, handle]);
 
   const handleSaveImage = useCallback(async () => {
     if (saving) return;
+    track('share_save_image', { handle });
     setSaving(true);
     try {
       const res = await fetch(ogUrl, { signal: AbortSignal.timeout(15_000) });
@@ -84,7 +80,8 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
         href={tweetIntentUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex h-14 w-full items-center justify-center gap-3 bg-black text-base font-semibold text-white transition-all duration-200 hover:bg-black/85 hover:shadow-[0_4px_20px_rgba(0,0,0,0.15)] active:scale-[0.98]"
+        onClick={() => track('share_x_clicked', { handle })}
+        className="flex h-14 w-full items-center justify-center gap-3 bg-foreground text-base font-semibold text-background transition-all duration-200 hover:bg-foreground/85 hover:shadow-[0_4px_20px_rgba(0,0,0,0.15)] active:scale-[0.98]"
 
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -98,8 +95,8 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
         <button
           onClick={handleSaveImage}
           disabled={saving}
-          className={`flex h-14 flex-1 cursor-pointer items-center justify-center gap-2.5 border text-sm font-medium transition-all active:scale-[0.97] ${
-            saveFailed ? 'border-red-300 text-red-500' : saved ? 'border-black text-black' : 'border-[#ddd] text-black hover:bg-[#f5f5f5]'
+          className={`flex h-14 flex-1 items-center justify-center gap-2.5 border text-sm font-medium transition-all active:scale-[0.97] ${
+            saveFailed ? 'border-destructive/30 text-destructive' : saved ? 'border-foreground text-foreground' : saving ? 'border-border text-muted-foreground cursor-wait opacity-60' : 'border-border text-foreground cursor-pointer hover:bg-muted'
           }`}
   
         >
@@ -129,7 +126,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
         <button
           onClick={handleCopyLink}
           className={`flex h-14 flex-1 cursor-pointer items-center justify-center gap-2.5 border text-sm font-medium transition-all active:scale-[0.97] ${
-            copied ? 'border-black text-black' : 'border-[#ddd] text-black hover:bg-[#f5f5f5]'
+            copied ? 'border-foreground text-foreground' : 'border-border text-foreground hover:bg-muted'
           }`}
   
         >
