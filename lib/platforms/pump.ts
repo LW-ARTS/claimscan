@@ -50,7 +50,7 @@ export const pumpAdapter: PlatformAdapter = {
     return [];
   },
 
-  async getHistoricalFees(wallet: string): Promise<TokenFee[]> {
+  async getHistoricalFees(_wallet: string): Promise<TokenFee[]> {
     // Pump.fun doesn't expose historical fee totals via API.
     // We can only read current vault balance (unclaimed).
     // Historical data would require indexing claim transactions.

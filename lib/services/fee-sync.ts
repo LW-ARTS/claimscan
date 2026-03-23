@@ -12,7 +12,7 @@ import { fetchClaimHistory } from '@/lib/helius/transactions';
 import type { Logger } from '@/lib/logger';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
-type ClaimEventRow = Database['public']['Tables']['claim_events']['Row'];
+type _ClaimEventRow = Database['public']['Tables']['claim_events']['Row'];
 type SupabaseClient = ReturnType<typeof import('@/lib/supabase/service').createServiceClient>;
 
 // ═══════════════════════════════════════════════

@@ -72,7 +72,7 @@ export function pushSSEEvent(wallet: string, data: Record<string, unknown>): num
 /**
  * Get count of connected SSE clients (debug/metrics).
  */
-function getSSEClientCount(): number {
+export function getSSEClientCount(): number {
   let count = 0;
   for (const clients of sseClients.values()) {
     count += clients.size;
