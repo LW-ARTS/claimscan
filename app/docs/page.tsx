@@ -10,12 +10,26 @@ export const metadata: Metadata = {
     title: 'ClaimScan Docs',
     description:
       'Architecture, security, and roadmap for the cross-chain DeFi fee tracker powering 9 launchpads.',
+    images: [
+      {
+        url: 'https://claimscan.tech/og-docs.png',
+        width: 1200,
+        height: 630,
+        alt: 'ClaimScan Docs — Architecture & Roadmap',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image' as const,
     title: 'ClaimScan Docs',
     description:
       'Architecture, security, and roadmap for the cross-chain DeFi fee tracker.',
+    images: [
+      {
+        url: 'https://claimscan.tech/og-docs.png',
+        alt: 'ClaimScan Docs — Architecture & Roadmap',
+      },
+    ],
   },
   alternates: {
     canonical: 'https://claimscan.tech/docs',
@@ -35,8 +49,82 @@ function Label({ children }: { children: React.ReactNode }) {
 /* ── Page ── */
 
 export default function DocsPage() {
+  const faqData = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'FAQPage',
+        '@id': 'https://claimscan.tech/docs#faq',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'How does ClaimScan work?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Enter a social handle (Twitter, Farcaster, GitHub) or wallet address. ClaimScan resolves it to wallet addresses and scans 9 DeFi launchpads across Solana and Base in parallel, showing earned, claimed, and unclaimed fees in real time.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'What platforms does ClaimScan support?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'ClaimScan supports 9 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana, plus Clanker, Zora, and Bankr on Base.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Is ClaimScan free?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes. ClaimScan is completely free to use. There are no fees for scanning or viewing your creator fee data.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'How do I claim fees?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Connect your wallet on a profile page and click Claim on eligible unclaimed fees. ClaimScan builds the transaction server-side, simulates it, and you sign it in your wallet. Currently live for Bags.fm with Clanker and Zora coming soon.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Is ClaimScan safe?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes. ClaimScan is fully read-only for scanning — no wallet connection required. For claiming, all transactions are built server-side and simulated before signing. ClaimScan never has access to your private keys.',
+            },
+          },
+        ],
+      },
+      {
+        '@type': 'BreadcrumbList',
+        '@id': 'https://claimscan.tech/docs#breadcrumb',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'ClaimScan',
+            item: 'https://claimscan.tech',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Docs',
+            item: 'https://claimscan.tech/docs',
+          },
+        ],
+      },
+    ],
+  });
+
   return (
     <article className="mx-auto w-full max-w-[720px] px-5 pb-24">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: faqData }}
+      />
 
       {/* ═══ HEADER ═══ */}
       <LazySection>
@@ -84,7 +172,7 @@ export default function DocsPage() {
             ].map((s) => (
               <div key={s.l} className="flex flex-col items-center rounded-xl bg-foreground py-3.5 text-background transition-transform duration-200 hover:scale-105">
                 <span className="text-xl font-bold tracking-tight">{s.v}</span>
-                <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wider text-background/50">{s.l}</span>
+                <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-background/50">{s.l}</span>
               </div>
             ))}
           </div>

@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ['@solana/web3.js', 'viem', '@meteora-ag/dynamic-bonding-curve-sdk'],
   images: {
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       { protocol: 'https', hostname: 'pbs.twimg.com' },
       { protocol: 'https', hostname: 'abs.twimg.com' },

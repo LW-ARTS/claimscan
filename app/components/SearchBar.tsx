@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, startTransition } from 'react
 import { useRouter, usePathname } from 'next/navigation';
 import { Search, Loader2, ArrowRight } from 'lucide-react';
 import { ShimmerButton } from '@/components/ui/shimmer-button';
+import { track } from '@vercel/analytics';
 
 export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
   const [query, setQuery] = useState('');
@@ -80,6 +81,7 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
         handle = handle.slice(1);
       }
 
+      track('search_initiated', { handle });
       router.push(`/${encodeURIComponent(handle)}`);
       timerRef.current = setTimeout(() => setLoading(false), 10_000);
     },
@@ -110,7 +112,7 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             name="query"
             autoComplete="off"
             spellCheck={false}
-            placeholder="Search by handle, username, or wallet"
+            placeholder="@handle, wallet address, or X/GitHub URL"
             aria-label="Search by Twitter handle, GitHub username, or wallet address"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

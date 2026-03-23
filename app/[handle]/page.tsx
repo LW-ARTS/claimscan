@@ -6,6 +6,7 @@ import { getNativeTokenPrices } from '@/lib/prices';
 import { computeFeeUsd } from '@/lib/utils';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 import { SearchBar } from '../components/SearchBar';
+import { ProfileJsonLd } from '../components/ProfileJsonLd';
 import { ProfileHero } from '../components/ProfileHero';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LazySection } from '../components/LazySection';
@@ -34,10 +35,11 @@ export async function generateMetadata({ params }: PageProps) {
   const isWallet = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(safeName);
   const displayName = isWallet ? safeName : `@${safeName}`;
   return {
-    title: `${displayName} Creator Fees`,
+    title: `${displayName} Unclaimed Creator Fees`,
     description: `See earned, claimed, and unclaimed fees for ${displayName} across Pump.fun, Bags.fm, Clanker, Zora and more. Real-time data on Solana and Base.`,
+    ...(isWallet ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
-      title: `${displayName} Creator Fees | ClaimScan`,
+      title: `${displayName} — Earned & Unclaimed Fees | ClaimScan`,
       description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads on Solana and Base.`,
       images: [
         {
@@ -52,7 +54,7 @@ export async function generateMetadata({ params }: PageProps) {
       card: 'summary_large_image' as const,
       site: '@lwartss',
       creator: '@lwartss',
-      title: `${displayName} Creator Fees | ClaimScan`,
+      title: `${displayName} — Earned & Unclaimed Fees | ClaimScan`,
       description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads.`,
       images: [
         {
@@ -85,23 +87,7 @@ export default async function ProfilePage({ params }: PageProps) {
   ]);
 
   if (!creatorResult.creator) {
-    return (
-      <div className="space-y-8">
-        <SearchBar />
-        <div role="alert" className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white/[0.06]">
-            <svg className="h-7 w-7 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold">No results found</h2>
-          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            Could not find any wallets or fees for &quot;{decoded.replace(/[\u200B-\u200D\uFEFF\u202A-\u202E]/g, '').slice(0, 64)}&quot;.
-            Try a different handle, username, or wallet address.
-          </p>
-        </div>
-      </div>
-    );
+    return notFound();
   }
 
   const creator = creatorResult.creator;
@@ -144,9 +130,21 @@ export default async function ProfilePage({ params }: PageProps) {
       : null
   );
 
+  // Build display name for structured data
+  const isWallet = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(decoded);
+  const displayName = isWallet ? decoded : `@${decoded}`;
+
   return (
     <div className="space-y-8 sm:space-y-10">
       <SearchBar />
+      <ProfileJsonLd
+        handle={decoded}
+        displayName={displayName}
+        totalEarnedUsd={totalEarnedUsd}
+        platformCount={platformCount}
+        avatarUrl={creator.avatar_url ?? null}
+        walletAddresses={wallets.map((w) => w.address)}
+      />
 
       {/* ZONE 1: Profile Hero */}
       <div className="animate-fade-in-up">
@@ -166,6 +164,13 @@ export default async function ProfilePage({ params }: PageProps) {
         </ErrorBoundary>
       </div>
 
+      {/* SSR summary for crawlers */}
+      <p className="sr-only">
+        {displayName} has earned {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalEarnedUsd)} in creator fees across {platformCount} platform{platformCount !== 1 ? 's' : ''}.
+        {feeRecords.filter(f => f.claim_status === 'unclaimed').length > 0 && ` ${feeRecords.filter(f => f.claim_status === 'unclaimed').length} fees remain unclaimed.`}
+        {' '}Platforms: {[...new Set(feeRecords.map(f => PLATFORM_CONFIG[f.platform]?.name ?? f.platform))].join(', ')}.
+      </p>
+
       {/* Identity disclaimer for notable/celebrity handles */}
       {identityDisclaimer && (
         <div className="animate-fade-in-up delay-100 flex items-start gap-4 rounded-xl border border-border/40 bg-card/80 px-5 py-4">
@@ -181,9 +186,22 @@ export default async function ProfilePage({ params }: PageProps) {
         </div>
       )}
 
+      {/* SSR fee data for crawlers */}
+      <div className="sr-only" aria-hidden="true">
+        <h2>All Fee Records</h2>
+        <ul>
+          {feeRecords.slice(0, 50).map(fee => (
+            <li key={fee.id}>
+              {fee.token_symbol || fee.token_address.slice(0,8)} on {PLATFORM_CONFIG[fee.platform]?.name ?? fee.platform}: {fee.claim_status}
+            </li>
+          ))}
+        </ul>
+      </div>
+
       {/* ZONE 2-4: Heavy content wrapped in Suspense so hero renders immediately */}
       <Suspense fallback={<BreakdownSkeleton />}>
         {/* ZONE 2: Breakdown (chain pills + platform tabs + table) */}
+        <h2 className="sr-only">Fee Breakdown by Platform</h2>
         <LazySection minHeight={200}>
           <div className="animate-fade-in-up delay-150">
             <PlatformBreakdown fees={feeRecords} solPrice={priceResult.sol} ethPrice={priceResult.eth} wallets={wallets} key={creator.id} />
@@ -191,6 +209,7 @@ export default async function ProfilePage({ params }: PageProps) {
         </LazySection>
 
         {/* ZONE 3: Claim History */}
+        <h2 className="sr-only">Claim History</h2>
         {creatorResult.claimEvents.length > 0 && (
           <LazySection minHeight={100}>
             <div className="animate-fade-in-up delay-200">
@@ -200,6 +219,7 @@ export default async function ProfilePage({ params }: PageProps) {
         )}
 
         {/* ZONE 4: Scan Status (minimal footnote) */}
+        <h2 className="sr-only">Scan Status</h2>
         <LazySection minHeight={80}>
           <div className="animate-fade-in-up delay-300">
             <ScanStatusLog fees={feeRecords} resolvedChains={resolvedChains} />

@@ -17,8 +17,8 @@ export default function Loading() {
 
         {/* Handle */}
         <div className="signal-fade-up signal-handle mb-1.5 flex items-baseline gap-0.5 text-[22px] tracking-[-0.5px]">
-          <span className="font-sans font-bold text-[#0a0a0a]">@</span>
-          <span className="font-sans font-bold text-[#0a0a0a]">{handle}</span>
+          <span className="font-sans font-bold text-foreground">@</span>
+          <span className="font-sans font-bold text-foreground">{handle}</span>
         </div>
 
         {/* SCANNING label */}
