@@ -100,8 +100,8 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js 16 + React 19 + TypeScript |
-| Styling | Tailwind CSS 4 + Radix UI + Motion 12 |
+| Framework | Next.js + React + TypeScript |
+| Styling | Tailwind CSS + Radix UI + Motion |
 | Blockchain | Solana (web3.js) + EVM (Viem) |
 | Database | PostgreSQL with row-level security |
 | Cache | Redis (Upstash) with in-memory fallback |
