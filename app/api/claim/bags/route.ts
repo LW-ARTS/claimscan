@@ -5,6 +5,7 @@ import { generateBatchClaimTransactions } from '@/lib/platforms/bags-claim';
 import { generateConfirmToken } from '@/lib/claim/hmac';
 import { CLAIMSCAN_FEE_BPS, MIN_FEE_LAMPORTS } from '@/lib/constants';
 import { trackClaimEvent, trackPerformance, trackFeeCollection } from '@/lib/monitoring';
+import { verifyTurnstile } from '@/lib/turnstile';
 
 /** Vercel Hobby hard limit is 10s. Reduced batch size (10 mints) fits within this budget. */
 export const maxDuration = 60;
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
   }
 
-  let body: { wallet?: string; tokenMints?: string[] };
+  let body: { wallet?: string; tokenMints?: string[]; cfTurnstileToken?: string };
   try {
     body = await request.json();
   } catch {
@@ -49,6 +50,15 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+  }
+
+  // Verify Turnstile CAPTCHA (prevents automated batch claiming)
+  const ip = request.headers.get('x-real-ip')
+    ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? null;
+  const turnstile = await verifyTurnstile(body.cfTurnstileToken ?? null, ip);
+  if (!turnstile.success) {
+    return NextResponse.json({ error: turnstile.error ?? 'Captcha verification failed' }, { status: 403 });
   }
 
   const supabase = createServiceClient();
@@ -121,8 +131,8 @@ export async function POST(request: Request) {
   });
 
   if (mintsToInsert.length > 0) {
-    // TODO: Create partial unique index for true atomic locking:
-    // CREATE UNIQUE INDEX idx_claim_attempts_active ON claim_attempts (wallet_address, token_address) WHERE status IN ('pending','signing','submitted');
+    // Atomic locking via idx_claim_attempts_active (migration 018).
+    // If a concurrent request inserts first, the unique constraint rejects the duplicate.
     // Step 2: Bulk insert all available mints (1 INSERT)
     const rows = mintsToInsert.map((mint) => ({
       wallet_address: wallet,

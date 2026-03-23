@@ -13,6 +13,8 @@ import { formatTokenAmount, formatUsd, safeBigInt, toUsdValue } from '@/lib/util
 import { CLAIMSCAN_FEE_BPS, MIN_FEE_LAMPORTS } from '@/lib/constants';
 import type { Database } from '@/lib/supabase/types';
 
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '';
+
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 
 interface ClaimDialogProps {
@@ -38,6 +40,8 @@ export function ClaimDialog({
   const { execute, cancel, phase, progress, results, error } = useClaimBags();
   const [solBalance, setSolBalance] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<HTMLDivElement>(null);
 
   const tokenMints = useMemo(() => fees.map((f) => f.token_address), [fees]);
   const connectedWallet = walletAdapter.publicKey?.toBase58() ?? null;
@@ -55,6 +59,47 @@ export function ClaimDialog({
     mql.addEventListener('change', onChange);
     return () => mql.removeEventListener('change', onChange);
   }, []);
+
+  // Turnstile invisible widget — renders when dialog opens, generates token automatically
+  useEffect(() => {
+    if (!open || !TURNSTILE_SITE_KEY || !turnstileRef.current) return;
+    setTurnstileToken(null);
+
+    const scriptId = 'cf-turnstile-script';
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+
+    function renderWidget() {
+      const w = window as unknown as { turnstile?: { render: (el: HTMLElement, opts: Record<string, unknown>) => string; remove: (id: string) => void } };
+      if (!w.turnstile || !turnstileRef.current) return;
+      // Clear previous widget instance safely
+      while (turnstileRef.current.firstChild) {
+        turnstileRef.current.removeChild(turnstileRef.current.firstChild);
+      }
+      w.turnstile.render(turnstileRef.current, {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (token: string) => setTurnstileToken(token),
+        'error-callback': () => setTurnstileToken(null),
+        theme: 'light',
+        size: 'invisible',
+      });
+    }
+
+    const interval = setInterval(() => {
+      const w = window as unknown as { turnstile?: unknown };
+      if (w.turnstile) {
+        clearInterval(interval);
+        renderWidget();
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [open]);
 
   const [balanceError, setBalanceError] = useState(false);
 
@@ -125,7 +170,7 @@ export function ClaimDialog({
       token_count: fees.length,
       total_unclaimed_usd: Math.round(totalUnclaimedUsd * 100) / 100,
     });
-    execute(tokenMints);
+    execute(tokenMints, turnstileToken ?? undefined);
   };
 
   const handleClose = () => {
@@ -139,6 +184,8 @@ export function ClaimDialog({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent showCloseButton={false} className="max-w-[calc(100%-2rem)] sm:max-w-[480px] border-border bg-card p-0 shadow-xl max-h-[85dvh] overflow-y-auto overscroll-contain">
+        {/* Turnstile invisible widget container */}
+        <div ref={turnstileRef} className="hidden" />
         <div className="flex flex-col gap-0 px-5 pt-6 pb-5 sm:px-8 sm:pt-8 sm:pb-6" style={{ fontFamily: 'var(--font-sans)' }}>
 
           {/* ─── Header ─── */}
