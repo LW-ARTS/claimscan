@@ -19,7 +19,8 @@ interface LazySectionProps {
 export function LazySection({
   children,
   rootMargin = '200px 0px',
-  minHeight: _minHeight,
+  // minHeight reserved for future placeholder sizing
+  minHeight: _minHeight, // eslint-disable-line @typescript-eslint/no-unused-vars
   className,
 }: LazySectionProps) {
   const ref = useRef<HTMLDivElement>(null);

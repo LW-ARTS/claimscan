@@ -73,7 +73,7 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             }
           }
         }
-      } catch (err) {
+      } catch {
         // Ignore invalid URL errors, treat as a normal input string
       }
 

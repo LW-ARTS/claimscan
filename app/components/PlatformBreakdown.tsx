@@ -6,7 +6,6 @@ import { track } from '@vercel/analytics';
 import dynamic from 'next/dynamic';
 import { TokenFeeTable } from './TokenFeeTable';
 import { PlatformIcon } from './PlatformIcon';
-import { ChainIcon } from './ChainIcon';
 import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
 import { computeFeeUsd, formatUsd, safeBigInt } from '@/lib/utils';
 import type { Database, Platform, Chain } from '@/lib/supabase/types';
@@ -219,7 +218,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
     return { byPlatform, platformsWithData, platformsEmpty };
   }, [displayFees]);
 
-  const platformFiltered = activeTab === 'all' ? displayFees : (byPlatform.get(activeTab as Platform) ?? []);
+  const platformFiltered = useMemo(
+    () => activeTab === 'all' ? displayFees : (byPlatform.get(activeTab as Platform) ?? []),
+    [activeTab, displayFees, byPlatform],
+  );
   const filteredFees = statusFilter === 'all'
     ? platformFiltered
     : statusFilter === 'unclaimed'

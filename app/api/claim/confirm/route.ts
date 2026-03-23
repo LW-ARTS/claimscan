@@ -104,7 +104,7 @@ export async function POST(request: Request) {
         feeLamports = actualDelta > 0n ? actualDelta.toString() : '0';
       }
       verified = actualDelta > 0n;
-    } catch (rpcErr) {
+    } catch {
       // RPC failure — insert with fee_lamports='0' to track the attempt.
       // Actual amount will be reconciled via cron once RPC is available.
       // Never trust client-supplied rawFeeLamports for unverified records.
