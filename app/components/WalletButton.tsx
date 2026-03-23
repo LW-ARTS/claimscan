@@ -8,7 +8,6 @@ import { copyToClipboard } from '@/lib/utils';
 
 export function WalletButton() {
   const [mounted, setMounted] = useState(false);
-  // eslint-disable-next-line react-compiler/react-compiler -- hydration guard pattern
   useEffect(() => setMounted(true), []);
 
   // Don't render anything until client-side (wallet context may not be available during SSR)
