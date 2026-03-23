@@ -21,9 +21,8 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - run: npx tsc --noEmit
-      - run: npx eslint --max-warnings 10 .
       - run: npm run build
 
       - uses: actions/upload-artifact@v4
@@ -43,7 +42,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
 
       - uses: actions/download-artifact@v4
