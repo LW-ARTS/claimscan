@@ -46,7 +46,7 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 ### Solana
 | Platform | Features |
 |----------|----------|
-| Bags.fm | Identity resolution, live polling, **direct claim** |
+| Bags.fm | Identity resolution, live polling, **direct claim with Turnstile + priority fees** |
 | Pump.fun | Historical + live fee tracking |
 | Believe | Creator fee tracking |
 | RevShare | Revenue share scanning |
@@ -74,31 +74,42 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 ### Claiming (V1.5)
 - **Zero-custody**: Transactions built server-side, signed exclusively in your wallet
 - **Pre-sign simulation**: Every transaction simulated before wallet prompt
-- **Verified requests**: Claims cryptographically verified end-to-end
+- **Priority fees**: Dynamic compute unit pricing for reliable on-chain confirmation
+- **Finalization tracking**: Claims tracked from signing through on-chain finalization
+- **Verified requests**: Claims cryptographically verified end-to-end (HMAC + request signing)
 - **Hardware wallet support**: Works with Ledger and other hardware wallets
 - **Auto-discovery**: Detects any Wallet Standard compatible wallet
 
 ### Security
 - **Defense in depth**: Multiple layers of abuse prevention across all endpoints
+- **Bot protection**: Turnstile verification on sensitive operations
+- **Request signing**: All client-server communication cryptographically signed
 - **Zero-custody claiming**: Transactions signed exclusively in user wallets
 - **Tamper-proof claims**: Claim states are immutable once finalized
 - **On-chain verifiable**: Every fee record independently verifiable on-chain
+- **Anti-enumeration**: Rate-limited identity resolution prevents scraping
 
 ### Performance
 - **Fast scans**: All routes optimized for parallel execution
-- **Smart caching**: Multi-layer caching keeps data fresh without hammering the chain
-- **Background indexing**: Automated token discovery keeps scans fast
+- **Smart caching**: Multi-layer caching (Redis + DB) keeps data fresh without hammering the chain
+- **Background indexing**: Automated token discovery via Helius DAS webhooks
 - **Graceful degradation**: Partial results instead of timeouts
+- **SSE streaming**: Real-time scan progress and live fee updates via Server-Sent Events
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React + Tailwind CSS |
-| Blockchain | Solana + EVM (Base) |
-| Database | SQL database with access controls |
-| Identity | Social identity resolution across platforms |
-| Pricing | Multi-source price aggregation |
+| Framework | Next.js 16 + React 19 + TypeScript |
+| Styling | Tailwind CSS 4 + Radix UI + Motion 12 |
+| Blockchain | Solana (web3.js) + EVM (Viem) |
+| Database | PostgreSQL with row-level security |
+| Cache | Redis (Upstash) with in-memory fallback |
+| Identity | Cross-platform resolution (Twitter, GitHub, Farcaster, wallets) |
+| Pricing | Multi-source aggregation (DexScreener, Jupiter, CoinGecko) |
+| Monitoring | Sentry + structured logging |
+| Security | Turnstile + HMAC signing + rate limiting + honeypots |
+| Deploy | Vercel (Edge + Serverless) |
 
 ## Stats
 
@@ -111,7 +122,7 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 
 | Version | Status | Highlights |
 |---------|--------|------------|
-| **V1.5** | **Live** | 9 platforms, claim system (Bags.fm), multi-layer security |
+| **V1.5** | **Live** | 9 platforms, Bags.fm claim (v3 + Turnstile + priority fees), defense-in-depth security, Helius DAS indexing |
 | V2 | Coming Soon | Token Fee Scanner (paste any CA), multi-platform claim |
 | V3 | 2026+ | Automated claim scheduling, creator analytics, portfolio dashboard |
 
