@@ -628,7 +628,6 @@ export const bankrAdapter: PlatformAdapter = {
     return [];
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getCreatorTokens(_wallet: string): Promise<CreatorToken[]> {
     return [];
   },
@@ -662,7 +661,6 @@ export const bankrAdapter: PlatformAdapter = {
     });
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
     return [];
   },

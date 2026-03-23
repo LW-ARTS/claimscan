@@ -230,7 +230,7 @@ export const coinbarrelAdapter: PlatformAdapter = {
       const fees: TokenFee[] = [];
 
       // Query bonding curves and pools in parallel
-      const [curves, pools] = await Promise.allSettled([
+      const [_curves, pools] = await Promise.allSettled([
         findBondingCurvesByCreator(creatorPk, signal),
         findPoolsByCreator(creatorPk, signal),
       ]);

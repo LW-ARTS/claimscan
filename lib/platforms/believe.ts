@@ -96,7 +96,6 @@ export const believeAdapter: PlatformAdapter = {
   supportsHandleBasedFees: false,
   historicalCoversLive: true,
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async resolveIdentity(
     _handle: string,
     _provider: IdentityProvider
