@@ -727,7 +727,7 @@ export function useClaimBags(): UseClaimBagsReturn {
       activeEntriesRef.current = [];
       walletRef.current = '';
     }
-  }, [publicKey, signAllTransactions, connection]);
+  }, [publicKey, signAllTransactions, connection, safeSetProgress, safeSetResults]);
 
   // Abort in-flight operations on unmount to prevent post-unmount state updates
   useEffect(() => {

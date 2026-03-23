@@ -3,7 +3,6 @@ import { GrammyError } from 'grammy';
 import { getAdapter } from '@/lib/platforms/index';
 import { getNativeTokenPrices } from '@/lib/prices/index';
 import { createServiceClient } from '@/lib/supabase/service';
-import { PLATFORM_CONFIG } from '@/lib/constants';
 import { safeBigInt, toUsdValue } from '@/lib/utils';
 import {
   getWatchedTokensWithUnclaimed,

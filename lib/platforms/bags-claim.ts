@@ -1,6 +1,6 @@
 import 'server-only';
 import { bagsFetch, getClaimablePositionsCached, invalidatePositionsCache } from './bags-api';
-import type { BagsClaimablePosition, BagsApiResponse } from './bags-api';
+import type { BagsClaimablePosition } from './bags-api';
 
 interface ClaimTxEntry {
   tx: string;

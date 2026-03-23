@@ -8,7 +8,6 @@ import {
   METEORA_DBC_PROGRAM,
   COINBARREL_PROGRAM_ID,
   RAYDIUM_LAUNCHLAB_PROGRAM_ID,
-  CLANKER_API_BASE,
 } from '@/lib/constants';
 import { getNativeTokenPrices } from '@/lib/prices/index';
 import { safeBigInt, toUsdValue } from '@/lib/utils';
