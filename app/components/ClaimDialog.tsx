@@ -49,6 +49,7 @@ export function ClaimDialog({
     && connectedWallet !== bagsRegisteredWallet;
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const mql = window.matchMedia('(max-width: 767px)');
     setIsMobile(mql.matches);
     function onChange(e: MediaQueryListEvent) { setIsMobile(e.matches); }

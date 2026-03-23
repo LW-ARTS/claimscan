@@ -446,7 +446,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
       {/* Claim Dialog — wrapped in error boundary for wallet/connection failures */}
       {connectedWallet && claimDialogOpen && (
         <ClaimErrorBoundary fallback={
-          <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             Failed to load claim dialog. Please refresh the page and try again.
           </p>
         }>

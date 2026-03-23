@@ -48,9 +48,9 @@ interface ProfileHeroProps {
 }
 
 const chainMeta: Record<string, { label: string; color: string; bg: string }> = {
-  sol: { label: 'Solana', color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
-  base: { label: 'Base', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-  eth: { label: 'Ethereum', color: 'text-blue-300', bg: 'bg-blue-400/10 border-blue-400/20' },
+  sol: { label: 'Solana', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
+  base: { label: 'Base', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
+  eth: { label: 'Ethereum', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
 };
 
 function CopyIcon({ className }: { className?: string }) {
@@ -162,8 +162,11 @@ export function ProfileHero({
 
   // Track profile load once on mount
   useEffect(() => {
+    const safeHandle = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(handle)
+      ? `${handle.slice(0, 6)}...${handle.slice(-4)}`
+      : handle;
     track('profile_loaded', {
-      handle,
+      handle: safeHandle,
       platform_count: platformCount,
       total_earned_usd: Math.round(totalEarnedUsd * 100) / 100,
     });

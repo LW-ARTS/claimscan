@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { resolveAndPersistCreator } from '@/lib/services/creator';
 import { getNativeTokenPrices } from '@/lib/prices';
-import { computeFeeUsd } from '@/lib/utils';
+import { computeFeeUsd, isWalletAddress } from '@/lib/utils';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 import { SearchBar } from '../components/SearchBar';
 import { ProfileJsonLd } from '../components/ProfileJsonLd';
@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: PageProps) {
   const decoded = decodeURIComponent(handle);
   const safeName = decoded.replace(/[^a-zA-Z0-9_\-\.]/g, '').slice(0, 64);
   // Don't prefix wallet addresses with @
-  const isWallet = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(safeName);
+  const isWallet = isWalletAddress(safeName);
   const displayName = isWallet ? safeName : `@${safeName}`;
   return {
     title: `${displayName} Unclaimed Creator Fees`,
@@ -131,20 +131,22 @@ export default async function ProfilePage({ params }: PageProps) {
   );
 
   // Build display name for structured data
-  const isWallet = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(decoded);
+  const isWallet = isWalletAddress(decoded);
   const displayName = isWallet ? decoded : `@${decoded}`;
 
   return (
     <div className="space-y-8 sm:space-y-10">
       <SearchBar />
-      <ProfileJsonLd
-        handle={decoded}
-        displayName={displayName}
-        totalEarnedUsd={totalEarnedUsd}
-        platformCount={platformCount}
-        avatarUrl={creator.avatar_url ?? null}
-        walletAddresses={wallets.map((w) => w.address)}
-      />
+      {!isWallet && (
+        <ProfileJsonLd
+          handle={decoded}
+          displayName={displayName}
+          totalEarnedUsd={totalEarnedUsd}
+          platformCount={platformCount}
+          avatarUrl={creator.avatar_url ?? null}
+          walletAddresses={wallets.map((w) => w.address)}
+        />
+      )}
 
       {/* ZONE 1: Profile Hero */}
       <div className="animate-fade-in-up">

@@ -26,10 +26,7 @@ export function JsonLd() {
         publisher: { '@id': 'https://lwdesigns.art/#org' },
         potentialAction: {
           '@type': 'SearchAction',
-          target: {
-            '@type': 'EntryPoint',
-            urlTemplate: 'https://claimscan.tech/{search_term_string}',
-          },
+          target: 'https://claimscan.tech/{search_term_string}',
           'query-input': 'required name=search_term_string',
         },
       },

@@ -6,6 +6,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Check whether a string looks like a wallet address (EVM 0x… or Solana base58).
+ */
+export function isWalletAddress(input: string): boolean {
+  return /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(input);
+}
+
 
 /**
  * Copy text to clipboard with fallback for older browsers.
