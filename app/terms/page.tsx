@@ -40,7 +40,7 @@ export const metadata: Metadata = {
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/50">
+    <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/50">
       {children}
     </span>
   );
@@ -108,7 +108,7 @@ export default function TermsPage() {
       <LazySection>
         <header className="pb-12 pt-8 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-foreground/[0.03] px-3.5 py-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70">
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/70">
               Legal
             </span>
           </div>
@@ -545,7 +545,7 @@ export default function TermsPage() {
                     <span className="text-[12px] text-foreground/60">{desc}</span>
                   </div>
                   <div className="mt-1 sm:ml-36">
-                    <span className="rounded-full border border-foreground/[0.08] bg-foreground/[0.04] px-2 py-0.5 text-[10px] font-medium text-foreground/40">
+                    <span className="rounded-full border border-foreground/[0.08] bg-foreground/[0.04] px-2 py-0.5 text-[11px] font-medium text-foreground/40">
                       Lawful basis: {basis}
                     </span>
                   </div>
@@ -594,7 +594,7 @@ export default function TermsPage() {
                 >
                   <span className="w-24 shrink-0 text-[11px] font-bold text-foreground/50">{name}</span>
                   <span className="flex-1 text-[11px] text-foreground/50">{purpose}</span>
-                  <span className="text-[10px] text-foreground/30">{location}</span>
+                  <span className="text-[11px] text-foreground/30">{location}</span>
                 </div>
               ))}
             </div>
@@ -894,7 +894,7 @@ export default function TermsPage() {
                   { label: 'X (Twitter)', value: '@lwartss' },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center gap-4">
-                    <span className="w-20 shrink-0 text-[10px] font-bold uppercase tracking-wider text-foreground/40">
+                    <span className="w-20 shrink-0 text-[11px] font-bold uppercase tracking-wider text-foreground/40">
                       {item.label}
                     </span>
                     <span className="font-mono text-[12px] text-foreground/70">{item.value}</span>

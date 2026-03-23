@@ -10,7 +10,7 @@ export default defineConfig({
   workers: isCI ? 1 : undefined,
   reporter: isCI ? 'github' : 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: isCI ? 'http://localhost:3000' : 'http://localhost:3001',
     trace: 'on-first-retry',
   },
   projects: [
@@ -29,8 +29,8 @@ export default defineConfig({
       : []),
   ],
   webServer: {
-    command: isCI ? 'npm run start' : 'npm run dev',
-    url: 'http://localhost:3000',
+    command: isCI ? 'npm run start' : 'npm run dev -- -p 3001',
+    url: isCI ? 'http://localhost:3000' : 'http://localhost:3001',
     reuseExistingServer: !isCI,
     timeout: 30_000,
   },

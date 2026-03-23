@@ -23,7 +23,7 @@ export default function Loading() {
 
         {/* SCANNING label */}
         <div
-          className="signal-fade-up signal-scan-label mb-6 font-mono text-[10px] font-medium uppercase tracking-[3px] text-foreground/28"
+          className="signal-fade-up signal-scan-label mb-6 font-mono text-[11px] font-medium uppercase tracking-[3px] text-foreground/28"
           style={{ animationDelay: '0.1s' }}
         >
           Scanning

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       provider: parsed.provider,
       wallets,
     }, {
-      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+      headers: { 'Cache-Control': 'private, no-store' },
     });
   } catch (error) {
     console.error('[resolve] error:', error instanceof Error ? error.message : error);

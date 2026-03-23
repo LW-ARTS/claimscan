@@ -299,7 +299,7 @@ export async function POST(request: Request) {
 
   // Track fee collection decision
   const feeCollected = feeLamports !== '0';
-  trackFeeCollection(feeCollected, feeLamports, 0);
+  trackFeeCollection(feeCollected, feeLamports);
   if (!feeCollected && transactions.length > 0) {
     trackClaimEvent('fee_skipped', { wallet, platform: 'bags', mintCount: transactions.length });
   }
