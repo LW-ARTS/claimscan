@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { track } from '@vercel/analytics';
 import { PlatformIcon } from './PlatformIcon';
 import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
 import { formatTokenAmount } from '@/lib/utils';
@@ -63,7 +64,7 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
       <button
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        className="flex w-full cursor-pointer items-center justify-between text-left group"
+        className="flex w-full cursor-pointer items-center justify-between py-3 text-left group sm:py-1"
       >
         <h3 className="text-sm font-semibold tracking-tight">
           Claim History
@@ -122,6 +123,7 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
                     href={getExplorerTxUrl(event.tx_hash, event.chain)!}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => track('external_link_clicked', { explorer: getExplorerName(event.chain), chain: event.chain })}
                     className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] text-muted-foreground/60 transition-colors hover:text-foreground"
                     aria-label={`View on ${getExplorerName(event.chain)}`}
                     title={`View on ${getExplorerName(event.chain)}`}
@@ -140,7 +142,7 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
       {events.length > 3 && !expanded && (
         <button
           onClick={() => setExpanded(true)}
-          className="w-full cursor-pointer rounded-lg py-1.5 text-center text-xs font-medium text-muted-foreground/50 transition-colors hover:bg-muted/40 hover:text-muted-foreground"
+          className="w-full cursor-pointer rounded-lg py-3 text-center text-xs font-medium text-muted-foreground/50 transition-colors hover:bg-muted/40 hover:text-muted-foreground sm:py-1.5"
         >
           Show {events.length - 3} more
         </button>

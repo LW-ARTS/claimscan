@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useRef } from 'react';
+import { track } from '@vercel/analytics';
 import { ClaimStatusBadge } from './ClaimStatusBadge';
 import { PlatformIcon } from './PlatformIcon';
 import { PLATFORM_CONFIG } from '@/lib/constants';
@@ -35,16 +36,21 @@ function tokenDisplay(fee: FeeRecord): { label: string; badge: string } {
 export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWallet, onClaimToken }: TokenFeeTableProps) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_COUNT);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [failedId, setFailedId] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const handleCopy = useCallback(async (id: string, address: string) => {
     try {
       await navigator.clipboard.writeText(address);
       setCopiedId(id);
+      setFailedId(null);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setCopiedId(null), 1500);
     } catch {
-      // Clipboard API not available (insecure context or permission denied)
+      setFailedId(id);
+      setCopiedId(null);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setFailedId(null), 2000);
     }
   }, []);
 
@@ -67,7 +73,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
 
   /** Currency label based on chain — shown after formatted amounts */
   const currencyLabel = (chain: string) => (
-    <span className="ml-1 text-[10px] font-medium uppercase text-muted-foreground/60">{chain === 'sol' ? 'SOL' : 'ETH'}</span>
+    <span className="ml-1 text-[11px] font-medium uppercase text-muted-foreground/60">{chain === 'sol' ? 'SOL' : 'ETH'}</span>
   );
 
   if (sortedFees.length === 0) {
@@ -96,7 +102,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-bold uppercase text-muted-foreground">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[11px] font-bold uppercase text-muted-foreground">
                   {badge}
                 </span>
                 <span className="font-mono text-sm font-semibold">
@@ -106,12 +112,14 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                   <button
                     type="button"
                     onClick={() => handleCopy(fee.id, fee.token_address!)}
-                    aria-label={copiedId === fee.id ? 'Copied' : 'Copy contract address'}
+                    aria-label={copiedId === fee.id ? 'Copied' : failedId === fee.id ? 'Copy failed' : 'Copy contract address'}
                     title="Copy contract address"
                     className="inline-flex cursor-pointer items-center justify-center rounded p-3 -m-1.5 text-muted-foreground/60 transition-all hover:text-foreground active:scale-90"
                   >
                     {copiedId === fee.id ? (
                       <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                    ) : failedId === fee.id ? (
+                      <svg className="h-3.5 w-3.5 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
                     ) : (
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
                     )}
@@ -126,19 +134,19 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Earned</p>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Earned</p>
                 <p className="font-mono tabular-nums">{formatTokenAmount(fee.total_earned, decimals)}{currencyLabel(fee.chain)}</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">USD</p>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">USD</p>
                 <p className="font-semibold tabular-nums">{formatUsd(usd)}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Unclaimed</p>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Unclaimed</p>
                 <p className="font-mono tabular-nums">{formatTokenAmount(fee.total_unclaimed, decimals)}{currencyLabel(fee.chain)}</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Claimed</p>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Claimed</p>
                 <p className="font-mono tabular-nums text-muted-foreground">{formatTokenAmount(fee.total_claimed, decimals)}{currencyLabel(fee.chain)}</p>
               </div>
             </div>
@@ -166,16 +174,16 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
       <table className="w-full font-mono" aria-label="Creator fee records by token">
         <caption className="sr-only">Fee records showing earned, claimed, and unclaimed amounts per token</caption>
         <thead>
-          <tr className="bg-[#f5f5f5]">
-            <th scope="col" className="py-3 pl-2 pr-0 text-left text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Token</th>
-            <th scope="col" className="py-3 text-left text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Platform</th>
-            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Earned</th>
-            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Claimed</th>
-            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Unclaimed</th>
-            <th scope="col" className="py-3 text-right text-[10px] font-medium uppercase tracking-[1px] text-[#777]">USD</th>
-            <th scope="col" className="py-3 text-center text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Status</th>
+          <tr className="bg-muted">
+            <th scope="col" className="py-3 pl-2 pr-0 text-left text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Token</th>
+            <th scope="col" className="py-3 text-left text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Platform</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Earned</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Claimed</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Unclaimed</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">USD</th>
+            <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Status</th>
             {connectedWallet && onClaimToken && (
-              <th scope="col" className="py-3 text-center text-[10px] font-medium uppercase tracking-[1px] text-[#777]">Action</th>
+              <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Action</th>
             )}
           </tr>
         </thead>
@@ -188,18 +196,18 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
             return (
               <tr
                 key={fee.id}
-                className="border-b border-[#ddd] transition-colors hover:bg-[#fafafa]"
+                className="border-b border-border transition-colors hover:bg-muted/50"
                 style={idx < 10 ? { animation: `fadeInUp 0.4s ease-out ${idx * 40}ms both` } : undefined}
               >
                 <td className="py-3.5 pl-2 pr-0">
                   <div className="flex items-center gap-2">
                     <span
-                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black text-[11px] font-bold text-white"
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background"
                                            aria-hidden="true"
                     >
                       {badge}
                     </span>
-                    <span className="font-sans text-sm font-semibold text-black">
+                    <span className="font-sans text-sm font-semibold text-foreground">
                       {label}
                     </span>
                     {fee.token_address && (
@@ -208,10 +216,12 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                         onClick={() => handleCopy(fee.id, fee.token_address!)}
                         aria-label={copiedId === fee.id ? 'Copied' : 'Copy contract address'}
                         title="Copy contract address"
-                        className="cursor-pointer text-[#999] transition-colors hover:text-black"
+                        className="inline-flex items-center justify-center rounded p-3 -m-2 cursor-pointer text-muted-foreground/60 transition-colors hover:text-foreground active:scale-90"
                       >
                         {copiedId === fee.id ? (
-                          <svg className="h-3 w-3 text-black" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                          <svg className="h-3 w-3 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                        ) : failedId === fee.id ? (
+                          <svg className="h-3 w-3 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
                         ) : (
                           <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
                         )}
@@ -219,35 +229,35 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                     )}
                   </div>
                 </td>
-                <td className="py-3.5 text-[13px] text-black">
+                <td className="py-3.5 text-[13px] text-foreground">
                   {platformConfig?.name ?? fee.platform}
                 </td>
-                <td className="py-3.5 text-right text-[13px] tabular-nums text-black">
+                <td className="py-3.5 text-right text-[13px] tabular-nums text-foreground">
                   {formatTokenAmount(fee.total_earned, decimals)} {chainLabel}
                 </td>
-                <td className="py-3.5 text-right text-[13px] tabular-nums text-black">
+                <td className="py-3.5 text-right text-[13px] tabular-nums text-foreground">
                   {formatTokenAmount(fee.total_claimed, decimals)} {chainLabel}
                 </td>
-                <td className={`py-3.5 text-right text-[13px] tabular-nums ${isZeroUnclaimed ? 'text-[#999]' : 'text-black'}`}>
+                <td className={`py-3.5 text-right text-[13px] tabular-nums ${isZeroUnclaimed ? 'text-muted-foreground/60' : 'text-foreground'}`}>
                   {formatTokenAmount(fee.total_unclaimed, decimals)} {chainLabel}
                 </td>
-                <td className="py-3.5 text-right font-sans text-[13px] font-bold tabular-nums text-black">
+                <td className="py-3.5 text-right font-sans text-[13px] font-bold tabular-nums text-foreground">
                   {formatUsd(usd)}
                 </td>
                 <td className="py-3.5 text-center">
                   {fee.claim_status === 'claimed' ? (
-                    <span className="inline-block border border-[#ddd] px-3 py-1 text-[10px] font-medium uppercase tracking-[1px] text-black">
+                    <span className="inline-block border border-border px-3 py-1 text-[11px] font-medium uppercase tracking-[1px] text-foreground">
                       CLAIMED
                     </span>
                   ) : fee.claim_status === 'partially_claimed' ? (
                     <span className="inline-flex items-center justify-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-black" />
-                      <span className="text-[10px] font-medium uppercase tracking-[1px] text-black">PARTIAL</span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
+                      <span className="text-[11px] font-medium uppercase tracking-[1px] text-foreground">PARTIAL</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center justify-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-black" />
-                      <span className="text-[10px] font-medium uppercase tracking-[1px] text-black">UNCLAIMED</span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
+                      <span className="text-[11px] font-medium uppercase tracking-[1px] text-foreground">UNCLAIMED</span>
                     </span>
                   )}
                 </td>
@@ -257,7 +267,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
                       <button
                         onClick={() => onClaimToken(fee.token_address)}
                         aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
-                        className="inline-flex cursor-pointer items-center gap-1.5 bg-black px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[1px] text-white transition-all hover:bg-black/90 active:scale-95"
+                        className="inline-flex cursor-pointer items-center gap-1.5 bg-foreground px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[1px] text-background transition-all hover:bg-foreground/90 active:scale-95"
                                              >
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -278,7 +288,10 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
     {hasMore && (
       <div className="mt-4 flex flex-col items-center gap-1">
         <button
-          onClick={() => setVisibleCount((c) => c + LOAD_MORE_COUNT)}
+          onClick={() => {
+            track('show_more_clicked', { remaining: sortedFees.length - displayedFees.length });
+            setVisibleCount((c) => c + LOAD_MORE_COUNT);
+          }}
           className="cursor-pointer rounded-lg border border-border/60 bg-card/80 px-5 py-2 text-sm font-medium text-foreground/80 transition-all hover:bg-foreground hover:text-background active:scale-95"
         >
           Show more ({sortedFees.length - displayedFees.length} remaining)

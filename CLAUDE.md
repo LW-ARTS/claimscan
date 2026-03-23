@@ -4,7 +4,7 @@ Plataforma de rastreamento e claim de fees de tokens cross-chain (Solana + Base 
 Agrega fees de 9 launchpads: Pump.fun, Bags.fm, Clanker, Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium.
 
 ## Stack
-- Next.js 16.1, React 19, TypeScript
+- Next.js 16.2, React 19, TypeScript
 - Tailwind CSS 4 + Radix UI + Motion 12 + Lottie
 - Solana: @solana/web3.js, wallet-adapter, spl-token
 - EVM: Viem 2.47
@@ -28,6 +28,12 @@ app/
     fees/stream/              # SSE - stream de fees
     claim/confirm/            # POST - update claim status
     claim/bags/               # POST - Bags.fm claim flow
+    balance/                  # GET - saldo de wallet
+    flex/                     # GET - flex stats do creator
+    export/                   # GET - exportar dados do creator
+    avatar/                   # GET - avatar proxy
+    admin/                    # rotas administrativas
+    v2/                       # versao 2 da API publica
     cron/index-fees/          # Vercel Cron - sync fees
     cron/index-tokens/        # Vercel Cron - discover tokens
     cron/refresh-prices/      # Vercel Cron - update prices
@@ -41,7 +47,9 @@ lib/
   resolve/                    # Identity resolution (Twitter/GitHub/Farcaster/wallet)
   prices/                     # DexScreener → Jupiter → CoinGecko waterfall
   claim/hmac.ts               # Confirmation tokens
-bot/                          # Telegram bot separado (grammy + tsup + PM2)
+  services/                   # creator.ts, fee-sync.ts, resolve.ts
+  logger.ts                   # Structured logger centralizado
+proxy.ts                      # Security middleware (450 linhas) - nao existe middleware.ts
 supabase/migrations/          # 12 migration files
 ```
 
@@ -54,7 +62,6 @@ supabase/migrations/          # 12 migration files
 - `claim_attempts` - status tracking (pending→signing→submitted→confirmed→finalized/failed/expired)
 - `token_prices` - cache de precos
 - `search_log` - analytics
-- Bot: `watched_tokens`, `group_watches`, `notification_log`
 
 ## Convencoes
 - Token amounts como **string** (BigInt precision, nunca Number)
@@ -62,12 +69,13 @@ supabase/migrations/          # 12 migration files
 - Chain types: 'sol' | 'base' | 'eth'
 - Claim status: claimed | unclaimed | partially_claimed | auto_distributed
 - Cache TTL: 40min normal, 2h pra creators com 500+ records
-- Price waterfall: DexScreener → Jupiter → CoinGecko
+- Price waterfall: DexScreener → Jupiter (Solana only). CoinGecko somente para precos nativos (SOL/ETH)
 - Rate limiting: 30 req/min geral, 10 req/min search, 20 handles/5min anti-enumeration
-- Middleware (1564 linhas): security headers, tarpit, honeypot, CORS, request signing
+- proxy.ts (450 linhas): security headers, tarpit, honeypot, CORS, request signing — nao existe middleware.ts
 - Cron endpoints protegidos com CRON_SECRET bearer token
 
 ## Env (principais)
+- .env.example existe na raiz — usar como base pra setup local
 ```
 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 SOLANA_RPC_URL, NEXT_PUBLIC_SOLANA_RPC_URL, BASE_RPC_URL
@@ -76,26 +84,26 @@ CRON_SECRET, CLAIM_HMAC_SECRET
 UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
 NEXT_PUBLIC_TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY
 NEXT_PUBLIC_API_SIGN_KEY
-RESOLVE_TIMEOUT_MS (optional, default 8000 — override for VPS/bot deployments)
+NEXT_PUBLIC_SENTRY_DSN
+RESOLVE_TIMEOUT_MS (optional, default 55000 — override para deploys externos)
 ```
 
 ## Git
 - origin: https://github.com/screwk/claimscan.git
 - moinho: https://github.com/LW-ARTS/ClaimScan-Moinho.git
+- .github/PULL_REQUEST_TEMPLATE.md e CODEOWNERS configurados
 
 ## Scripts
 ```
-npm run dev          # Next.js dev
-npm run build        # Production build
-npm run test:e2e     # Playwright tests
-# Bot (cd bot/):
-npm run build        # tsup
-npm start            # node dist/index.js
+npm run dev -- -p 3001   # Next.js dev (porta padrao do projeto)
+npm run build            # Production build
+npm run test:e2e         # Playwright tests
 ```
 
 ## Cuidados
-- maxDuration=10s nas pages (Vercel Hobby limit)
+- maxDuration=60s nas API routes (Vercel Hobby max), wallclock guards em crons usam 55s
 - Creators grandes (500+ fees) sao cacheados por cron, nao on-demand
 - Middleware e gigante - qualquer mudanca de security header, editar com cuidado
 - Honeypot endpoint retorna dados falsos - nao confundir com API real
 - Wallet adapter auto-discovers wallets via Wallet Standard (sem imports explicitos)
+- Sentry org: lw-52.sentry.io (project: claimscan, team: #lw)

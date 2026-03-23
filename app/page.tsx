@@ -26,7 +26,7 @@ export default function Home() {
 
       <div className="relative w-full max-w-3xl text-center">
         {/* Status line */}
-        <div className="animate-fade-in-up mb-6 inline-flex items-center gap-3 font-mono text-xs tracking-wide text-muted-foreground sm:mb-8">
+        <div className="animate-fade-in-up mb-6 inline-flex flex-wrap items-center justify-center gap-2 font-mono text-xs tracking-wide text-muted-foreground sm:mb-8 sm:gap-3">
           <span className="scan-line relative overflow-hidden rounded-sm border border-foreground/10 bg-foreground/[0.03] px-2.5 py-1 uppercase">
             {platformEntries.length} launchpads
           </span>
@@ -49,7 +49,7 @@ export default function Home() {
         </div>
 
         {/* Main heading — animated TrueFocus */}
-        <h1 className="sr-only">Track your creator revenue across 9 DeFi launchpads</h1>
+        <h1 className="sr-only">Find unclaimed creator fees across 9 launchpads on Solana and Base</h1>
         <div aria-hidden="true" className="animate-fade-in-up delay-100 flex flex-col items-center gap-1 sm:gap-2">
           <div className="flex items-center justify-center gap-2 sm:gap-3">
             <span className="text-3xl font-black uppercase tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">Track your</span>
@@ -58,7 +58,7 @@ export default function Home() {
           <TrueFocus
             sentence="creator revenue"
             manualMode={false}
-            blurAmount={3}
+            blurAmount={1.5}
             borderColor="currentColor"
             animationDuration={0.4}
             pauseBetweenAnimations={1.5}
@@ -71,7 +71,7 @@ export default function Home() {
         </p>
 
         {/* Search bar */}
-        <div className="animate-fade-in-up delay-300 mx-auto mt-8 w-full max-w-xl sm:mt-10">
+        <div className="animate-fade-in-up delay-300 mx-auto mt-6 w-full max-w-xl sm:mt-10">
           <SearchBar size="lg" />
         </div>
 
@@ -82,7 +82,7 @@ export default function Home() {
             {platformEntries.map(([key, p]) => (
               <span
                 key={key}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground"
               >
                 <span
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -98,22 +98,22 @@ export default function Home() {
           <div className="shimmer mt-4 overflow-hidden rounded-2xl border border-foreground/[0.08] glass-strong">
             <div className="grid grid-cols-3 divide-x divide-foreground/[0.08]">
               <div className="px-2 py-3 sm:px-4 sm:py-5 text-center">
-                <p className="text-xl font-black tabular-nums tracking-tighter sm:text-2xl md:text-3xl text-foreground">~40%</p>
-                <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground sm:text-[10px]">Go Unclaimed</p>
+                <p className="text-xl font-black tabular-nums tracking-tighter sm:text-2xl md:text-3xl text-foreground">$0</p>
+                <p className="mt-1 text-[11px] font-bold uppercase tracking-widest text-muted-foreground sm:text-xs">Always Free</p>
               </div>
               <div className="px-2 py-3 sm:px-4 sm:py-5 text-center">
                 <p className="text-xl font-black tabular-nums tracking-tighter sm:text-2xl md:text-3xl text-foreground">&lt;30s</p>
-                <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground sm:text-[10px]">Scan Time</p>
+                <p className="mt-1 text-[11px] font-bold uppercase tracking-widest text-muted-foreground sm:text-xs">Full Scan</p>
               </div>
               <div className="px-2 py-3 sm:px-4 sm:py-5 text-center">
-                <p className="text-xl font-black tabular-nums tracking-tighter sm:text-2xl md:text-3xl text-foreground">$0</p>
-                <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground sm:text-[10px]">Always Free</p>
+                <p className="text-xl font-black tabular-nums tracking-tighter sm:text-2xl md:text-3xl text-foreground">~40%</p>
+                <p className="mt-1 text-[11px] font-bold uppercase tracking-widest text-muted-foreground sm:text-xs">Left Behind</p>
               </div>
             </div>
           </div>
 
           {/* LW ARTS attribution */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-1 font-mono text-[11px] tracking-wide text-muted-foreground/60">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-1 font-mono text-xs tracking-wide text-muted-foreground/60">
             <span>Built by</span>
             <a
               href="https://lwdesigns.art"

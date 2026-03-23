@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { parseSearchQuery, resolveWallets } from '@/lib/resolve/identity';
 
-export const maxDuration = 10;
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const contentType = request.headers.get('content-type') ?? '';
@@ -30,6 +30,8 @@ export async function POST(request: Request) {
       query: parsed.value,
       provider: parsed.provider,
       wallets,
+    }, {
+      headers: { 'Cache-Control': 'private, no-store' },
     });
   } catch (error) {
     console.error('[resolve] error:', error instanceof Error ? error.message : error);

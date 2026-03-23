@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
+import { track } from '@vercel/analytics';
 import { PlatformIcon } from './PlatformIcon';
 import { ShareButton } from './ShareButton';
 import { PLATFORM_CONFIG, LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
@@ -47,9 +48,9 @@ interface ProfileHeroProps {
 }
 
 const chainMeta: Record<string, { label: string; color: string; bg: string }> = {
-  sol: { label: 'Solana', color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
-  base: { label: 'Base', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-  eth: { label: 'Ethereum', color: 'text-blue-300', bg: 'bg-blue-400/10 border-blue-400/20' },
+  sol: { label: 'Solana', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
+  base: { label: 'Base', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
+  eth: { label: 'Ethereum', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
 };
 
 function CopyIcon({ className }: { className?: string }) {
@@ -106,11 +107,11 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
 
   return (
     <div className="group flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50">
-      <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${meta.bg} ${meta.color}`}>
+      <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${meta.bg} ${meta.color}`}>
         {wallet.chain}
       </span>
       <span className="min-w-0 flex-1 overflow-hidden">
-        <span className="block truncate font-mono text-[11px] leading-relaxed text-foreground/80 sm:text-xs" title={wallet.address}>
+        <span className="block truncate font-mono text-xs leading-relaxed text-foreground/80" title={wallet.address}>
           {wallet.address}
         </span>
       </span>
@@ -118,7 +119,7 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
         onClick={handleCopy}
         aria-label={copyState === 'copied' ? 'Copied!' : copyState === 'failed' ? 'Copy failed' : 'Copy address'}
         title={copyState === 'copied' ? 'Copied!' : copyState === 'failed' ? 'Failed to copy' : 'Copy address'}
-        className={`inline-flex shrink-0 items-center justify-center rounded-md p-1 transition-all ${
+        className={`inline-flex shrink-0 items-center justify-center rounded-md p-3 -m-2 transition-all ${
           copyState === 'copied'
             ? 'text-emerald-400'
             : copyState === 'failed'
@@ -155,8 +156,22 @@ export function ProfileHero({
   // ── Live polling (migrated from FeeSummaryCard) ──
   const [liveFees, setLiveFees] = useState<LiveFee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pollError, setPollError] = useState(false);
 
   const walletsKey = useMemo(() => JSON.stringify(walletsForLive), [walletsForLive]);
+
+  // Track profile load once on mount
+  useEffect(() => {
+    const safeHandle = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(handle)
+      ? `${handle.slice(0, 6)}...${handle.slice(-4)}`
+      : handle;
+    track('profile_loaded', {
+      handle: safeHandle,
+      platform_count: platformCount,
+      total_earned_usd: Math.round(totalEarnedUsd * 100) / 100,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -215,6 +230,7 @@ export function ProfileHero({
                   streamedFees.set(data.platform, data.fees);
                   flushStreamedFees();
                   setLoading(false);
+                  setPollError(false);
                 }
               } catch {
                 // Ignore parse errors in stream
@@ -248,9 +264,11 @@ export function ProfileHero({
         }
         const data = await res.json();
         setLiveFees(data.fees ?? []);
+        setPollError(false);
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
         console.warn('[ProfileHero] live fee poll failed:', err instanceof Error ? err.message : err);
+        setPollError(true);
       } finally {
         setLoading(false);
       }
@@ -326,29 +344,29 @@ export function ProfileHero({
     };
   }, [walletsKey]);
 
+  // ── Helpers ──
+  const feeToUsd = useCallback((chain: string, amount: bigint) => {
+    const price = chain === 'sol' ? solPrice : ethPrice;
+    const decimals = chain === 'sol' ? 9 : 18;
+    return toUsdValue(amount, decimals, price);
+  }, [solPrice, ethPrice]);
+
   // ── Computed values ──
   // Per-platform merge with floor: live data can increase a platform's unclaimed
   // total (new fees arrived) but never reduce it below the cached DB value.
-  // This prevents incomplete live API responses (e.g. Bags.fm claimable-positions
-  // returns only currently-claimable tokens, not all unclaimed) from zeroing out
-  // the hero total. The cached value refreshes on next page load.
   const displayUnclaimedUsd = useMemo(() => {
     const platformUsd = new Map<string, number>();
     for (const f of initialFees) {
       const amount = safeBigInt(f.total_unclaimed);
       if (amount === 0n) continue;
-      const price = f.chain === 'sol' ? solPrice : ethPrice;
-      const decimals = f.chain === 'sol' ? 9 : 18;
-      platformUsd.set(f.platform, (platformUsd.get(f.platform) ?? 0) + toUsdValue(amount, decimals, price));
+      platformUsd.set(f.platform, (platformUsd.get(f.platform) ?? 0) + feeToUsd(f.chain, amount));
     }
     if (liveFees.length > 0) {
       const livePlatformUsd = new Map<string, number>();
       for (const f of liveFees) {
         const amount = safeBigInt(f.totalUnclaimed);
         if (amount === 0n) continue;
-        const price = f.chain === 'sol' ? solPrice : ethPrice;
-        const decimals = f.chain === 'sol' ? 9 : 18;
-        livePlatformUsd.set(f.platform, (livePlatformUsd.get(f.platform) ?? 0) + toUsdValue(amount, decimals, price));
+        livePlatformUsd.set(f.platform, (livePlatformUsd.get(f.platform) ?? 0) + feeToUsd(f.chain, amount));
       }
       for (const [platform, liveUsd] of livePlatformUsd) {
         const cachedUsd = platformUsd.get(platform) ?? 0;
@@ -358,7 +376,7 @@ export function ProfileHero({
     let total = 0;
     for (const usd of platformUsd.values()) total += usd;
     return total;
-  }, [initialFees, liveFees, solPrice, ethPrice]);
+  }, [initialFees, liveFees, feeToUsd]);
 
   // Claimed USD computed directly from DB total_claimed — not derived from
   // totalEarned - unclaimed, which drifts when live polling updates unclaimed.
@@ -367,9 +385,7 @@ export function ProfileHero({
     for (const f of initialFees) {
       const amount = safeBigInt(f.total_claimed);
       if (amount === 0n) continue;
-      const price = f.chain === 'sol' ? solPrice : ethPrice;
-      const decimals = f.chain === 'sol' ? 9 : 18;
-      total += toUsdValue(amount, decimals, price);
+      total += feeToUsd(f.chain, amount);
     }
     return total;
   }, [initialFees, solPrice, ethPrice]);
@@ -385,7 +401,7 @@ export function ProfileHero({
   const avatarUrl = isValidHandle ? `https://unavatar.io/x/${avatarHandle}?_cb=${cacheBuster}` : null;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#ddd] bg-white">
+    <div className="overflow-hidden rounded-2xl border border-border bg-card">
       <div className="px-5 py-6 sm:px-14 sm:py-12">
         {/* Hero: side-by-side on desktop, stacked on mobile */}
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
@@ -395,33 +411,34 @@ export function ProfileHero({
               {avatarUrl && !avatarError ? (
                 <Image
                   src={avatarUrl}
-                  alt=""
+                  alt={displayName}
                   width={100}
                   height={100}
+                  priority
                   className="h-14 w-14 rounded-full object-cover sm:h-[100px] sm:w-[100px]"
                   onError={() => setAvatarError(true)}
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-black text-xl font-black text-white sm:h-[100px] sm:w-[100px] sm:text-4xl">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-xl font-black text-background sm:h-[100px] sm:w-[100px] sm:text-4xl">
                   {displayName[0]?.toUpperCase()}
                 </div>
               )}
             </div>
 
             <div className="animate-fade-in-up delay-100 min-w-0 space-y-2 sm:space-y-3">
-              <h1 className="truncate text-xl font-bold tracking-tight text-black sm:text-[32px]">
+              <h1 className="truncate text-xl font-bold tracking-tight text-foreground sm:text-[32px]">
                 {displayName}
               </h1>
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 {creator.twitter_handle && (
-                  <span className="inline-flex items-center gap-1.5 border border-[#ddd] px-2 py-1 text-xs text-black sm:px-3 sm:py-1.5 sm:text-[13px]">
+                  <span className="inline-flex items-center gap-1.5 border border-border px-2 py-1 text-xs text-foreground sm:px-3 sm:py-1.5 sm:text-[13px]">
                     <XIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     @{creator.twitter_handle}
                   </span>
                 )}
                 {creator.github_handle && (
-                  <span className="inline-flex items-center gap-1.5 border border-[#ddd] px-2 py-1 text-xs text-[#777] sm:px-3 sm:py-1.5 sm:text-[13px]">
+                  <span className="inline-flex items-center gap-1.5 border border-border px-2 py-1 text-xs text-muted-foreground sm:px-3 sm:py-1.5 sm:text-[13px]">
                     {creator.github_handle}
                   </span>
                 )}
@@ -430,9 +447,9 @@ export function ProfileHero({
                   return (
                     <span
                       key={chain}
-                      className="inline-flex items-center gap-1.5 border border-[#ddd] px-2 py-1 text-[11px] text-[#777] sm:px-3 sm:py-1.5 sm:text-xs"
+                      className="inline-flex items-center gap-1.5 border border-border px-2 py-1.5 text-xs text-muted-foreground sm:px-3 sm:py-1.5"
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-black" aria-hidden="true" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-foreground" aria-hidden="true" />
                       {meta.label}
                     </span>
                   );
@@ -443,15 +460,15 @@ export function ProfileHero({
 
           {/* Right: TOTAL EARNED */}
           <div className="animate-fade-in-up delay-200 shrink-0 text-center sm:text-right">
-            <p className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#777]">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
               Total Earned
             </p>
-            <p className="mt-1 text-4xl font-black tabular-nums tracking-tighter text-black sm:text-6xl">
+            <p className="mt-1 text-4xl font-black tabular-nums tracking-tighter text-foreground sm:text-6xl">
               {formatUsd(totalEarnedUsd)}
             </p>
             {totalEarnedUsd > 0 && (
-              <div className="mt-2 inline-flex items-center border border-[#ddd] px-3 py-1.5 sm:mt-3 sm:px-4 sm:py-2">
-                <span className="font-mono text-xs text-[#777] sm:text-[13px]">
+              <div className="mt-2 inline-flex items-center border border-border px-3 py-1.5 sm:mt-3 sm:px-4 sm:py-2">
+                <span className="font-mono text-xs text-muted-foreground sm:text-[13px]">
                   {formatUsd(displayClaimedUsd)} claimed
                 </span>
               </div>
@@ -460,24 +477,31 @@ export function ProfileHero({
         </div>
 
         {/* Stats row */}
-        <div className="animate-fade-in-up delay-300 mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:flex sm:gap-3">
-          <div className="border border-[#ddd] px-4 py-4 sm:px-6 sm:py-5">
-            <p className="font-mono text-[10px] font-normal uppercase tracking-[1px] text-[#777] sm:text-[11px]">Unclaimed</p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-black sm:mt-1.5 sm:text-[26px]" aria-live="polite" aria-atomic>
+        <div className="animate-fade-in-up delay-300 mt-6 flex flex-wrap gap-2 sm:mt-8 sm:gap-3 *:min-w-0 *:flex-1">
+          <div className="border border-border px-4 py-4 sm:px-6 sm:py-5">
+            <p className="font-mono text-[11px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-xs">Unclaimed</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-foreground sm:mt-1.5 sm:text-[26px]" aria-live="polite" aria-atomic="true">
               {formatUsd(displayUnclaimedUsd)}
-              {loading && <PulsingDot className="ml-1.5 inline-flex h-1.5 w-1.5 text-black" />}
+              {loading && <PulsingDot className="ml-1.5 inline-flex h-1.5 w-1.5 text-foreground" />}
+              {pollError && !loading && (
+                <span className="ml-1.5 inline-flex text-destructive" title="Live data may be outdated. Showing cached values." aria-label="Live fee polling error">
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                </span>
+              )}
             </p>
           </div>
-          <div className="border border-[#ddd] px-4 py-4 sm:px-6 sm:py-5">
-            <p className="font-mono text-[10px] font-normal uppercase tracking-[1px] text-[#777] sm:text-[11px]">Platforms</p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-black sm:mt-1.5 sm:text-[26px]">
+          <div className="border border-border px-4 py-4 sm:px-6 sm:py-5">
+            <p className="font-mono text-[11px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-xs">Platforms</p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-foreground sm:mt-1.5 sm:text-[26px]">
               {platformCount > 0 ? platformCount : '\u2014'}
             </p>
           </div>
           {resolveMs > 0 && (
-            <div className="border border-[#ddd] px-4 py-4 sm:px-6 sm:py-5">
-              <p className="font-mono text-[10px] font-normal uppercase tracking-[1px] text-[#777] sm:text-[11px]">Scanned In</p>
-              <p className="mt-1 text-lg font-bold tabular-nums text-black sm:mt-1.5 sm:text-[26px]">
+            <div className="border border-border px-4 py-4 sm:px-6 sm:py-5">
+              <p className="font-mono text-[11px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-xs">Scanned In</p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-foreground sm:mt-1.5 sm:text-[26px]">
                 {(resolveMs / 1000).toFixed(1)}s
               </p>
             </div>
@@ -487,7 +511,7 @@ export function ProfileHero({
         {/* Divider + Action buttons */}
         {totalEarnedUsd > 0 && (
           <div className="animate-fade-in-up delay-400 mt-8 space-y-4 sm:mt-10">
-            <div className="h-px bg-[#ddd]" />
+            <div className="h-px bg-border" />
             <ShareButton
               handle={handle}
               totalEarnedUsd={totalEarnedUsd}
@@ -503,12 +527,13 @@ export function ProfileHero({
           {!showAllWallets ? (
             <button
               onClick={() => setShowAllWallets(true)}
+              aria-expanded={false}
               className="group flex w-full cursor-pointer items-center justify-between py-2 transition-colors"
             >
-              <span className="font-mono text-[10px] font-medium uppercase tracking-[2px] text-[#999] sm:text-[11px]">
+              <span className="font-mono text-[11px] font-medium uppercase tracking-[2px] text-muted-foreground/60 sm:text-xs">
                 Resolved Wallets
               </span>
-              <span className="flex items-center gap-2 font-mono text-xs text-[#999] sm:text-[13px]">
+              <span className="flex items-center gap-2 font-mono text-xs text-muted-foreground/60 sm:text-[13px]">
                 {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -518,10 +543,10 @@ export function ProfileHero({
           ) : (
             <>
               <div className="mb-3 flex items-center justify-between">
-                <p className="font-mono text-[10px] font-medium uppercase tracking-[2px] text-[#999] sm:text-[11px]">
+                <p className="font-mono text-[11px] font-medium uppercase tracking-[2px] text-muted-foreground/60 sm:text-xs">
                   Resolved Wallets
                 </p>
-                <p className="font-mono text-xs tabular-nums text-[#999] sm:text-[13px]">
+                <p className="font-mono text-xs tabular-nums text-muted-foreground/60 sm:text-[13px]">
                   {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -532,7 +557,7 @@ export function ProfileHero({
               </div>
               <button
                 onClick={() => setShowAllWallets(false)}
-                className="mt-3 w-full cursor-pointer py-2 text-center font-mono text-[11px] font-medium text-[#999] transition-colors hover:text-black"
+                className="mt-3 w-full cursor-pointer py-3 text-center font-mono text-xs font-medium text-muted-foreground/60 transition-colors hover:text-foreground"
               >
                 Hide wallets
               </button>

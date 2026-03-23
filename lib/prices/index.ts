@@ -3,6 +3,8 @@ import {
   DEXSCREENER_API,
   JUPITER_PRICE_API,
 } from '@/lib/constants';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('prices');
 
 export interface TokenPrice {
   chain: 'sol' | 'base' | 'eth';
@@ -55,9 +57,13 @@ export async function getNativeTokenPrices(): Promise<{
   stale: boolean;
 }> {
   try {
+    const headers: Record<string, string> = {};
+    if (process.env.COINGECKO_API_KEY) {
+      headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY;
+    }
     const res = await fetchWithTimeout(
       `${COINGECKO_API}/simple/price?ids=solana,ethereum&vs_currencies=usd`,
-      { next: { revalidate: 300 } }
+      { headers, next: { revalidate: 300 } }
     );
     if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
     const data = await res.json();
@@ -68,10 +74,10 @@ export async function getNativeTokenPrices(): Promise<{
     lastKnownNativePrices = { ...prices, fetchedAt: Date.now() };
     return { ...prices, stale: false };
   } catch (err) {
-    console.error('[prices] CoinGecko fetch failed:', err instanceof Error ? err.message : err);
+    log.error('CoinGecko fetch failed', { error: err instanceof Error ? err.message : String(err) });
     if (lastKnownNativePrices) {
       const ageMin = Math.round((Date.now() - lastKnownNativePrices.fetchedAt) / 60_000);
-      console.warn(`[prices] Returning stale native prices (${ageMin}min old)`);
+      log.warn(`Returning stale native prices (${ageMin}min old)`);
       return { sol: lastKnownNativePrices.sol, eth: lastKnownNativePrices.eth, stale: true };
     }
     return { sol: 0, eth: 0, stale: true };
@@ -95,7 +101,7 @@ async function fetchDexScreenerPrice(
       { next: { revalidate: 300 } }
     );
     if (!res.ok) {
-      console.warn(`[prices] DexScreener returned HTTP ${res.status} for ${tokenAddress}`);
+      log.warn(`DexScreener returned HTTP ${res.status}`, { tokenAddress });
       return null;
     }
     const data = await res.json();
@@ -114,7 +120,7 @@ async function fetchDexScreenerPrice(
 
     return validPair ? sanitizePrice(validPair.priceUsd) : null;
   } catch (err) {
-    console.warn('[prices] DexScreener fetch failed:', err instanceof Error ? err.message : err);
+    log.warn('DexScreener fetch failed', { error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }
@@ -132,14 +138,18 @@ async function fetchJupiterPrice(
       { headers, next: { revalidate: 300 } }
     );
     if (!res.ok) {
-      console.warn(`[prices] Jupiter returned HTTP ${res.status} for ${tokenAddress}`);
+      log.warn(`Jupiter returned HTTP ${res.status}`, { tokenAddress });
       return null;
     }
     const data = await res.json();
-    const price = data.data?.[tokenAddress]?.usdPrice;
-    return sanitizePrice(price);
+    const entry = data?.[tokenAddress];
+    if (!entry) {
+      log.debug('Jupiter returned no entry for token', { tokenAddress, responseKeys: Object.keys(data ?? {}).slice(0, 5) });
+      return null;
+    }
+    return sanitizePrice(entry.usdPrice);
   } catch (err) {
-    console.warn('[prices] Jupiter fetch failed:', err instanceof Error ? err.message : err);
+    log.warn('Jupiter fetch failed', { error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }
@@ -148,24 +158,17 @@ export async function getTokenPriceWithSource(
   chain: 'sol' | 'base' | 'eth',
   tokenAddress: string
 ): Promise<{ price: number; source: TokenPrice['source'] }> {
-  // Fire DexScreener + Jupiter in parallel (prefer DexScreener)
-  const jupiterPromise = chain === 'sol'
-    ? fetchJupiterPrice(tokenAddress)
-    : Promise.resolve(null);
-
-  const [dexResult, jupResult] = await Promise.allSettled([
-    fetchDexScreenerPrice(chain, tokenAddress),
-    jupiterPromise,
-  ]);
-
-  const dexPrice = dexResult.status === 'fulfilled' ? dexResult.value : null;
+  // Sequential waterfall: DexScreener first, Jupiter only on failure (Solana only)
+  const dexPrice = await fetchDexScreenerPrice(chain, tokenAddress);
   if (dexPrice !== null) {
     return { price: dexPrice, source: 'dexscreener' };
   }
 
-  const jupPrice = jupResult.status === 'fulfilled' ? jupResult.value : null;
-  if (jupPrice !== null) {
-    return { price: jupPrice, source: 'jupiter' };
+  if (chain === 'sol') {
+    const jupPrice = await fetchJupiterPrice(tokenAddress);
+    if (jupPrice !== null) {
+      return { price: jupPrice, source: 'jupiter' };
+    }
   }
 
   return { price: 0, source: 'none' };
@@ -200,7 +203,7 @@ export async function batchGetTokenPrices(
     if (result.status === 'fulfilled') {
       fulfilled.push(result.value);
     } else {
-      console.warn('[prices] batchGetTokenPrices item failed:', result.reason instanceof Error ? result.reason.message : result.reason);
+      log.warn('batchGetTokenPrices item failed', { error: result.reason instanceof Error ? result.reason.message : String(result.reason) });
     }
   }
   return fulfilled;

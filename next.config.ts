@@ -5,9 +5,11 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   experimental: {
     viewTransition: true,
+    optimizePackageImports: ['lucide-react'],
   },
   serverExternalPackages: ['@solana/web3.js', 'viem', '@meteora-ag/dynamic-bonding-curve-sdk'],
   images: {
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       { protocol: 'https', hostname: 'pbs.twimg.com' },
       { protocol: 'https', hostname: 'abs.twimg.com' },
@@ -24,7 +26,7 @@ export default withSentryConfig(nextConfig, {
   project: process.env.SENTRY_PROJECT,
   silent: !process.env.CI,
   widenClientFileUpload: true,
-  disableLogger: true,
+  webpack: { treeshake: { removeDebugLogging: true } },
   tunnelRoute: '/monitoring',
   sourcemaps: { deleteSourcemapsAfterUpload: true },
 });

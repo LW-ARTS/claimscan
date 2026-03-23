@@ -3,6 +3,8 @@ import { fetchTokenMetadataBatch } from '@/lib/chains/solana';
 import { heliusDasRpc, isHeliusAvailable } from '@/lib/helius/client';
 import { sanitizeTokenSymbol } from '@/lib/utils';
 import type { TokenFee } from './types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('solana-metadata');
 
 // ═══════════════════════════════════════════════
 // Helius DAS API (primary) + Metaplex on-chain (fallback)
@@ -110,7 +112,7 @@ export async function enrichSolanaTokenSymbols(
       };
     });
   } catch (err) {
-    console.warn('[solana-metadata] enrichSolanaTokenSymbols failed:', err instanceof Error ? err.message : err);
+    log.warn('enrichSolanaTokenSymbols failed', { error: err instanceof Error ? err.message : String(err) });
     return fees;
   }
 }

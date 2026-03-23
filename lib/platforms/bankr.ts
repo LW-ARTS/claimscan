@@ -9,6 +9,8 @@ import type {
   TokenFee,
   ClaimEvent,
 } from './types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('bankr');
 
 // ═══════════════════════════════════════════════
 // Bankr Agent API (limited fallback)
@@ -61,14 +63,14 @@ async function promptBankrAgent(prompt: string, timeoutMs = AGENT_SHORT_TIMEOUT_
     });
 
     if (!submitRes.ok) {
-      console.warn(`[bankr] agent prompt returned HTTP ${submitRes.status}`);
+      log.warn(`agent prompt returned HTTP ${submitRes.status}`);
       return null;
     }
 
     const data = (await submitRes.json()) as AgentPromptResponse & { success?: boolean };
 
     if (data.success === false) {
-      console.warn('[bankr] agent prompt returned success=false');
+      log.warn('agent prompt returned success=false');
       return null;
     }
 
@@ -90,18 +92,18 @@ async function promptBankrAgent(prompt: string, timeoutMs = AGENT_SHORT_TIMEOUT_
 
       if (job.status === 'completed') return job.response || job.result || null;
       if (job.status === 'failed' || job.status === 'cancelled') {
-        console.warn(`[bankr] agent job ${data.jobId} ${job.status}`, (job as Record<string, unknown>).error || '');
+        log.warn(`agent job ${data.jobId} ${job.status}`, { error: String((job as Record<string, unknown>).error || '') });
         return null;
       }
     }
 
-    console.warn(`[bankr] agent job ${data.jobId} timed out after ${MAX_POLL_ATTEMPTS} polls`);
+    log.warn(`agent job ${data.jobId} timed out after ${MAX_POLL_ATTEMPTS} polls`);
     return null;
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       return null;
     }
-    console.warn('[bankr] agent prompt failed:', err instanceof Error ? err.message : err);
+    log.warn('agent prompt failed', { error: err instanceof Error ? err.message : String(err) });
     return null;
   } finally {
     clearTimeout(deadline);
@@ -142,7 +144,7 @@ function parseAgentFeeResponse(response: string): ParsedAgentFee[] {
         if (fees.length > 0) return fees;
       }
     } catch (jsonErr) {
-      console.warn('[bankr] JSON parse failed, trying pipe-delimited:', jsonErr instanceof Error ? jsonErr.message : jsonErr);
+      log.warn('JSON parse failed, trying pipe-delimited', { error: jsonErr instanceof Error ? jsonErr.message : String(jsonErr) });
     }
   }
 
@@ -184,7 +186,7 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
     if (/no (token|fee|result)|not found|\[\s*\]|none|zero|empty/i.test(response)) {
       return [];
     }
-    console.warn('[bankr] could not parse agent response:', response.slice(0, 300));
+    log.warn('could not parse agent response', { error: response.slice(0, 300) });
     return [];
   }
 
@@ -194,24 +196,24 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
 
   const validated = parsed.filter((p) => {
     if (!EVM_ADDR_RE.test(p.tokenAddress)) {
-      console.warn(`[bankr] LLM rejected: invalid address "${p.tokenAddress}"`);
+      log.warn(`LLM rejected: invalid address "${p.tokenAddress}"`);
       return false;
     }
     try {
       const earnedWei = BigInt(wethToWei(p.earnedWeth) || '0');
       if (earnedWei > MAX_FEE_WEI) {
-        console.warn(`[bankr] LLM rejected: ${p.earnedWeth} ETH exceeds 1000 ETH cap for ${p.tokenAddress}`);
+        log.warn(`LLM rejected: ${p.earnedWeth} ETH exceeds 1000 ETH cap for ${p.tokenAddress}`);
         return false;
       }
     } catch (err) {
-      console.warn(`[bankr] LLM rejected: BigInt parse failed for ${p.tokenAddress}:`, err instanceof Error ? err.message : err);
+      log.warn(`LLM rejected: BigInt parse failed for ${p.tokenAddress}`, { error: err instanceof Error ? err.message : String(err) });
       return false;
     }
     return true;
   });
 
   if (validated.length > 0) {
-    console.info(`[bankr] LLM fees for @${safeHandle}:`, validated.map((p) => `${p.tokenSymbol}:${p.earnedWeth}`).join(', '));
+    log.info(`LLM fees for @${safeHandle}`, { fees: validated.map((p) => `${p.tokenSymbol}:${p.earnedWeth}`).join(', ') });
   }
 
   return validated
@@ -230,7 +232,7 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
         try {
           totalEarned = (BigInt(claimed) + BigInt(unclaimed)).toString();
         } catch (mathErr) {
-          console.warn('[bankr] BigInt arithmetic failed for earned calculation:', mathErr instanceof Error ? mathErr.message : mathErr);
+          log.warn('BigInt arithmetic failed for earned calculation', { error: mathErr instanceof Error ? mathErr.message : String(mathErr) });
           totalEarned = unclaimed;
         }
       }
@@ -388,7 +390,7 @@ async function searchLaunchesPaginated(
         { headers: bankrAuthHeaders(), signal: combinedSignal }
       );
       clearTimeout(timeout);
-      if (!res.ok) { console.warn(`[bankr] searchLaunchesPaginated returned HTTP ${res.status}`); break; }
+      if (!res.ok) { log.warn(`searchLaunchesPaginated returned HTTP ${res.status}`); break; }
 
       const data = (await res.json()) as BankrPaginatedResponse;
       for (const token of data.results ?? []) {
@@ -399,7 +401,7 @@ async function searchLaunchesPaginated(
       if (!data.nextCursor) break;
       cursor = data.nextCursor;
     } catch (err) {
-      console.warn('[bankr] searchLaunchesPaginated failed:', err instanceof Error ? err.message : err);
+      log.warn('searchLaunchesPaginated failed', { error: err instanceof Error ? err.message : String(err) });
       break;
     }
   }
@@ -418,7 +420,7 @@ async function searchLaunchesPaginated(
   });
 
   if (filtered.length < all.length) {
-    console.info(`[bankr] Post-filter: ${all.length} → ${filtered.length} tokens (query="${query}")`);
+    log.info(`Post-filter: ${all.length} → ${filtered.length} tokens (query="${query}")`);
   }
 
   return filtered;
@@ -434,10 +436,10 @@ export async function searchLaunches(query: string): Promise<BankrSearchResponse
       { headers: bankrAuthHeaders(), signal: controller.signal }
     );
     clearTimeout(timeout);
-    if (!res.ok) { console.warn(`[bankr] searchLaunches returned HTTP ${res.status}`); return {}; }
+    if (!res.ok) { log.warn(`searchLaunches returned HTTP ${res.status}`); return {}; }
     return (await res.json()) as BankrSearchResponse;
   } catch (err) {
-    console.warn('[bankr] searchLaunches failed:', err instanceof Error ? err.message : err);
+    log.warn('searchLaunches failed', { error: err instanceof Error ? err.message : String(err) });
     return {};
   }
 }
@@ -457,12 +459,12 @@ export async function getTokenFees(tokenAddress: string, externalSignal?: AbortS
       signal: combinedSignal,
     });
     clearTimeout(timeout);
-    if (!res.ok) { console.warn(`[bankr] getTokenFees returned HTTP ${res.status} for ${tokenAddress}`); return null; }
+    if (!res.ok) { log.warn(`getTokenFees returned HTTP ${res.status} for ${tokenAddress}`); return null; }
     const data = (await res.json()) as BankrTokenFeeResponse;
     dopplerCacheSet(tokenAddress, data);
     return data;
   } catch (err) {
-    console.warn('[bankr] getTokenFees failed:', err instanceof Error ? err.message : err);
+    log.warn('getTokenFees failed', { error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }
@@ -488,7 +490,7 @@ export function wethToWei(val: string | null | undefined): string {
   const result = (whole + frac).replace(/^0+/, '') || '0';
   // Reject values above 1 billion ETH (obviously wrong from LLM)
   if (result.length > 27) {
-    console.warn('[bankr] wethToWei produced unreasonably large value, clamping to 0');
+    log.warn('wethToWei produced unreasonably large value, clamping to 0');
     return '0';
   }
   return result;
@@ -653,7 +655,7 @@ export const bankrAdapter: PlatformAdapter = {
       try {
         return BigInt(f.totalUnclaimed) > 0n;
       } catch (err) {
-        console.warn('[bankr] BigInt parse failed in getLiveUnclaimedFees:', err instanceof Error ? err.message : err);
+        log.warn('BigInt parse failed in getLiveUnclaimedFees', { error: err instanceof Error ? err.message : String(err) });
         return parseFloat(f.totalUnclaimed) > 0;
       }
     });

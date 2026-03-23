@@ -1,9 +1,27 @@
 import 'server-only';
 import { BAGS_API_BASE } from '@/lib/constants';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('bags-api');
 
 // ═══════════════════════════════════════════════
-// Multi-key rotation with per-key rate limit tracking
+// Multi-key rotation with distributed rate limit tracking (Upstash Redis)
+// Falls back to in-memory Map when Redis is not configured.
 // ═══════════════════════════════════════════════
+
+let redis: import('@upstash/redis').Redis | null = null;
+const REDIS_PREFIX = 'claimscan:bags:rl:';
+
+try {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (url && token) {
+    // Dynamic import resolved at build time by bundler — lazy init avoids import cycle
+    const { Redis } = require('@upstash/redis') as typeof import('@upstash/redis');
+    redis = new Redis({ url, token });
+  }
+} catch {
+  // Redis unavailable — fall back to in-memory
+}
 
 /** Parse API keys from BAGS_API_KEYS (comma-separated) or legacy BAGS_API_KEY. */
 export function getApiKeys(): string[] {
@@ -14,32 +32,75 @@ export function getApiKeys(): string[] {
   return [];
 }
 
-/** Per-key rate limit expiry timestamps. */
-const keyRateLimits = new Map<string, number>();
-let keyIndex = 0;
+/** In-memory fallback when Redis is unavailable. */
+const memRateLimits = new Map<string, number>();
+let memKeyIndex = 0;
+
+/** Mark a key as rate-limited until `resetAt` (epoch ms). */
+async function markKeyLimited(keyIdx: number, resetAt: number): Promise<void> {
+  const ttlMs = resetAt - Date.now();
+  if (ttlMs <= 0) return;
+  if (redis) {
+    try {
+      await redis.set(`${REDIS_PREFIX}${keyIdx}`, resetAt, { px: ttlMs });
+      return;
+    } catch {
+      // Redis write failed — fall through to memory
+    }
+  }
+  memRateLimits.set(String(keyIdx), resetAt);
+}
+
+/** Check if a key is currently rate-limited. Returns resetAt or 0. */
+async function getKeyResetAt(keyIdx: number): Promise<number> {
+  if (redis) {
+    try {
+      const val = await redis.get<number>(`${REDIS_PREFIX}${keyIdx}`);
+      return val ?? 0;
+    } catch {
+      // Redis read failed — fall through to memory
+    }
+  }
+  return memRateLimits.get(String(keyIdx)) ?? 0;
+}
 
 /** Get the next available (non-rate-limited) API key, or null if all exhausted. */
-export function getAvailableKey(): string | null {
+export async function getAvailableKey(): Promise<string | null> {
   const keys = getApiKeys();
   if (keys.length === 0) return null;
   const now = Date.now();
+
+  // Get round-robin index from Redis for distributed rotation
+  let startIdx = memKeyIndex;
+  if (redis) {
+    try {
+      const next = await redis.incr(`${REDIS_PREFIX}idx`);
+      startIdx = (next - 1) % keys.length;
+    } catch {
+      // Redis unavailable — use memory index
+    }
+  }
+
   for (let i = 0; i < keys.length; i++) {
-    const idx = (keyIndex + i) % keys.length;
-    const key = keys[idx];
-    const limitedUntil = keyRateLimits.get(key) ?? 0;
+    const idx = (startIdx + i) % keys.length;
+    const limitedUntil = await getKeyResetAt(idx);
     if (now >= limitedUntil) {
-      keyIndex = (idx + 1) % keys.length;
-      return key;
+      memKeyIndex = (idx + 1) % keys.length;
+      return keys[idx];
     }
   }
   return null;
 }
 
-export function isRateLimited(): boolean {
+export async function isRateLimited(): Promise<boolean> {
   const keys = getApiKeys();
   if (keys.length === 0) return true;
   const now = Date.now();
-  return keys.every((k) => (keyRateLimits.get(k) ?? 0) > now);
+  for (let i = 0; i < keys.length; i++) {
+    const resetAt = await getKeyResetAt(i);
+    if (now >= resetAt) return false;
+  }
+  return true;
 }
 
 /**
@@ -54,7 +115,7 @@ export async function bagsFetch<T>(
   const keys = getApiKeys();
   if (attempt >= keys.length) return null;
 
-  const apiKey = getAvailableKey();
+  const apiKey = await getAvailableKey();
   if (!apiKey) return null;
 
   try {
@@ -77,29 +138,28 @@ export async function bagsFetch<T>(
         const body = await res.json() as { resetTime?: string };
         if (body.resetTime) resetAt = new Date(body.resetTime).getTime();
       } catch (parseErr) {
-        console.warn('[bags] Could not parse 429 resetTime, using 5min default:', parseErr instanceof Error ? parseErr.message : parseErr);
+        log.warn('Could not parse 429 resetTime, using 5min default', { error: parseErr instanceof Error ? parseErr.message : String(parseErr) });
       }
-      keyRateLimits.set(apiKey, resetAt);
-      const keysLeft = keys.filter((k) => (keyRateLimits.get(k) ?? 0) <= Date.now()).length;
       const keyIdx = keys.indexOf(apiKey);
-      console.warn(`[bags] key #${keyIdx} rate limited until ${new Date(resetAt).toISOString()} (${keysLeft} keys remaining)`);
-      if (keysLeft > 0) return bagsFetch<T>(path, options, attempt + 1);
-      return null;
+      await markKeyLimited(keyIdx, resetAt);
+      log.warn(`key #${keyIdx} rate limited until ${new Date(resetAt).toISOString()}`);
+      // Try next key if any remain
+      return bagsFetch<T>(path, options, attempt + 1);
     }
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
         const keyIdx = keys.indexOf(apiKey);
-        console.error(`[bags] CRITICAL: API key #${keyIdx} returned HTTP ${res.status} for ${path} — possible key revocation`);
+        log.error(`CRITICAL: API key #${keyIdx} returned HTTP ${res.status} for ${path} — possible key revocation`);
       } else if (res.status >= 500) {
-        console.error(`[bags] fetch ${path} returned HTTP ${res.status} (server error)`);
+        log.error(`fetch ${path} returned HTTP ${res.status} (server error)`);
       } else {
-        console.warn(`[bags] fetch ${path} returned HTTP ${res.status}`);
+        log.warn(`fetch ${path} returned HTTP ${res.status}`);
       }
       return null;
     }
     return await res.json() as T;
   } catch (err) {
-    console.warn(`[bags] fetch ${path} failed:`, err instanceof Error ? err.message : err);
+    log.warn(`fetch ${path} failed`, { error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }
