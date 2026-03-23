@@ -169,7 +169,6 @@ export function sanitizeTokenSymbol(val: unknown): string | null {
 export function sanitizeTokenName(val: unknown): string | null {
   if (typeof val !== 'string') return null;
   // Strip control chars + Unicode bidi/invisible characters (prevents phishing via invisible chars)
-  // eslint-disable-next-line no-control-regex
   return val.replace(/[\x00-\x1f\x7f\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g, '').trim().slice(0, 100) || null;
 }
 
