@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   experimental: {
     viewTransition: true,
+    optimizePackageImports: ['lucide-react'],
   },
   serverExternalPackages: ['@solana/web3.js', 'viem', '@meteora-ag/dynamic-bonding-curve-sdk'],
   images: {

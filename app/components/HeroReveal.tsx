@@ -5,11 +5,11 @@ import { useState, useEffect, useCallback, startTransition, type ReactNode } fro
 /**
  * Full-screen reveal animation for the homepage hero.
  *
- * Timeline (3 s total):
- *  0.0 s - 0.7 s  Logo scales in with subtle blur clear
- *  0.4 s - 0.8 s  "ClaimScan" text fades in below logo
- *  0.8 s - 2.0 s  Hold (logo + text visible)
- *  2.0 s - 3.0 s  Overlay fades out, content animations begin
+ * Timeline (1.3 s total):
+ *  0.0 s - 0.4 s  Logo scales in with subtle blur clear
+ *  0.2 s - 0.5 s  "ClaimScan" text fades in below logo
+ *  0.0 s - 0.8 s  Hold (logo + text visible, OVERLAY_HOLD_MS)
+ *  0.8 s - 1.3 s  Overlay fades out (OVERLAY_FADE_MS), content animations begin
  *
  * Only plays once per browser session (sessionStorage).
  * Skips entirely when prefers-reduced-motion is enabled.

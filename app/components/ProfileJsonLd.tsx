@@ -67,7 +67,7 @@ export function ProfileJsonLd({
         ],
       },
     ],
-  }).replace(/</g, '\\u003c');
+  }).replace(/[<>&]/g, c => ({ '<': '\\u003c', '>': '\\u003e', '&': '\\u0026' })[c]!);
 
   return (
     <script

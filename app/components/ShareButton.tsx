@@ -10,13 +10,6 @@ interface ShareButtonProps {
   platformCount: number;
 }
 
-function saveButtonStyle({ saveFailed, saved, saving }: { saveFailed: boolean; saved: boolean; saving: boolean }) {
-  if (saveFailed) return 'border-red-500/30 bg-red-500/10 text-red-400';
-  if (saved) return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
-  if (saving) return 'border-border bg-muted/60 text-muted-foreground/50 cursor-wait';
-  return 'border-border bg-muted/40 text-muted-foreground cursor-pointer hover:bg-muted hover:border-foreground/20 hover:text-foreground';
-}
-
 export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -102,8 +95,8 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
         <button
           onClick={handleSaveImage}
           disabled={saving}
-          className={`flex h-14 flex-1 cursor-pointer items-center justify-center gap-2.5 border text-sm font-medium transition-all active:scale-[0.97] ${
-            saveFailed ? 'border-red-300 text-red-500' : saved ? 'border-foreground text-foreground' : 'border-border text-foreground hover:bg-muted'
+          className={`flex h-14 flex-1 items-center justify-center gap-2.5 border text-sm font-medium transition-all active:scale-[0.97] ${
+            saveFailed ? 'border-destructive/30 text-destructive' : saved ? 'border-foreground text-foreground' : saving ? 'border-border text-muted-foreground cursor-wait opacity-60' : 'border-border text-foreground cursor-pointer hover:bg-muted'
           }`}
   
         >

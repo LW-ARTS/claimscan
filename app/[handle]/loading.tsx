@@ -23,7 +23,7 @@ export default function Loading() {
 
         {/* SCANNING label */}
         <div
-          className="signal-fade-up signal-scan-label mb-6 font-mono text-[10px] font-medium uppercase tracking-[3px] text-black/28"
+          className="signal-fade-up signal-scan-label mb-6 font-mono text-[10px] font-medium uppercase tracking-[3px] text-foreground/28"
           style={{ animationDelay: '0.1s' }}
         >
           Scanning
@@ -40,11 +40,11 @@ export default function Loading() {
           <svg className="signal-ring-outer signal-ring-outer-svg absolute h-[220px] w-[220px]" viewBox="0 0 220 220">
             <circle
               cx="110" cy="110" r="108"
-              fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth="1.5"
+              fill="none" stroke="currentColor" strokeWidth="1.5" className="text-foreground/[0.07]"
             />
             <circle
               cx="110" cy="110" r="108"
-              fill="none" stroke="rgba(0,0,0,0.45)" strokeWidth="1.5"
+              fill="none" stroke="currentColor" strokeWidth="1.5" className="text-foreground/45"
               strokeLinecap="round" strokeDasharray="80 614"
               transform="rotate(-90 110 110)"
             />
@@ -62,7 +62,7 @@ export default function Loading() {
               <svg className="signal-reticle absolute inset-0 h-full w-full" viewBox="0 0 32 32">
                 <circle
                   cx="16" cy="16" r="14"
-                  stroke="rgba(0,0,0,0.18)" strokeWidth="1"
+                  stroke="currentColor" strokeWidth="1" className="text-foreground/[0.18]"
                   fill="none" strokeDasharray="3 5"
                 />
               </svg>

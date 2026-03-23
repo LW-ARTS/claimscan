@@ -81,7 +81,10 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
         handle = handle.slice(1);
       }
 
-      track('search_initiated', { handle });
+      const safeHandle = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(handle)
+        ? `${handle.slice(0, 6)}...${handle.slice(-4)}`
+        : handle;
+      track('search_initiated', { handle: safeHandle });
       router.push(`/${encodeURIComponent(handle)}`);
       timerRef.current = setTimeout(() => setLoading(false), 10_000);
     },

@@ -5,6 +5,7 @@ import { invalidatePositionsCache } from '@/lib/platforms/bags-api';
 import { verifyConfirmToken } from '@/lib/claim/hmac';
 import { CLAIMSCAN_FEE_WALLET } from '@/lib/constants';
 import type { ClaimAttemptStatus } from '@/lib/supabase/types';
+import { trackClaimEvent, trackFeeCollection } from '@/lib/monitoring';
 
 /**
  * Valid forward-only status transitions.
@@ -102,6 +103,7 @@ export async function POST(request: Request) {
       // Actual amount will be reconciled via cron once RPC is available.
       // Never trust client-supplied rawFeeLamports for unverified records.
       console.error(`[claim/confirm] FEE_VERIFICATION_FAILED: sig=${feeSig} wallet=${feeWallet} lamports=${rawFeeLamports} — inserting unverified record with amount=0`);
+      trackClaimEvent('failure', { reason: 'fee_verification_rpc_error', wallet: feeWallet ?? '', feeLamports: rawFeeLamports ?? '0' });
       try {
         const svc = createServiceClient();
         await svc.from('claim_fees').insert({
@@ -130,6 +132,10 @@ export async function POST(request: Request) {
     });
     if (insertError && insertError.code !== '23505') {
       console.error('[claim/confirm] Fee log insert FAILED (revenue loss):', insertError.message, { sig: feeSig, wallet: feeWallet });
+      trackClaimEvent('failure', { reason: 'fee_insert_error', wallet: feeWallet ?? '', feeLamports });
+    } else {
+      trackFeeCollection(true, feeLamports, 0);
+      trackClaimEvent('fee_collected', { wallet: feeWallet ?? '', feeLamports });
     }
     return NextResponse.json({ ok: true });
   }
@@ -242,6 +248,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Another active claim exists for this token' }, { status: 409 });
     }
     console.error('[claim/confirm] Update error:', updateError.message);
+    trackClaimEvent('failure', { reason: 'db_update_error', claimAttemptId, wallet: wallet ?? '', status: validatedStatus });
     return NextResponse.json({ error: 'Failed to update claim status' }, { status: 500 });
   }
   if (updateCount === 0) {
@@ -252,6 +259,12 @@ export async function POST(request: Request) {
   // On confirmed: invalidate positions cache
   if (validatedStatus === 'confirmed') {
     invalidatePositionsCache(attempt.wallet_address);
+    trackClaimEvent('success', { claimAttemptId, wallet: wallet ?? '', platform: attempt.platform ?? '', chain: attempt.chain ?? '' });
+  }
+
+  // Track claim failures reported by the client
+  if (validatedStatus === 'failed') {
+    trackClaimEvent('failure', { reason: errorReason ?? 'unknown', claimAttemptId, wallet: wallet ?? '', platform: attempt.platform ?? '' });
   }
 
   return NextResponse.json({ ok: true, status: validatedStatus });
