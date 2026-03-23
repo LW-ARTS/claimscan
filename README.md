@@ -134,4 +134,4 @@ Fullstack Web3 studio. 408+ crypto projects delivered. $1.6B+ in market cap gene
 
 ## License
 
-All Rights Reserved. This repository is for reference and demonstration purposes only. The source code is proprietary and not included.
+Proprietary — All Rights Reserved. See [LICENSE](LICENSE) for full terms. View-only for personal reference. No use, copy, deploy, or derivative works without written permission from LW ARTS.

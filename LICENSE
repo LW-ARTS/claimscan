@@ -1,13 +1,52 @@
-Copyright (c) 2026 LW ARTS
+ClaimScan - Proprietary License
+Copyright (c) 2026 LW ARTS. All Rights Reserved.
 
-All Rights Reserved.
+1. Ownership
+All intellectual property rights in and to this repository, including but not limited to source code, smart contract logic, tokenomics models, API schemas, database schemas, UI/UX designs, branding assets, documentation, and any derivative works, are and shall remain the exclusive property of LW ARTS (hereinafter "Owner").
 
-This repository and its contents are provided for reference and demonstration
-purposes only. No part of the source code, design, or implementation may be
-reproduced, distributed, or used without explicit written permission from
-LW ARTS.
+2. Grant of Rights
+No license, right, or interest in any intellectual property of the Owner is granted to any person or entity by virtue of this repository being publicly accessible. Public visibility does not constitute a grant of permission to use, copy, modify, merge, publish, distribute, sublicense, or sell any portion of this software or its associated assets.
 
-For inquiries:
-https://lwdesigns.art
-https://x.com/lwartss
-https://t.me/lwarts
+3. Permitted Use
+You may view and read the source code in this repository solely for personal, non-commercial reference purposes. This means:
+* Allowed: reading code to learn patterns, techniques, or architectural approaches for your own independent work.
+* Not allowed: copying, reproducing, forking, cloning for deployment, adapting, integrating, or incorporating any part of this codebase, in whole or in part, into any other project, product, or service, whether commercial or non-commercial, without prior explicit written permission from the Owner.
+
+4. Restrictions
+Without the Owner's prior written consent, you may not:
+(a) Use, copy, modify, or create derivative works of any part of this software;
+(b) Deploy, host, or run this software or any portion thereof in any environment (development, staging, production, or otherwise);
+(c) Reverse engineer, decompile, or disassemble any compiled or obfuscated components;
+(d) Remove, alter, or obscure any copyright, trademark, or proprietary notices;
+(e) Use the Owner's name, logo, branding, or trademarks in any manner that implies endorsement, affiliation, or sponsorship;
+(f) Scrape, crawl, or programmatically extract data or content from any deployed instance of this software;
+(g) Train machine learning or AI models on any part of this codebase.
+
+5. Contributions
+Any contribution (pull request, patch, issue with proposed code, or other submission) made to this repository automatically and irrevocably assigns all intellectual property rights in that contribution to the Owner. By submitting a contribution, you represent that you have the right to make such assignment and that the contribution is your original work. If you do not agree to this assignment, do not submit contributions.
+
+6. Disclaimer of Warranties
+THIS SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
+
+THE OWNER MAKES NO WARRANTY THAT THE SOFTWARE WILL BE UNINTERRUPTED, SECURE, ERROR-FREE, OR FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS.
+
+7. Limitation of Liability
+IN NO EVENT SHALL THE OWNER BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF DIGITAL ASSETS, CRYPTOCURRENCY, TOKENS, OR FUNDS; LOSS OF PROFITS, DATA, OR BUSINESS OPPORTUNITY; OR COST OF PROCUREMENT OF SUBSTITUTE SERVICES, ARISING OUT OF OR IN CONNECTION WITH THE USE, INABILITY TO USE, OR RELIANCE ON THIS SOFTWARE, REGARDLESS OF THE THEORY OF LIABILITY (CONTRACT, TORT, NEGLIGENCE, STRICT LIABILITY, OR OTHERWISE), EVEN IF THE OWNER HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+8. DeFi and Blockchain Disclaimer
+This software interacts with decentralized protocols, smart contracts, and blockchain networks. The Owner does not control, operate, or guarantee the behavior of any third-party protocol, smart contract, or blockchain network. Users interact with on-chain systems entirely at their own risk. Nothing in this software constitutes financial, investment, tax, or legal advice.
+
+9. Governing Law
+This license shall be governed by and construed in accordance with the laws of the State of Delaware, United States, without regard to its conflict of laws provisions.
+
+10. Severability
+If any provision of this license is held to be unenforceable or invalid, that provision shall be modified to the minimum extent necessary to make it enforceable, and the remaining provisions shall continue in full force and effect.
+
+11. Enforcement
+The Owner reserves the right to enforce this license through any legal means available, including but not limited to injunctive relief, statutory damages under the U.S. Copyright Act (17 U.S.C. § 504), and recovery of attorneys' fees and costs.
+
+12. Contact
+For licensing inquiries, permissions, or partnership proposals:
+* Web: https://lwdesigns.art
+* X: https://x.com/lwartss
+* Telegram: https://t.me/lwarts
