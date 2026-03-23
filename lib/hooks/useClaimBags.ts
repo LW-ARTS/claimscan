@@ -7,6 +7,7 @@ import {
   TransactionMessage,
   SystemProgram,
   PublicKey,
+  ComputeBudgetProgram,
 } from '@solana/web3.js';
 import { getBase58Encoder } from '@solana/codecs';
 import { signedFetch } from '@/lib/signed-fetch';
@@ -94,7 +95,7 @@ export interface ClaimResult {
 }
 
 interface UseClaimBagsReturn {
-  execute: (tokenMints: string[]) => Promise<void>;
+  execute: (tokenMints: string[], cfTurnstileToken?: string) => Promise<void>;
   cancel: () => void;
   phase: ClaimPhase;
   progress: { completed: number; failed: number; total: number };
@@ -205,7 +206,7 @@ export function useClaimBags(): UseClaimBagsReturn {
     setError('Claim cancelled');
   }, []);
 
-  const execute = useCallback(async (tokenMints: string[]) => {
+  const execute = useCallback(async (tokenMints: string[], cfTurnstileToken?: string) => {
     if (!publicKey || !signAllTransactions) {
       setError('Wallet not connected');
       return;
@@ -241,7 +242,7 @@ export function useClaimBags(): UseClaimBagsReturn {
         const res = await signedFetch('/api/claim/bags', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wallet: walletAddress, tokenMints: chunk }),
+          body: JSON.stringify({ wallet: walletAddress, tokenMints: chunk, ...(cfTurnstileToken ? { cfTurnstileToken } : {}) }),
           signal: controller.signal,
         });
 
@@ -319,10 +320,16 @@ export function useClaimBags(): UseClaimBagsReturn {
             toPubkey: new PublicKey(CLAIMSCAN_FEE_WALLET),
             lamports: feeLamports,
           });
+
+          // Priority fee: 50,000 microlamports/CU with 200K CU limit
+          // Ensures fee tx lands even during moderate congestion
+          const computeUnitLimit = ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 });
+          const computeUnitPrice = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 });
+
           const feeMessage = new TransactionMessage({
             payerKey: publicKey,
             recentBlockhash: latestBlockhash.blockhash,
-            instructions: [feeInstruction],
+            instructions: [computeUnitLimit, computeUnitPrice, feeInstruction],
           }).compileToV0Message();
           unsignedFeeTx = new VersionedTransaction(feeMessage);
         } catch (feeErr) {
@@ -633,10 +640,12 @@ export function useClaimBags(): UseClaimBagsReturn {
               toPubkey: new PublicKey(CLAIMSCAN_FEE_WALLET),
               lamports: feeLamports,
             });
+            const freshComputeUnitLimit = ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 });
+            const freshComputeUnitPrice = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 });
             const freshMessage = new TransactionMessage({
               payerKey: publicKey,
               recentBlockhash: freshBlockhash.blockhash,
-              instructions: [freshInstruction],
+              instructions: [freshComputeUnitLimit, freshComputeUnitPrice, freshInstruction],
             }).compileToV0Message();
             const freshTx = new VersionedTransaction(freshMessage);
             // Re-sign requires a second wallet popup (only for Ledger/slow signers)

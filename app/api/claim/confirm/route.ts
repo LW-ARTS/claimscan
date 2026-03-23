@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { Connection } from '@solana/web3.js';
 import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
 import { createServiceClient } from '@/lib/supabase/service';
 import { invalidatePositionsCache } from '@/lib/platforms/bags-api';
@@ -6,6 +7,43 @@ import { verifyConfirmToken } from '@/lib/claim/hmac';
 import { CLAIMSCAN_FEE_WALLET } from '@/lib/constants';
 import type { ClaimAttemptStatus } from '@/lib/supabase/types';
 import { trackClaimEvent, trackFeeCollection } from '@/lib/monitoring';
+
+// ═══════════════════════════════════════════════
+// Finalization verification (fire-and-forget)
+// ═══════════════════════════════════════════════
+
+const FINALIZE_RPC = process.env.SOLANA_RPC_URL?.split(',')[0] || 'https://api.mainnet-beta.solana.com';
+
+/**
+ * After a claim is marked as 'confirmed', wait for on-chain finalization
+ * and upgrade the status to 'finalized'. This runs asynchronously after
+ * the response is sent so it never blocks the user.
+ *
+ * Uses an optimistic lock (eq status='confirmed') to avoid overwriting
+ * any concurrent status change (e.g., if a cron already finalized it).
+ */
+async function verifyFinalization(
+  txSignature: string,
+  claimAttemptId: string,
+  supabase: ReturnType<typeof createServiceClient>
+) {
+  // Wait for finalization — typically 6-12s after confirmed on Solana
+  await new Promise((r) => setTimeout(r, 15_000));
+
+  const connection = new Connection(FINALIZE_RPC, 'finalized');
+  const tx = await connection.getTransaction(txSignature, {
+    commitment: 'finalized',
+    maxSupportedTransactionVersion: 0,
+  });
+
+  if (tx && !tx.meta?.err) {
+    await supabase
+      .from('claim_attempts')
+      .update({ status: 'finalized' as ClaimAttemptStatus })
+      .eq('id', claimAttemptId)
+      .eq('status', 'confirmed'); // Optimistic lock: only upgrade if still confirmed
+  }
+}
 
 /**
  * Valid forward-only status transitions.
@@ -261,10 +299,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Claim status was already updated' }, { status: 409 });
   }
 
-  // On confirmed: invalidate positions cache
+  // On confirmed: invalidate positions cache + schedule finalization upgrade
   if (validatedStatus === 'confirmed') {
     invalidatePositionsCache(attempt.wallet_address);
     trackClaimEvent('success', { claimAttemptId, wallet: wallet ?? '', platform: attempt.platform ?? '', chain: attempt.chain ?? '' });
+
+    // Fire-and-forget: upgrade confirmed → finalized after on-chain finalization.
+    // This runs after the response is sent so it doesn't block the user.
+    if (txSignature) {
+      verifyFinalization(txSignature, claimAttemptId, supabase).catch((err) => {
+        console.warn('[claim/confirm] Finalization check failed:', err instanceof Error ? err.message : err);
+      });
+    }
   }
 
   // Track claim failures reported by the client

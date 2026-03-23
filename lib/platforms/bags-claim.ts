@@ -23,7 +23,7 @@ export interface ClaimTransactionResult {
 
 /**
  * Generate claim transactions for a single token via Bags API v3.
- * Sends the full position object as required by the v3 endpoint.
+ * v3 accepts { feeClaimer, tokenMint } and handles all logic server-side.
  */
 async function generateClaimTransactions(
   wallet: string,
@@ -34,7 +34,7 @@ async function generateClaimTransactions(
       '/token-launch/claim-txs/v3',
       {
         method: 'POST',
-        body: { wallet, position },
+        body: { feeClaimer: wallet, tokenMint: position.baseMint },
       }
     );
 
