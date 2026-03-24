@@ -71,14 +71,28 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 - **Shareable receipts**: OG image cards for social sharing
 - **Privacy-first**: Searches anonymized before logging
 
-### Claiming (V1.5)
-- **Zero-custody**: Transactions built server-side, signed exclusively in your wallet
-- **Pre-sign simulation**: Every transaction simulated before wallet prompt
-- **Priority fees**: Dynamic compute unit pricing for reliable on-chain confirmation
-- **Finalization tracking**: Claims tracked from signing through on-chain finalization
-- **Verified requests**: Claims cryptographically verified end-to-end (HMAC + request signing)
-- **Hardware wallet support**: Works with Ledger and other hardware wallets
-- **Auto-discovery**: Detects any Wallet Standard compatible wallet
+### Claiming (V1.5) ✦ Bags.fm Live
+V1.5 is the update where ClaimScan went from read-only scanner to full claimer. Bags.fm is the first platform with direct on-chain claiming built in. No third-party custody, no approvals, no token permissions. Connect your wallet, review the simulation, sign, done.
+
+**How the claim flow works:**
+1. ClaimScan detects unclaimed fees on Bags.fm for your wallet
+2. A claim transaction is built server-side with optimized compute units
+3. The transaction is simulated before it ever reaches your wallet
+4. You review and sign in your own wallet (Phantom, Backpack, Ledger, or any Wallet Standard compatible wallet)
+5. ClaimScan tracks the transaction from submission through on-chain finalization
+6. Claim status updates in real time: `pending → signing → submitted → confirmed → finalized`
+
+**Claim architecture:**
+- **Zero-custody**: Your keys never leave your wallet. Transactions are constructed server-side but signed exclusively client-side
+- **Pre-sign simulation**: Every transaction is simulated on-chain before the wallet prompt appears, so failed claims are caught before you spend gas
+- **Priority fees**: Dynamic compute unit pricing calibrated per transaction for reliable confirmation, even during network congestion
+- **Turnstile-gated**: Every claim request is verified through Cloudflare Turnstile to prevent bot abuse and replay attacks
+- **Finalization tracking**: Claims are tracked end-to-end with immutable state transitions. Once finalized, a claim cannot be reverted or replayed
+- **Cryptographic verification**: Claim requests are signed and verified at every step, from client to server to chain
+- **Hardware wallet support**: Full compatibility with Ledger and other hardware signers
+- **Auto-discovery**: Wallet detection via Wallet Standard protocol. No manual wallet imports needed
+
+> More platforms coming in V2. Bags.fm is just the start.
 
 ### Security
 - **Defense in depth**: Multiple layers of abuse prevention across all endpoints
@@ -122,7 +136,7 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 
 | Version | Status | Highlights |
 |---------|--------|------------|
-| **V1.5** | **Live** | 9 platforms, Bags.fm claim (v3 + Turnstile + priority fees), defense-in-depth security, Helius DAS indexing |
+| **V1.5** | **Live** | 9 platforms, **first on-chain claim flow (Bags.fm)**, Turnstile + priority fees, defense-in-depth security, Helius DAS indexing |
 | V2 | Coming Soon | Token Fee Scanner (paste any CA), multi-platform claim |
 | V3 | 2026+ | Automated claim scheduling, creator analytics, portfolio dashboard |
 
