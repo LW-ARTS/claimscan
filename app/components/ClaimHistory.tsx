@@ -35,6 +35,7 @@ function getExplorerTxUrl(txHash: string, chain: Chain): string | null {
   switch (chain) {
     case 'base': return EVM_TX_RE.test(txHash) ? `https://basescan.org/tx/${txHash}` : null;
     case 'eth': return EVM_TX_RE.test(txHash) ? `https://etherscan.io/tx/${txHash}` : null;
+    case 'bsc': return EVM_TX_RE.test(txHash) ? `https://bscscan.com/tx/${txHash}` : null;
     default: return SOL_TX_RE.test(txHash) ? `https://solscan.io/tx/${txHash}` : null;
   }
 }
@@ -44,6 +45,7 @@ function getExplorerName(chain: Chain): string {
   switch (chain) {
     case 'base': return 'Basescan';
     case 'eth': return 'Etherscan';
+    case 'bsc': return 'BscScan';
     default: return 'Solscan';
   }
 }
@@ -87,7 +89,7 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
       <div className="space-y-1.5">
         {displayed.map((event) => {
           const config = PLATFORM_CONFIG[event.platform as keyof typeof PLATFORM_CONFIG];
-          const nativeSymbol = event.chain === 'sol' ? 'SOL' : 'ETH';
+          const nativeSymbol = event.chain === 'sol' ? 'SOL' : event.chain === 'bsc' ? 'BNB' : 'ETH';
 
           return (
             <div

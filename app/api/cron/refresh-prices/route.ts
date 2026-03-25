@@ -3,6 +3,7 @@ import { createServiceClient, verifyCronSecret } from '@/lib/supabase/service';
 import { getNativeTokenPrices, getTokenPrice } from '@/lib/prices';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress } from '@/lib/chains/base';
+import type { Chain } from '@/lib/supabase/types';
 
 export const maxDuration = 60;
 
@@ -53,12 +54,24 @@ export async function GET(request: Request) {
         }, { onConflict: 'chain,token_address' });
       if (ethErr) console.warn('[refresh-prices] ETH upsert failed:', ethErr.message);
     }
+    if (nativePrices.bnb > 0) {
+      const { error: bnbErr } = await supabase
+        .from('token_prices')
+        .upsert({
+          chain: 'bsc' as const,
+          token_address: 'BNB',
+          token_symbol: 'BNB',
+          price_usd: nativePrices.bnb,
+          updated_at: now,
+        }, { onConflict: 'chain,token_address' });
+      if (bnbErr) console.warn('[refresh-prices] BNB upsert failed:', bnbErr.message);
+    }
 
     // Get unique token addresses from fee_records that need price updates
     const { data: tokens, error: tokensError } = await supabase
       .from('fee_records')
       .select('chain, token_address, token_symbol')
-      .not('token_address', 'in', '("SOL","ETH")')
+      .not('token_address', 'in', '("SOL","ETH","BNB")')
       .not('token_address', 'like', '%:%')
       .order('last_synced_at', { ascending: false })
       .limit(15);
@@ -69,7 +82,7 @@ export async function GET(request: Request) {
     }
 
     // Deduplicate
-    const unique = new Map<string, { chain: 'sol' | 'base' | 'eth'; address: string; symbol: string }>();
+    const unique = new Map<string, { chain: Chain; address: string; symbol: string }>();
     for (const t of tokens ?? []) {
       const key = `${t.chain}:${t.token_address}`;
       if (!unique.has(key)) {
@@ -83,7 +96,7 @@ export async function GET(request: Request) {
 
     // Fetch prices in parallel batches of 10, then batch-upsert all results
     const entries = Array.from(unique.values());
-    const priceRows: { chain: 'sol' | 'base' | 'eth'; token_address: string; token_symbol: string; price_usd: number; updated_at: string }[] = [];
+    const priceRows: { chain: Chain; token_address: string; token_symbol: string; price_usd: number; updated_at: string }[] = [];
 
     for (let i = 0; i < entries.length; i += 10) {
       const batch = entries.slice(i, i + 10);

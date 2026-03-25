@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useRef } from 'react';
 import { track } from '@vercel/analytics';
 import { ClaimStatusBadge } from './ClaimStatusBadge';
 import { PlatformIcon } from './PlatformIcon';
-import { PLATFORM_CONFIG } from '@/lib/constants';
+import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
 import { computeFeeUsd, formatTokenAmount, formatUsd, safeBigInt } from '@/lib/utils';
 import type { Database } from '@/lib/supabase/types';
 
@@ -18,6 +18,7 @@ interface TokenFeeTableProps {
   fees: FeeRecord[];
   solPrice?: number;
   ethPrice?: number;
+  bnbPrice?: number;
   connectedWallet?: string | null;
   onClaimToken?: (tokenMint: string) => void;
 }
@@ -33,7 +34,7 @@ function tokenDisplay(fee: FeeRecord): { label: string; badge: string } {
   return { label: short, badge: '?' };
 }
 
-export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWallet, onClaimToken }: TokenFeeTableProps) {
+export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, connectedWallet, onClaimToken }: TokenFeeTableProps) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_COUNT);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
@@ -58,7 +59,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
   const sortedFees = useMemo(() => {
     const withUsd = fees.map((fee) => ({
       fee,
-      usd: computeFeeUsd(fee, solPrice, ethPrice),
+      usd: computeFeeUsd(fee, solPrice, ethPrice, bnbPrice),
       display: tokenDisplay(fee),
     }));
     withUsd.sort((a, b) => {
@@ -66,15 +67,16 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
       return Number(safeBigInt(b.fee.total_unclaimed) - safeBigInt(a.fee.total_unclaimed));
     });
     return withUsd;
-  }, [fees, solPrice, ethPrice]);
+  }, [fees, solPrice, ethPrice, bnbPrice]);
 
   const displayedFees = sortedFees.slice(0, visibleCount);
   const hasMore = visibleCount < sortedFees.length;
 
   /** Currency label based on chain — shown after formatted amounts */
-  const currencyLabel = (chain: string) => (
-    <span className="ml-1 text-[11px] font-medium uppercase text-muted-foreground/60">{chain === 'sol' ? 'SOL' : 'ETH'}</span>
-  );
+  const currencyLabel = (chain: string) => {
+    const symbol = CHAIN_CONFIG[chain as keyof typeof CHAIN_CONFIG]?.nativeToken ?? 'ETH';
+    return <span className="ml-1 text-[11px] font-medium uppercase text-muted-foreground/60">{symbol}</span>;
+  };
 
   if (sortedFees.length === 0) {
     return (
@@ -191,7 +193,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, connectedWalle
           {displayedFees.map(({ fee, usd, display: { label, badge } }, idx) => {
             const platformConfig = PLATFORM_CONFIG[fee.platform];
             const decimals = fee.chain === 'sol' ? 9 : 18;
-            const chainLabel = fee.chain === 'sol' ? 'SOL' : 'ETH';
+            const chainLabel = CHAIN_CONFIG[fee.chain as keyof typeof CHAIN_CONFIG]?.nativeToken ?? 'ETH';
             const isZeroUnclaimed = safeBigInt(fee.total_unclaimed) === 0n;
             return (
               <tr

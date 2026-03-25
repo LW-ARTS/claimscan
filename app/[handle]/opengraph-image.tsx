@@ -58,24 +58,25 @@ function computeUsd(amount: bigint, decimals: number, priceUsd: number): number 
   return (Number(whole) + Number(remainder) / Number(divisor)) * priceUsd;
 }
 
-async function fetchPrices(): Promise<{ sol: number; eth: number }> {
+async function fetchPrices(): Promise<{ sol: number; eth: number; bnb: number }> {
   try {
     const headers: Record<string, string> = {};
     if (process.env.COINGECKO_API_KEY) {
       headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY;
     }
     const res = await fetch(
-      'https://api.coingecko.com/api/v3/simple/price?ids=solana,ethereum&vs_currencies=usd',
+      'https://api.coingecko.com/api/v3/simple/price?ids=solana,ethereum,binancecoin&vs_currencies=usd',
       { signal: AbortSignal.timeout(4000), next: { revalidate: 300 }, headers },
     );
-    if (!res.ok) return { sol: 0, eth: 0 };
+    if (!res.ok) return { sol: 0, eth: 0, bnb: 0 };
     const data = await res.json();
     return {
       sol: Number(data.solana?.usd) || 0,
       eth: Number(data.ethereum?.usd) || 0,
+      bnb: Number(data.binancecoin?.usd) || 0,
     };
   } catch {
-    return { sol: 0, eth: 0 };
+    return { sol: 0, eth: 0, bnb: 0 };
   }
 }
 
@@ -158,7 +159,7 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
               // Prefer total_earned (claimed + unclaimed) when populated; fall back to unclaimed for stale data
               const amount = earned > 0n ? earned : unclaimed;
               if (amount > 0n) {
-                const price = f.chain === 'sol' ? prices.sol : prices.eth;
+                const price = f.chain === 'sol' ? prices.sol : f.chain === 'bsc' ? prices.bnb : prices.eth;
                 const decimals = f.chain === 'sol' ? 9 : 18;
                 usd = computeUsd(amount, decimals, price);
               }

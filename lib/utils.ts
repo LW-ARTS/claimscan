@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { PLATFORM_CONFIG } from '@/lib/constants'
+import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -105,7 +105,7 @@ export function formatTokenAmount(raw: string, decimals: number): string {
 /**
  * Validate a wallet object shape for API input validation.
  */
-export const VALID_CHAINS = new Set(['sol', 'base', 'eth']);
+export const VALID_CHAINS = new Set(['sol', 'base', 'eth', 'bsc']);
 export const VALID_PLATFORMS = new Set(Object.keys(PLATFORM_CONFIG));
 
 /**
@@ -198,6 +198,7 @@ export function computeFeeUsd(
   fee: { total_earned_usd?: number | null; total_unclaimed: string | null; total_earned: string | null; chain: string; platform?: string; token_address?: string },
   solPrice: number,
   ethPrice: number,
+  bnbPrice = 0,
 ): number {
   if (fee.total_earned_usd != null && fee.total_earned_usd > 0) {
     return fee.total_earned_usd;
@@ -207,7 +208,7 @@ export function computeFeeUsd(
   // use tokenAddress like "SOL:believe:<pool>"). Other platforms' meme-token fees
   // would get wrong USD from native price conversion.
   const isNativePlatform = fee.platform && NATIVE_TOKEN_FEE_PLATFORMS.has(fee.platform);
-  const isNativeTokenRow = fee.token_address?.startsWith('SOL:') || fee.token_address?.startsWith('ETH:');
+  const isNativeTokenRow = fee.token_address?.startsWith('SOL:') || fee.token_address?.startsWith('ETH:') || fee.token_address?.startsWith('BNB:');
   if (!isNativePlatform && !isNativeTokenRow) {
     return 0;
   }
@@ -216,8 +217,10 @@ export function computeFeeUsd(
   // Prefer total_earned (claimed + unclaimed) when populated; fall back to unclaimed for stale data
   const amount = earned > 0n ? earned : unclaimed;
   if (amount === 0n) return 0;
-  const price = fee.chain === 'sol' ? solPrice : ethPrice;
-  const decimals = fee.chain === 'sol' ? 9 : 18;
+  const config = CHAIN_CONFIG[fee.chain as keyof typeof CHAIN_CONFIG];
+  const prices: Record<string, number> = { sol: solPrice, eth: ethPrice, base: ethPrice, bsc: bnbPrice };
+  const price = prices[fee.chain] ?? ethPrice;
+  const decimals = config?.nativeDecimals ?? 18;
   return toUsdValue(amount, decimals, price);
 }
 
@@ -271,6 +274,6 @@ export function isValidWalletInput(w: unknown): w is { address: string; chain: s
   if (obj.chain === 'sol') {
     return addr.length >= 32 && addr.length <= 44 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(addr);
   }
-  // EVM chains (base, eth)
+  // EVM chains (base, eth, bsc)
   return addr.length === 42 && /^0x[a-fA-F0-9]{40}$/.test(addr);
 }

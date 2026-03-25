@@ -236,6 +236,75 @@ describe('computeFeeUsd', () => {
     const result = computeFeeUsd(fee, solPrice, ethPrice);
     expect(result).toBeCloseTo(150, 1);
   });
+
+  // ─── BSC / BNB Chain tests ───────────────────────────────
+
+  it('uses bnbPrice for BSC chain (native platform)', () => {
+    // 1 BNB = 10^18 wei, price $600 → $600
+    const bnbPrice = 600;
+    const fee = {
+      total_earned_usd: null,
+      total_unclaimed: '1000000000000000000',
+      total_earned: '1000000000000000000',
+      chain: 'bsc',
+      platform: 'bankr', // native-token platform
+    };
+    const result = computeFeeUsd(fee, solPrice, ethPrice, bnbPrice);
+    expect(result).toBeCloseTo(600, 0);
+  });
+
+  it('defaults bnbPrice to 0 when omitted (backward compat)', () => {
+    const fee = {
+      total_earned_usd: null,
+      total_unclaimed: '1000000000000000000',
+      total_earned: '1000000000000000000',
+      chain: 'bsc',
+      platform: 'bankr',
+    };
+    // Call without bnbPrice — should default to 0 and return 0
+    const result = computeFeeUsd(fee, solPrice, ethPrice);
+    expect(result).toBe(0);
+  });
+
+  it('returns 0 for non-native BSC platform without total_earned_usd', () => {
+    const fee = {
+      total_earned_usd: null,
+      total_unclaimed: '1000000000000000000',
+      total_earned: '1000000000000000000',
+      chain: 'bsc',
+      platform: 'clanker',
+    };
+    expect(computeFeeUsd(fee, solPrice, ethPrice, 600)).toBe(0);
+  });
+
+  it('allows BNB: prefix for native-token row fallback', () => {
+    const bnbPrice = 600;
+    const fee = {
+      total_earned_usd: null,
+      total_unclaimed: '1000000000000000000',
+      total_earned: '1000000000000000000',
+      chain: 'bsc',
+      platform: 'believe', // not a native platform for BSC, but BNB: prefix triggers fallback
+      token_address: 'BNB:someplatform:somepool',
+    };
+    const result = computeFeeUsd(fee, solPrice, ethPrice, bnbPrice);
+    expect(result).toBeCloseTo(600, 0);
+  });
+
+  it('does not confuse BSC with ETH price', () => {
+    const bnbPrice = 600;
+    const fee = {
+      total_earned_usd: null,
+      total_unclaimed: '1000000000000000000',
+      total_earned: '1000000000000000000',
+      chain: 'bsc',
+      platform: 'bankr',
+    };
+    const result = computeFeeUsd(fee, solPrice, ethPrice, bnbPrice);
+    // Should use BNB price (600), NOT ETH price (3000)
+    expect(result).toBeCloseTo(600, 0);
+    expect(result).not.toBeCloseTo(3000, 0);
+  });
 });
 
 // ─── toUsdValue ─────────────────────────────────────────
@@ -382,6 +451,25 @@ describe('isValidWalletInput', () => {
     expect(isValidWalletInput({
       address: '8VU2cuNTgxqXEfCXrhLzt7rbVxeoev881C9jY3LGivzR',
       chain: 'base',
+      sourcePlatform: 'clanker',
+    })).toBe(false);
+  });
+
+  // ─── BSC wallet input tests ──────────────────────────────
+
+  it('accepts a valid BSC wallet input', () => {
+    const input = {
+      address: '0x1234567890abcdef1234567890abcdef12345678',
+      chain: 'bsc',
+      sourcePlatform: 'clanker',
+    };
+    expect(isValidWalletInput(input)).toBe(true);
+  });
+
+  it('rejects BSC chain with Solana address format', () => {
+    expect(isValidWalletInput({
+      address: '8VU2cuNTgxqXEfCXrhLzt7rbVxeoev881C9jY3LGivzR',
+      chain: 'bsc',
       sourcePlatform: 'clanker',
     })).toBe(false);
   });

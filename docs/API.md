@@ -247,7 +247,7 @@ data: {"platform":"pump","wallet":"...","unclaimed":"1000000000"}
 Token prices with 5-minute ISR cache.
 
 **Query Parameters:**
-- `chain` (string, optional): `sol` | `base` | `eth`
+- `chain` (string, optional): `sol` | `base` | `eth` | `bsc`
 - `token` (string, optional): Token address
 
 **Response (native prices):**
@@ -255,6 +255,7 @@ Token prices with 5-minute ISR cache.
 {
   "sol": 125.50,
   "eth": 3500.75,
+  "bnb": 605.20,
   "stale": false
 }
 ```
@@ -464,7 +465,7 @@ Batch price updates for top tokens from fee_records.
 ## Common Types
 
 ```typescript
-type Chain = 'sol' | 'base' | 'eth';
+type Chain = 'sol' | 'base' | 'eth' | 'bsc';
 
 type Platform = 'bags' | 'pump' | 'clanker' | 'zora' | 'bankr'
   | 'believe' | 'revshare' | 'coinbarrel' | 'raydium';

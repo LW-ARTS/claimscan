@@ -3,11 +3,12 @@ import {
   DEXSCREENER_API,
   JUPITER_PRICE_API,
 } from '@/lib/constants';
+import type { Chain } from '@/lib/supabase/types';
 import { createLogger } from '@/lib/logger';
 const log = createLogger('prices');
 
 export interface TokenPrice {
-  chain: 'sol' | 'base' | 'eth';
+  chain: Chain;
   tokenAddress: string;
   symbol: string;
   priceUsd: number;
@@ -49,11 +50,12 @@ function sanitizePrice(raw: unknown): number | null {
 // ═══════════════════════════════════════════════
 
 // Stale-while-revalidate cache for native prices
-let lastKnownNativePrices: { sol: number; eth: number; fetchedAt: number } | null = null;
+let lastKnownNativePrices: { sol: number; eth: number; bnb: number; fetchedAt: number } | null = null;
 
 export async function getNativeTokenPrices(): Promise<{
   sol: number;
   eth: number;
+  bnb: number;
   stale: boolean;
 }> {
   try {
@@ -62,7 +64,7 @@ export async function getNativeTokenPrices(): Promise<{
       headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY;
     }
     const res = await fetchWithTimeout(
-      `${COINGECKO_API}/simple/price?ids=solana,ethereum&vs_currencies=usd`,
+      `${COINGECKO_API}/simple/price?ids=solana,ethereum,binancecoin&vs_currencies=usd`,
       { headers, next: { revalidate: 300 } }
     );
     if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
@@ -70,6 +72,7 @@ export async function getNativeTokenPrices(): Promise<{
     const prices = {
       sol: sanitizePrice(data.solana?.usd) ?? 0,
       eth: sanitizePrice(data.ethereum?.usd) ?? 0,
+      bnb: sanitizePrice(data.binancecoin?.usd) ?? 0,
     };
     lastKnownNativePrices = { ...prices, fetchedAt: Date.now() };
     return { ...prices, stale: false };
@@ -78,9 +81,9 @@ export async function getNativeTokenPrices(): Promise<{
     if (lastKnownNativePrices) {
       const ageMin = Math.round((Date.now() - lastKnownNativePrices.fetchedAt) / 60_000);
       log.warn(`Returning stale native prices (${ageMin}min old)`);
-      return { sol: lastKnownNativePrices.sol, eth: lastKnownNativePrices.eth, stale: true };
+      return { sol: lastKnownNativePrices.sol, eth: lastKnownNativePrices.eth, bnb: lastKnownNativePrices.bnb, stale: true };
     }
-    return { sol: 0, eth: 0, stale: true };
+    return { sol: 0, eth: 0, bnb: 0, stale: true };
   }
 }
 
@@ -89,11 +92,11 @@ export async function getNativeTokenPrices(): Promise<{
 // ═══════════════════════════════════════════════
 
 async function fetchDexScreenerPrice(
-  chain: 'sol' | 'base' | 'eth',
+  chain: Chain,
   tokenAddress: string
 ): Promise<number | null> {
   try {
-    const CHAIN_SLUG_MAP: Record<string, string> = { sol: 'solana', base: 'base', eth: 'ethereum' };
+    const CHAIN_SLUG_MAP: Record<string, string> = { sol: 'solana', base: 'base', eth: 'ethereum', bsc: 'bsc' };
     const chainSlug = CHAIN_SLUG_MAP[chain];
     if (!chainSlug) return null;
     const res = await fetchWithTimeout(
@@ -155,7 +158,7 @@ async function fetchJupiterPrice(
 }
 
 export async function getTokenPriceWithSource(
-  chain: 'sol' | 'base' | 'eth',
+  chain: Chain,
   tokenAddress: string
 ): Promise<{ price: number; source: TokenPrice['source'] }> {
   // Sequential waterfall: DexScreener first, Jupiter only on failure (Solana only)
@@ -175,7 +178,7 @@ export async function getTokenPriceWithSource(
 }
 
 export async function getTokenPrice(
-  chain: 'sol' | 'base' | 'eth',
+  chain: Chain,
   tokenAddress: string
 ): Promise<number> {
   const { price } = await getTokenPriceWithSource(chain, tokenAddress);
@@ -183,7 +186,7 @@ export async function getTokenPrice(
 }
 
 export async function batchGetTokenPrices(
-  tokens: Array<{ chain: 'sol' | 'base' | 'eth'; address: string; symbol: string }>
+  tokens: Array<{ chain: Chain; address: string; symbol: string }>
 ): Promise<TokenPrice[]> {
   const results = await Promise.allSettled(
     tokens.map(async (t) => {

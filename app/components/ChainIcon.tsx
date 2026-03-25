@@ -48,5 +48,17 @@ export function ChainIcon({ chain, className = 'h-5 w-5' }: ChainIconProps) {
     );
   }
 
+  if (chain === 'bsc') {
+    return (
+      <svg className={className} viewBox="0 0 128 128" fill="none" aria-hidden="true">
+        <circle cx="64" cy="64" r="64" fill="#F3BA2F" />
+        <path
+          d="M64 36l9.5 9.5-9.5 9.5-9.5-9.5L64 36Zm-20 20l9.5 9.5-9.5 9.5-9.5-9.5L44 56Zm40 0l9.5 9.5-9.5 9.5-9.5-9.5L84 56ZM64 76l9.5 9.5-9.5 9.5-9.5-9.5L64 76Z"
+          fill="#fff"
+        />
+      </svg>
+    );
+  }
+
   return null;
 }

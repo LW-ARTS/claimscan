@@ -1,9 +1,10 @@
 import 'server-only';
 import { CLANKER_API_BASE } from '@/lib/constants';
 import { batchClankerFees, getClankerClaimLogs, isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
+import { batchClankerFeesBsc, getClankerClaimLogsBsc } from '@/lib/chains/bsc';
 import { safeBigInt, sanitizeTokenSymbol, sanitizeTokenName } from '@/lib/utils';
-import type { IdentityProvider } from '@/lib/supabase/types';
-import { getAddress } from 'viem';
+import type { IdentityProvider, Chain } from '@/lib/supabase/types';
+import { getAddress, type Address } from 'viem';
 import type {
   PlatformAdapter,
   ResolvedWallet,
@@ -40,6 +41,8 @@ interface ClankerToken {
   img_url: string | null;
   admin?: string;
   fid?: number;
+  /** Chain identifier — 8453 = Base, 56 = BSC. API may return as number or string. */
+  chain_id?: number | string;
 }
 
 /** /search-creator response shape */
@@ -53,6 +56,16 @@ interface ClankerSearchCreatorResponse {
 // ═══════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════
+
+/** Map Clanker API chain_id to ClaimScan Chain type. Returns null for unsupported chains.
+ * Coerces string values to number since JSON APIs may serialize chain_id inconsistently. */
+function mapChainId(chainId: number | string | undefined): Chain | null {
+  const id = typeof chainId === 'string' ? Number(chainId) : chainId;
+  if (id === 56) return 'bsc';
+  if (id === 8453 || id === undefined) return 'base';
+  log.warn(`Unknown Clanker chain_id: ${chainId} (type: ${typeof chainId}) — token skipped`);
+  return null;
+}
 
 async function clankerFetch<T>(path: string, externalSignal?: AbortSignal): Promise<T | null> {
   try {
@@ -77,12 +90,57 @@ async function clankerFetch<T>(path: string, externalSignal?: AbortSignal): Prom
 }
 
 // ═══════════════════════════════════════════════
-// Clanker Adapter
+// Chain-specific fee fetchers
+// ═══════════════════════════════════════════════
+
+async function fetchChainFees(
+  chain: Chain,
+  wallet: Address,
+  tokens: CreatorToken[],
+): Promise<TokenFee[]> {
+  const validTokens = tokens.filter((t) => isValidEvmAddress(t.tokenAddress));
+  if (validTokens.length === 0) return [];
+
+  const tokenAddresses = validTokens.map((t) => getAddress(t.tokenAddress));
+
+  const [feeResults, claimLogs] = await Promise.all([
+    chain === 'bsc'
+      ? batchClankerFeesBsc(wallet, tokenAddresses)
+      : batchClankerFees(wallet, tokenAddresses),
+    chain === 'bsc'
+      ? getClankerClaimLogsBsc(wallet, tokenAddresses)
+      : getClankerClaimLogs(wallet, tokenAddresses),
+  ]);
+
+  const validTokenMap = new Map(validTokens.map((t) => [getAddress(t.tokenAddress) as string, t]));
+
+  const fees: TokenFee[] = [];
+  for (const f of feeResults) {
+    const claimed = claimLogs.get(f.token.toLowerCase()) ?? 0n;
+    const available = f.available;
+    if (available === 0n && claimed === 0n) continue;
+    fees.push({
+      tokenAddress: f.token,
+      tokenSymbol: validTokenMap.get(f.token)?.symbol ?? null,
+      chain,
+      platform: 'clanker' as const,
+      totalEarned: (available + claimed).toString(),
+      totalClaimed: claimed.toString(),
+      totalUnclaimed: available.toString(),
+      totalEarnedUsd: null,
+      royaltyBps: null,
+    });
+  }
+  return fees;
+}
+
+// ═══════════════════════════════════════════════
+// Clanker Adapter (multi-chain: Base + BSC)
 // ═══════════════════════════════════════════════
 
 export const clankerAdapter: PlatformAdapter = {
   platform: 'clanker',
-  chain: 'base',
+  chain: 'base', // Primary chain — BSC handled internally by getCreatorTokens + fetchChainFees
   supportsIdentityResolution: true,
   supportsLiveFees: true,
   supportsHandleBasedFees: false,
@@ -94,11 +152,11 @@ export const clankerAdapter: PlatformAdapter = {
   ): Promise<ResolvedWallet[]> {
     if (provider === 'wallet') {
       if (!isValidEvmAddress(handle)) return [];
+      // Only return 'base' — the adapter handles BSC internally via getCreatorTokens.
+      // Returning both chains would cause double-dispatch in fetchAllFees.
       return [{ address: normalizeEvmAddress(handle), chain: 'base', sourcePlatform: 'clanker' }];
     }
 
-    // Search Clanker by handle — API resolves Farcaster handles internally
-    // and returns the wallet as `searchedAddress` (not `walletAddress`)
     const data = await clankerFetch<ClankerCreatorResult>(
       `/search-creator?q=${encodeURIComponent(handle)}`
     );
@@ -106,7 +164,6 @@ export const clankerAdapter: PlatformAdapter = {
     const wallets: ResolvedWallet[] = [];
     const seen = new Set<string>();
 
-    // Primary: searchedAddress is the resolved wallet
     const primary = data?.searchedAddress;
     if (primary && isValidEvmAddress(primary)) {
       const normalized = normalizeEvmAddress(primary);
@@ -114,7 +171,6 @@ export const clankerAdapter: PlatformAdapter = {
       wallets.push({ address: normalized, chain: 'base', sourcePlatform: 'clanker' });
     }
 
-    // Secondary: extract verified addresses from user profiles
     for (const user of data?.users ?? []) {
       for (const addr of user.verifiedAddresses ?? []) {
         if (isValidEvmAddress(addr)) {
@@ -137,11 +193,7 @@ export const clankerAdapter: PlatformAdapter = {
   async getCreatorTokens(wallet: string): Promise<CreatorToken[]> {
     if (!isValidEvmAddress(wallet)) return [];
 
-    // Use /search-creator?q=<wallet> to find tokens deployed by this wallet.
-    // NOTE: The /tokens?feeRecipient= endpoint was tested but is broken —
-    // it ignores the feeRecipient parameter and returns the 10 most recent
-    // tokens platform-wide (verified 2026-03-11 with address 0x0...01).
-    const MAX_PAGES = 10; // 200 tokens max safety cap
+    const MAX_PAGES = 10;
     const allTokens: ClankerToken[] = [];
     const seen = new Set<string>();
     const paginationDeadline = Date.now() + 6_000;
@@ -169,74 +221,53 @@ export const clankerAdapter: PlatformAdapter = {
 
     if (allTokens.length === 0) return [];
 
-    return allTokens.map((t) => ({
-      tokenAddress: t.contract_address,
-      chain: 'base' as const,
-      platform: 'clanker' as const,
-      symbol: sanitizeTokenSymbol(t.symbol),
-      name: sanitizeTokenName(t.name),
-      imageUrl: t.img_url?.startsWith('https://') ? t.img_url : null,
-    }));
+    const mapped: CreatorToken[] = [];
+    for (const t of allTokens) {
+      const chain = mapChainId(t.chain_id);
+      if (!chain) continue; // Skip unsupported chains
+      mapped.push({
+        tokenAddress: t.contract_address,
+        chain,
+        platform: 'clanker' as const,
+        symbol: sanitizeTokenSymbol(t.symbol),
+        name: sanitizeTokenName(t.name),
+        imageUrl: t.img_url?.startsWith('https://') ? t.img_url : null,
+      });
+    }
+    return mapped;
   },
 
   async getHistoricalFees(wallet: string): Promise<TokenFee[]> {
-    // Validate EVM address before making onchain calls
     if (!isValidEvmAddress(wallet)) return [];
 
-    // Get creator's tokens first, then batch read fees onchain
     const tokens = await this.getCreatorTokens(wallet);
     if (tokens.length === 0) return [];
 
-    // Filter to only valid EVM contract addresses before casting
-    const validTokens = tokens.filter((t) => isValidEvmAddress(t.tokenAddress));
-    if (validTokens.length === 0) return [];
+    // Split tokens by chain and fetch fees in parallel
+    const baseTokens = tokens.filter((t) => t.chain === 'base');
+    const bscTokens = tokens.filter((t) => t.chain === 'bsc');
+    const walletAddr = getAddress(wallet);
 
-    const tokenAddresses = validTokens.map((t) => getAddress(t.tokenAddress));
-    const feeResults = await batchClankerFees(
-      getAddress(wallet),
-      tokenAddresses
-    );
+    const results = await Promise.allSettled([
+      baseTokens.length > 0 ? fetchChainFees('base', walletAddr, baseTokens) : Promise.resolve([]),
+      bscTokens.length > 0 ? fetchChainFees('bsc', walletAddr, bscTokens) : Promise.resolve([]),
+    ]);
 
-    const validTokenMap = new Map(validTokens.map((t) => [getAddress(t.tokenAddress) as string, t]));
-
-    // Fetch claimed totals from ERC20 Transfer event logs (FeeLocker → owner)
-    const claimLogs = await getClankerClaimLogs(
-      getAddress(wallet),
-      tokenAddresses
-    );
-
-    // Include tokens with either unclaimed OR claimed fees.
-    // Now that we have event logs, we can show tokens that were fully claimed.
     const fees: TokenFee[] = [];
-    for (const f of feeResults) {
-      const claimed = claimLogs.get(f.token.toLowerCase()) ?? 0n;
-      const available = f.available;
-      if (available === 0n && claimed === 0n) continue;
-      fees.push({
-        tokenAddress: f.token,
-        tokenSymbol: validTokenMap.get(f.token)?.symbol ?? null,
-        chain: 'base' as const,
-        platform: 'clanker' as const,
-        totalEarned: (available + claimed).toString(),
-        totalClaimed: claimed.toString(),
-        totalUnclaimed: available.toString(),
-        totalEarnedUsd: null,
-        royaltyBps: null,
-      });
+    for (const r of results) {
+      if (r.status === 'fulfilled') fees.push(...r.value);
+      else log.warn('fetchChainFees failed:', { error: r.reason instanceof Error ? r.reason.message : String(r.reason) });
     }
     return fees;
   },
 
   async getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]> {
     if (signal?.aborted) return [];
-    // Delegate to getHistoricalFees to avoid fetching the token list twice
     const fees = await this.getHistoricalFees(wallet);
     return fees.filter((f) => safeBigInt(f.totalUnclaimed) > 0n);
   },
 
   async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
-    // Claim events would need to be parsed from onchain logs.
-    // Not implementing for MVP — historical fees already cover totals.
     return [];
   },
 };
