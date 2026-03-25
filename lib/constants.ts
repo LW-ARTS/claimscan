@@ -54,6 +54,13 @@ export const CHAIN_CONFIG = {
     coingeckoId: 'ethereum',
     chainId: 1,
   },
+  bsc: {
+    name: 'BNB Chain',
+    nativeToken: 'BNB',
+    nativeDecimals: 18,
+    coingeckoId: 'binancecoin',
+    chainId: 56,
+  },
 } as const;
 
 // ═══════════════════════════════════════════════
@@ -71,6 +78,9 @@ export const PLATFORM_CONFIG = {
   coinbarrel: { name: 'Coinbarrel', chain: 'sol' as const, color: '#FF8C00' },
   raydium: { name: 'Raydium', chain: 'sol' as const, color: '#6C5CE7' },
 } as const;
+
+/** All EVM-compatible chain keys. Used for cross-chain matching and normalization checks. */
+export const EVM_CHAINS: ReadonlySet<string> = new Set(['base', 'eth', 'bsc']);
 
 // ═══════════════════════════════════════════════
 // ClaimScan Fee Config

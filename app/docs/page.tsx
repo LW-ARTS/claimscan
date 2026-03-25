@@ -5,7 +5,7 @@ import { LazySection } from '../components/LazySection';
 export const metadata: Metadata = {
   title: 'ClaimScan Docs: Architecture & Roadmap',
   description:
-    'ClaimScan documentation. V1 creator fee tracking across 9 launchpads. V2 roadmap: token contract lookup, fee recipient discovery, and claim status on Solana and Base.',
+    'ClaimScan documentation. V1 creator fee tracking across 9 launchpads. V2 roadmap: token contract lookup, fee recipient discovery, and claim status on Solana, Base, and BNB Chain.',
   openGraph: {
     title: 'ClaimScan Docs',
     description:
@@ -61,7 +61,7 @@ export default function DocsPage() {
             name: 'How does ClaimScan work?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Enter a social handle (Twitter, Farcaster, GitHub) or wallet address. ClaimScan resolves it to wallet addresses and scans 9 DeFi launchpads across Solana and Base in parallel, showing earned, claimed, and unclaimed fees in real time.',
+              text: 'Enter a social handle (Twitter, Farcaster, GitHub) or wallet address. ClaimScan resolves it to wallet addresses and scans 9 DeFi launchpads across Solana, Base, and BNB Chain in parallel, showing earned, claimed, and unclaimed fees in real time.',
             },
           },
           {
@@ -153,18 +153,18 @@ export default function DocsPage() {
         <section className="glass rounded-2xl p-6 sm:p-8">
           <Label>Overview</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            One search. 9 launchpads. 2 chains.
+            One search. 9 launchpads. 4 chains.
           </h2>
           <p className="mt-4 text-[15px] leading-[1.75] text-foreground/70">
             You launched tokens. Platforms collected fees for you. But nobody told you where the money is.
-            ClaimScan scans 9 launchpads across Solana and Base in real time, showing what you&apos;ve
+            ClaimScan scans 9 launchpads across Solana, Base, and BNB Chain in real time, showing what you&apos;ve
             earned, what you&apos;ve claimed, and what&apos;s still sitting uncollected on-chain.
           </p>
 
           <div className="mt-8 grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3">
             {[
               { v: '9', l: 'Platforms' },
-              { v: '2', l: 'Chains' },
+              { v: '4', l: 'Chains' },
               { v: '~40%', l: 'Unclaimed' },
               { v: '<30s', l: 'Scan' },
               { v: '$0', l: 'Cost' },
@@ -184,10 +184,10 @@ export default function DocsPage() {
         <section className="mt-12">
           <Label>Supported Platforms</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            9 platforms across Solana and Base
+            9 platforms across Solana, Base, and BNB Chain
           </h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            Every major creator fee launchpad. More chains coming in V2.
+            Every major creator fee launchpad across Solana and EVM chains.
           </p>
 
           <div className="mt-8 grid gap-5 sm:grid-cols-2">
@@ -333,7 +333,7 @@ export default function DocsPage() {
           <div className="mt-6 overflow-hidden rounded-xl border border-foreground/[0.06]">
             {[
               ['Frontend', 'React + Tailwind CSS'],
-              ['Blockchain', 'Solana + EVM (Base)'],
+              ['Blockchain', 'Solana + EVM (Base, ETH, BSC)'],
               ['Database', 'SQL database with access controls'],
               ['Price Feeds', 'Multi-source price aggregation'],
               ['Identity', 'Social identity resolution across platforms'],
@@ -465,7 +465,7 @@ export default function DocsPage() {
                   </div>
                   <div className="ml-1 mt-5 columns-1 gap-x-6 space-y-1.5 sm:columns-2">
                     {[
-                      '9 platform support (Solana + Base)',
+                      '9 platform support (Solana + Base + BSC)',
                       'Multi-identity search (Twitter, GitHub, Farcaster, Wallet)',
                       'Real-time streaming scan results',
                       'Signal Lock loading animation',

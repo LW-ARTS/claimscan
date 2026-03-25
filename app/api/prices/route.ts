@@ -3,6 +3,7 @@ import { getNativeTokenPrices, getTokenPrice } from '@/lib/prices';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress } from '@/lib/chains/base';
 import { VALID_CHAINS } from '@/lib/utils';
+import type { Chain } from '@/lib/supabase/types';
 
 /** Cache native prices for 5 minutes via Next.js ISR. */
 export const revalidate = 300;
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     if (chain && token) {
       if (!VALID_CHAINS.has(chain)) {
         return NextResponse.json(
-          { error: 'Invalid chain. Must be one of: sol, base, eth' },
+          { error: 'Invalid chain. Must be one of: sol, base, eth, bsc' },
           { status: 400 }
         );
       }
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
       }
 
       const priceUsd = await getTokenPrice(
-        chain as 'sol' | 'base' | 'eth',
+        chain as Chain,
         token
       );
       return NextResponse.json({ chain, token, priceUsd });

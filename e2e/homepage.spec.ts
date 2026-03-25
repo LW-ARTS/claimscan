@@ -30,7 +30,7 @@ test.describe('Homepage', () => {
 
     // Stats strip — 9 launchpads (dynamic from PLATFORM_CONFIG)
     await expect(page.getByText('9 launchpads').first()).toBeVisible();
-    await expect(page.getByText('2 chains').first()).toBeVisible();
+    await expect(page.getByText('4 chains').first()).toBeVisible();
     await expect(page.getByText('live').first()).toBeVisible();
   });
 

@@ -1,7 +1,7 @@
 # ClaimScan
 
-Plataforma de rastreamento e claim de fees de tokens cross-chain (Solana + Base + ETH).
-Agrega fees de 9 launchpads: Pump.fun, Bags.fm, Clanker, Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium.
+Plataforma de rastreamento e claim de fees de tokens cross-chain (Solana + Base + ETH + BSC).
+Agrega fees de 9 launchpads: Pump.fun, Bags.fm, Clanker (Base+BSC), Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium.
 
 ## Stack
 - Next.js 16.2, React 19, TypeScript
@@ -42,7 +42,7 @@ app/
     honeypot/[...path]/       # Trap pra scrapers (retorna dados fake)
 lib/
   platforms/                  # 9 adapters (bags, pump, clanker, zora, etc)
-  chains/                     # solana.ts, base.ts, eth.ts
+  chains/                     # solana.ts, base.ts, eth.ts, bsc.ts, clanker-reads.ts
   supabase/                   # client.ts, server.ts, service.ts
   resolve/                    # Identity resolution (Twitter/GitHub/Farcaster/wallet)
   prices/                     # DexScreener → Jupiter → CoinGecko waterfall
@@ -66,7 +66,7 @@ supabase/migrations/          # 12 migration files
 ## Convencoes
 - Token amounts como **string** (BigInt precision, nunca Number)
 - Decimals: Solana=9, EVM=18
-- Chain types: 'sol' | 'base' | 'eth'
+- Chain types: 'sol' | 'base' | 'eth' | 'bsc'
 - Claim status: claimed | unclaimed | partially_claimed | auto_distributed
 - Cache TTL: 40min normal, 2h pra creators com 500+ records
 - Price waterfall: DexScreener → Jupiter (Solana only). CoinGecko somente para precos nativos (SOL/ETH)
@@ -78,7 +78,7 @@ supabase/migrations/          # 12 migration files
 - .env.example existe na raiz — usar como base pra setup local
 ```
 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
-SOLANA_RPC_URL, NEXT_PUBLIC_SOLANA_RPC_URL, BASE_RPC_URL
+SOLANA_RPC_URL, NEXT_PUBLIC_SOLANA_RPC_URL, BASE_RPC_URL, BSC_RPC_URL
 BAGS_API_KEY, ZORA_API_KEY, HELIUS_API_KEY, HELIUS_WEBHOOK_SECRET
 CRON_SECRET, CLAIM_HMAC_SECRET
 UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN

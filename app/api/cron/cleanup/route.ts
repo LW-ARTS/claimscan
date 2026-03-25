@@ -3,6 +3,7 @@ import { createServiceClient, verifyCronSecret } from '@/lib/supabase/service';
 import { getNativeTokenPrices, getTokenPrice } from '@/lib/prices';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress } from '@/lib/chains/base';
+import type { Chain } from '@/lib/supabase/types';
 
 export const maxDuration = 60;
 
@@ -125,7 +126,7 @@ export async function GET(request: Request) {
         ]);
         const now = new Date().toISOString();
 
-        // Upsert native prices (SOL, ETH) in parallel
+        // Upsert native prices (SOL, ETH, BNB) in parallel
         await Promise.allSettled([
           nativePrices.sol > 0
             ? supabase.from('token_prices').upsert(
@@ -139,6 +140,12 @@ export async function GET(request: Request) {
                 { onConflict: 'chain,token_address' }
               )
             : Promise.resolve(),
+          nativePrices.bnb > 0
+            ? supabase.from('token_prices').upsert(
+                { chain: 'bsc' as const, token_address: 'BNB', token_symbol: 'BNB', price_usd: nativePrices.bnb, updated_at: now },
+                { onConflict: 'chain,token_address' }
+              )
+            : Promise.resolve(),
         ]);
 
         // Fetch a few token prices if time allows
@@ -146,11 +153,11 @@ export async function GET(request: Request) {
           const { data: tokens } = await supabase
             .from('fee_records')
             .select('chain, token_address, token_symbol')
-            .not('token_address', 'in', '("SOL","ETH")')
+            .not('token_address', 'in', '("SOL","ETH","BNB")')
             .order('last_synced_at', { ascending: false })
             .limit(5);
 
-          const unique = new Map<string, { chain: 'sol' | 'base' | 'eth'; address: string; symbol: string }>();
+          const unique = new Map<string, { chain: Chain; address: string; symbol: string }>();
           for (const t of tokens ?? []) {
             const key = `${t.chain}:${t.token_address}`;
             if (!unique.has(key)) {
@@ -158,7 +165,7 @@ export async function GET(request: Request) {
             }
           }
 
-          const priceRows: Array<{ chain: 'sol' | 'base' | 'eth'; token_address: string; token_symbol: string; price_usd: number; updated_at: string }> = [];
+          const priceRows: Array<{ chain: Chain; token_address: string; token_symbol: string; price_usd: number; updated_at: string }> = [];
           const entries = Array.from(unique.values());
           const results = await Promise.allSettled(
             entries.map(async (t) => {

@@ -6,6 +6,7 @@ import type { IdentityProvider } from '@/lib/supabase/types';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
 import { safeBigInt } from '@/lib/utils';
+import { EVM_CHAINS } from '@/lib/constants';
 import { isHeliusAvailable } from '@/lib/helius/client';
 import { discoverWalletTokens } from '@/lib/helius/discovery';
 
@@ -115,7 +116,7 @@ export async function resolveWallets(
 
   // Helper to add a wallet with dedup
   const addWallet = (wallet: ResolvedWallet) => {
-    const normalizedAddress = (wallet.chain === 'base' || wallet.chain === 'eth')
+    const normalizedAddress = EVM_CHAINS.has(wallet.chain)
       ? normalizeEvmAddress(wallet.address)
       : wallet.address;
     const key = `${wallet.chain}:${normalizedAddress.toLowerCase()}`;
@@ -164,11 +165,15 @@ export async function fetchAllFees(
   const taskMeta: Array<{ platform: string; wallet: string; type: string }> = [];
   const tasks: Promise<TokenFee[]>[] = [];
 
-  // Zora queries both Base + ETH mainnet internally, so also dispatch for ETH wallets
+  // Multi-chain adapters whose primary chain is 'base' but also serve other EVM chains.
+  // Zora needs this because it queries Base+ETH internally but its resolveIdentity is disabled.
+  // Clanker is NOT here — its adapter handles Base+BSC internally via getCreatorTokens,
+  // and resolveIdentity only returns 'base' wallets to avoid double-dispatch.
   const CROSS_CHAIN_EVM: Set<string> = new Set(['zora']);
 
   for (const wallet of wallets) {
     for (const adapter of allAdapters) {
+      // Zora cross-chain: dispatch for ETH wallets only (Zora exists on Base+ETH, not BSC)
       const chainMatch = adapter.chain === wallet.chain
         || (CROSS_CHAIN_EVM.has(adapter.platform) && wallet.chain === 'eth' && adapter.chain === 'base');
       if (!chainMatch) continue;
@@ -318,7 +323,7 @@ export async function fetchLiveUnclaimedFees(
   // from lingering after the response is sent.
   const controller = new AbortController();
 
-  // Zora queries both Base + ETH mainnet, so also dispatch for ETH wallets
+  // Multi-chain adapters: Zora only (see CROSS_CHAIN_EVM comment above)
   const LIVE_CROSS_CHAIN_EVM: Set<string> = new Set(['zora']);
 
   const taskMeta: Array<{ platform: string; wallet: string }> = [];

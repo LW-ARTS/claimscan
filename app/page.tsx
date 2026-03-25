@@ -34,7 +34,7 @@ export default function Home() {
             /
           </span>
           <span className="rounded-sm border border-foreground/10 bg-foreground/[0.03] px-2.5 py-1 uppercase">
-            2 chains
+            4 chains
           </span>
           <span className="text-foreground/15" aria-hidden>
             /

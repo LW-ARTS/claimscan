@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { track } from '@vercel/analytics';
 import { PlatformIcon } from './PlatformIcon';
 import { ShareButton } from './ShareButton';
-import { PLATFORM_CONFIG, LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
+import { PLATFORM_CONFIG, CHAIN_CONFIG, LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
 import { safeBigInt, formatUsd, toUsdValue, copyToClipboard } from '@/lib/utils';
 import { signedFetch } from '@/lib/signed-fetch';
 import type { Database, Chain, Platform } from '@/lib/supabase/types';
@@ -41,6 +41,7 @@ interface ProfileHeroProps {
   walletsForLive: WalletInput[];
   solPrice: number;
   ethPrice: number;
+  bnbPrice?: number;
   handle: string;
   totalEarnedUsd: number;
   platformCount: number;
@@ -51,6 +52,7 @@ const chainMeta: Record<string, { label: string; color: string; bg: string }> = 
   sol: { label: 'Solana', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
   base: { label: 'Base', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
   eth: { label: 'Ethereum', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
+  bsc: { label: 'BNB Chain', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
 };
 
 function CopyIcon({ className }: { className?: string }) {
@@ -143,6 +145,7 @@ export function ProfileHero({
   walletsForLive,
   solPrice,
   ethPrice,
+  bnbPrice = 0,
   handle,
   totalEarnedUsd,
   platformCount,
@@ -344,10 +347,10 @@ export function ProfileHero({
 
   // ── Helpers ──
   const feeToUsd = useCallback((chain: string, amount: bigint) => {
-    const price = chain === 'sol' ? solPrice : ethPrice;
-    const decimals = chain === 'sol' ? 9 : 18;
-    return toUsdValue(amount, decimals, price);
-  }, [solPrice, ethPrice]);
+    const prices: Record<string, number> = { sol: solPrice, eth: ethPrice, base: ethPrice, bsc: bnbPrice };
+    const config = CHAIN_CONFIG[chain as keyof typeof CHAIN_CONFIG];
+    return toUsdValue(amount, config?.nativeDecimals ?? 18, prices[chain] ?? ethPrice);
+  }, [solPrice, ethPrice, bnbPrice]);
 
   // ── Computed values ──
   // Per-platform merge with floor: live data can increase a platform's unclaimed

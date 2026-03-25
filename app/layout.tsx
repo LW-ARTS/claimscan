@@ -45,14 +45,14 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL('https://claimscan.tech'),
   title: {
-    default: 'ClaimScan | Find Unclaimed Creator Fees on Solana & Base',
+    default: 'ClaimScan | Find Unclaimed Creator Fees on Solana, Base & BSC',
     template: '%s | ClaimScan',
   },
   description:
-    'Find unclaimed creator fees on Pump.fun, Bags.fm, Clanker, Zora and 9 launchpads. Paste any @handle or wallet to see earnings across Solana and Base in seconds.',
+    'Find unclaimed creator fees on Pump.fun, Bags.fm, Clanker, Zora and 9 launchpads. Paste any @handle or wallet to see earnings across Solana, Base, and BNB Chain in seconds.',
   keywords: [
     'DeFi fees', 'creator fees', 'Pump.fun fees', 'Bags.fm', 'Clanker',
-    'Zora', 'Solana', 'Base', 'cross-chain', 'fee tracker', 'unclaimed fees',
+    'Zora', 'Solana', 'Base', 'BNB Chain', 'BSC', 'cross-chain', 'fee tracker', 'unclaimed fees',
     'crypto revenue', 'token launchpad', 'DeFi analytics',
   ],
   authors: [{ name: 'ClaimScan' }],
@@ -65,13 +65,13 @@ export const metadata: Metadata = {
     siteName: 'ClaimScan',
     title: 'ClaimScan | Track Unclaimed Creator Fees Across DeFi',
     description:
-      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 9 launchpads on Solana and Base.',
+      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 9 launchpads on Solana, Base, and BNB Chain.',
     images: [
       {
         url: '/opengraph-image.png',
         width: 1200,
         height: 630,
-        alt: 'ClaimScan — Cross-chain DeFi fee tracker for Solana and Base',
+        alt: 'ClaimScan — Cross-chain DeFi fee tracker for Solana, Base, and BNB Chain',
       },
     ],
   },
@@ -85,7 +85,7 @@ export const metadata: Metadata = {
     images: [
       {
         url: '/opengraph-image.png',
-        alt: 'ClaimScan — Cross-chain DeFi fee tracker for Solana and Base',
+        alt: 'ClaimScan — Cross-chain DeFi fee tracker for Solana, Base, and BNB Chain',
       },
     ],
   },

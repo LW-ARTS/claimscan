@@ -1,5 +1,7 @@
 import 'server-only';
 import type { Address } from 'viem';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('evm-logs');
 
 /**
  * Minimal client interface for getLogs calls.
@@ -107,7 +109,7 @@ export async function chunkedGetLogs(
       if (r.status === 'fulfilled') {
         allLogs.push(...r.value);
       } else {
-        console.warn(`${tag} chunkedGetLogs chunk failed:`, r.reason instanceof Error ? r.reason.message : r.reason);
+        log.warn(`${tag} chunkedGetLogs chunk failed`, { error: r.reason instanceof Error ? r.reason.message : String(r.reason) });
       }
     }
 

@@ -75,6 +75,7 @@ interface PlatformBreakdownProps {
   fees: FeeRecord[];
   solPrice?: number;
   ethPrice?: number;
+  bnbPrice?: number;
   wallets?: Wallet[];
 }
 
@@ -86,7 +87,7 @@ interface ChainSummary {
   partialCount: number;
 }
 
-export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = [] }: PlatformBreakdownProps) {
+export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, wallets = [] }: PlatformBreakdownProps) {
   const [activeTab, setActiveTab] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unclaimed' | 'claimed' | 'partial'>('all');
   const tabsId = useId();
@@ -197,13 +198,13 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
         unclaimedCount: 0,
         partialCount: 0,
       };
-      existing.totalUsd += computeFeeUsd(fee, solPrice, ethPrice);
+      existing.totalUsd += computeFeeUsd(fee, solPrice, ethPrice, bnbPrice);
       if (fee.claim_status === 'unclaimed') existing.unclaimedCount += 1;
       if (fee.claim_status === 'partially_claimed') existing.partialCount += 1;
       byChain.set(fee.chain, existing);
     }
     return Array.from(byChain.values());
-  }, [displayFees, solPrice, ethPrice]);
+  }, [displayFees, solPrice, ethPrice, bnbPrice]);
 
   // Group fees by platform (memoized — fees can contain hundreds of records)
   const { byPlatform, platformsWithData, platformsEmpty } = useMemo(() => {
@@ -430,6 +431,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, wallets = 
             fees={filteredFees}
             solPrice={solPrice}
             ethPrice={ethPrice}
+            bnbPrice={bnbPrice}
             connectedWallet={connectedWallet}
             onClaimToken={handleClaimToken}
           />

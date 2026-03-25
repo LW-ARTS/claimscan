@@ -36,11 +36,11 @@ export async function generateMetadata({ params }: PageProps) {
   const displayName = isWallet ? safeName : `@${safeName}`;
   return {
     title: `${displayName} Unclaimed Creator Fees`,
-    description: `See earned, claimed, and unclaimed fees for ${displayName} across Pump.fun, Bags.fm, Clanker, Zora and more. Real-time data on Solana and Base.`,
+    description: `See earned, claimed, and unclaimed fees for ${displayName} across Pump.fun, Bags.fm, Clanker, Zora and more. Real-time data on Solana, Base, and BNB Chain.`,
     ...(isWallet ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       title: `${displayName} — Earned & Unclaimed Fees | ClaimScan`,
-      description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads on Solana and Base.`,
+      description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads on Solana, Base, and BNB Chain.`,
       images: [
         {
           url: `/${encodeURIComponent(safeName)}/opengraph-image`,
@@ -83,7 +83,7 @@ export default async function ProfilePage({ params }: PageProps) {
   // Prices use a catch fallback (price failure should NOT crash the page).
   const [creatorResult, priceResult] = await Promise.all([
     resolveAndPersistCreator(decoded),
-    getNativeTokenPrices().catch(() => ({ sol: 0, eth: 0, stale: true as const })),
+    getNativeTokenPrices().catch(() => ({ sol: 0, eth: 0, bnb: 0, stale: true as const })),
   ]);
 
   if (!creatorResult.creator) {
@@ -104,7 +104,7 @@ export default async function ProfilePage({ params }: PageProps) {
   const resolvedChains = [...new Set(wallets.map((w) => w.chain))] as Chain[];
 
   const feeToUsd = (fee: typeof feeRecords[number]): number => {
-    return computeFeeUsd(fee, priceResult.sol, priceResult.eth);
+    return computeFeeUsd(fee, priceResult.sol, priceResult.eth, priceResult.bnb);
   };
 
   // Compute aggregate stats
@@ -158,6 +158,7 @@ export default async function ProfilePage({ params }: PageProps) {
             walletsForLive={walletsForLive}
             solPrice={priceResult.sol}
             ethPrice={priceResult.eth}
+            bnbPrice={priceResult.bnb}
             handle={decoded}
             totalEarnedUsd={totalEarnedUsd}
             platformCount={platformCount}
@@ -206,7 +207,7 @@ export default async function ProfilePage({ params }: PageProps) {
         <h2 className="sr-only">Fee Breakdown by Platform</h2>
         <LazySection minHeight={200}>
           <div className="animate-fade-in-up delay-150">
-            <PlatformBreakdown fees={feeRecords} solPrice={priceResult.sol} ethPrice={priceResult.eth} wallets={wallets} key={creator.id} />
+            <PlatformBreakdown fees={feeRecords} solPrice={priceResult.sol} ethPrice={priceResult.eth} bnbPrice={priceResult.bnb} wallets={wallets} key={creator.id} />
           </div>
         </LazySection>
 

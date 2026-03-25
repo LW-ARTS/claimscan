@@ -6,6 +6,7 @@ import {
   ZORA_PROTOCOL_REWARDS,
 } from '@/lib/constants-evm';
 import { chunkedGetLogs } from './evm-logs';
+import { batchClankerFeesGeneric, getClankerClaimLogsGeneric } from './clanker-reads';
 
 // ═══════════════════════════════════════════════
 // Client (multi-RPC with adaptive fallback)
@@ -54,14 +55,8 @@ export const baseLogsClient = createPublicClient({
 
 // ═══════════════════════════════════════════════
 // ABIs (minimal — only the reads we need)
+// Clanker ABI (clankerFeeLockerAbi) lives in clanker-reads.ts, shared by Base + BSC.
 // ═══════════════════════════════════════════════
-
-export const clankerFeeLockerAbi = parseAbi([
-  'function availableFees(address feeOwner, address token) view returns (uint256)',
-  // NOTE: The FeeLocker contract does NOT expose a 'claimedFees' read function.
-  // Total claimed amounts must be derived from onchain event logs or a subgraph.
-  // Only availableFees (unclaimed) is directly readable.
-]);
 
 export const zoraProtocolRewardsAbi = parseAbi([
   'function balanceOf(address account) view returns (uint256)',
@@ -75,68 +70,17 @@ export const erc20Abi = parseAbi([
 ]);
 
 // ═══════════════════════════════════════════════
-// Clanker Reads
+// Clanker Reads (delegated to shared clanker-reads.ts)
 // ═══════════════════════════════════════════════
-
-/**
- * Get unclaimed fees for a single token from Clanker FeeLocker.
- */
-/**
- * Batch read unclaimed fees for multiple tokens via multicall.
- * Returns array of { token, available } for each token.
- * NOTE: Only unclaimed (available) fees are readable onchain.
- * Claimed totals are not exposed by the FeeLocker contract.
- */
-/** Max tokens per multicall batch.
- * Post-Fusaka (Dec 2025), Base gas limit is 60M. Each availableFees call
- * uses ~5k gas, so the chain supports 1000+ calls per multicall. The limit
- * here is driven by RPC response payload size (~2-4MB on most providers). */
-const MULTICALL_BATCH_SIZE = 200;
 
 export async function batchClankerFees(
   owner: Address,
   tokens: Address[]
 ): Promise<Array<{ token: Address; available: bigint; claimed: bigint }>> {
-  if (tokens.length === 0) return [];
-
-  // Process in chunks to avoid overloading the RPC with huge multicall payloads
-  const allResults: Array<{ token: Address; available: bigint; claimed: bigint }> = [];
-
-  for (let start = 0; start < tokens.length; start += MULTICALL_BATCH_SIZE) {
-    const chunk = tokens.slice(start, start + MULTICALL_BATCH_SIZE);
-
-    // Only read availableFees — claimedFees is not a valid contract function
-    const contracts = chunk.map((token) => ({
-      address: CLANKER_FEE_LOCKER,
-      abi: clankerFeeLockerAbi,
-      functionName: 'availableFees' as const,
-      args: [owner, token] as const,
-    }));
-
-    const results = await baseClient.multicall({
-      contracts,
-      allowFailure: true,
-    });
-
-    const chunkResults = chunk.map((token, i) => {
-      const availResult = results[i];
-      if (availResult.status === 'failure') {
-        console.warn(`[base] multicall availableFees failed for token=${token}:`, availResult.error?.message ?? 'unknown');
-      }
-      return {
-        token,
-        available: availResult.status === 'success' && typeof availResult.result === 'bigint'
-          ? availResult.result
-          : 0n,
-        // claimed is not readable from the contract — always 0n
-        claimed: 0n,
-      };
-    });
-
-    allResults.push(...chunkResults);
-  }
-
-  return allResults;
+  // Cast needed: viem's PublicClient<Transport, typeof base> has chain-specific type params
+  // that don't unify with the structural MulticallClient interface, despite satisfying it at runtime.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return batchClankerFeesGeneric(baseClient as any, CLANKER_FEE_LOCKER, owner, tokens, '[base]');
 }
 
 // ═══════════════════════════════════════════════
@@ -164,107 +108,27 @@ export async function getZoraProtocolRewardsBalance(
 }
 
 // ═══════════════════════════════════════════════
-// Clanker Claim Logs (Event-based claimed totals)
+// Clanker Claim Logs (delegated to shared clanker-reads.ts)
 // ═══════════════════════════════════════════════
-
-/**
- * ERC20 Transfer event — used to detect fee claims from FeeLocker to owner.
- * When a creator calls collectFees(), the FeeLocker transfers tokens to them.
- */
-const erc20TransferEvent = parseAbiItem(
-  'event Transfer(address indexed from, address indexed to, uint256 value)'
-);
 
 /** FeeLocker deployed ~late 2024 on Base. */
 const CLANKER_FEELOCKER_DEPLOY_BLOCK = 20_000_000n;
 
-/** Zora ProtocolRewards deployed ~Aug 2023 on Base (shortly after Base launch).
- * Conservative floor to avoid scanning from genesis while being safely before deployment. */
+/** Zora ProtocolRewards deployed ~Aug 2023 on Base (shortly after Base launch). */
 const ZORA_REWARDS_BASE_DEPLOY_BLOCK = 1_000_000n;
 
-/** Max blocks per getLogs query.
- * mainnet.base.org and drpc.org both support ~10K blocks per getLogs. */
 const LOGS_CHUNK_SIZE = 10_000n;
-
-/** Concurrent chunk requests for chunkedGetLogs. */
 const LOGS_PARALLEL_CHUNKS = 3;
-
-/** Scan window: ~500K blocks ≈ ~11.5 days of Base blocks (2s block time).
- * All tokens are scanned in a single pass (address array), so total chunks = 500K/10K = 50.
- * At 3 parallel = ~17 rounds × ~500ms = ~8.5s per scan. Combined with MAX preservation
- * in creator.ts, claimed values never regress from partial scans. */
 const SCAN_WINDOW_BLOCKS = 500_000n;
-
-/** Timeout for getLogs-based scans — prevents blocking the resolve if RPCs are slow.
- * 500K blocks / 10K chunks = 50 chunks. At 3 parallel = ~17 rounds × ~500ms = ~8.5s.
- * 15s gives room for retries (1s+2s+3s backoff) while staying within resolve budget. */
 const CLAIM_LOGS_TIMEOUT_MS = 15_000;
 
-/**
- * Get total claimed fees per token by scanning Transfer events FROM the FeeLocker TO the owner.
- * Scans ALL tokens in a single chunked pass using address array — O(chunks) not O(tokens×chunks).
- * Returns a Map of lowercase token address → total claimed wei.
- */
 export async function getClankerClaimLogs(
   owner: Address,
   tokens: Address[]
 ): Promise<Map<string, bigint>> {
-  if (tokens.length === 0) return new Map();
-
-  // Wrap in a timeout to prevent blocking the resolve when RPCs are slow.
-  // Returns empty map on timeout — tokens with available>0 still appear.
-  const scan = async (): Promise<Map<string, bigint>> => {
-    const claimMap = new Map<string, bigint>();
-    const t0 = Date.now();
-    const latestBlock = await baseLogsClient.getBlockNumber();
-    const fromBlock = latestBlock > SCAN_WINDOW_BLOCKS
-      ? latestBlock - SCAN_WINDOW_BLOCKS
-      : CLANKER_FEELOCKER_DEPLOY_BLOCK;
-
-    if (process.env.VERBOSE_LOGS) console.debug(`[base] getClankerClaimLogs: scanning ${tokens.length} tokens, blocks ${fromBlock}..${latestBlock} (${latestBlock - fromBlock} blocks, ${(latestBlock - fromBlock) / LOGS_CHUNK_SIZE} chunks)`);
-
-    const logs = await chunkedGetLogs(
-      baseLogsClient,
-      '[base]',
-      LOGS_CHUNK_SIZE,
-      LOGS_PARALLEL_CHUNKS,
-      200,
-      {
-        address: tokens,
-        event: erc20TransferEvent,
-        args: {
-          from: CLANKER_FEE_LOCKER,
-          to: owner,
-        },
-        fromBlock,
-        toBlock: latestBlock,
-      }
-    );
-
-    for (const log of logs) {
-      const token = log.address.toLowerCase();
-      const value = (log.args.value as bigint) ?? 0n;
-      claimMap.set(token, (claimMap.get(token) ?? 0n) + value);
-    }
-
-    if (process.env.VERBOSE_LOGS) console.debug(`[base] getClankerClaimLogs: found ${claimMap.size} tokens with claims, ${logs.length} transfers in ${Date.now() - t0}ms`);
-    return claimMap;
-  };
-
-  try {
-    return await Promise.race([
-      scan(),
-      new Promise<Map<string, bigint>>((resolve) =>
-        setTimeout(() => {
-          console.warn(`[base] getClankerClaimLogs: timed out after ${CLAIM_LOGS_TIMEOUT_MS}ms`);
-          resolve(new Map());
-        }, CLAIM_LOGS_TIMEOUT_MS)
-      ),
-    ]);
-  } catch (err) {
-    console.warn('[base] getClankerClaimLogs failed:', err instanceof Error ? err.message : err);
-    return new Map();
-  }
+  // Cast needed: same viem chain-generic mismatch as batchClankerFees above.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return getClankerClaimLogsGeneric(baseLogsClient as any, CLANKER_FEE_LOCKER, CLANKER_FEELOCKER_DEPLOY_BLOCK, SCAN_WINDOW_BLOCKS, LOGS_CHUNK_SIZE, LOGS_PARALLEL_CHUNKS, 200, CLAIM_LOGS_TIMEOUT_MS, '[base]', owner, tokens);
 }
 
 // ═══════════════════════════════════════════════

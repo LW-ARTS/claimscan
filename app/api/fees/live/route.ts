@@ -21,7 +21,7 @@ function validateWallets(parsed: unknown): ResolvedWallet[] | NextResponse {
   for (const w of parsed.slice(0, 10)) {
     if (!isValidWalletInput(w)) {
       return NextResponse.json(
-        { error: 'Invalid wallet object. Required: address, chain (sol|base|eth), sourcePlatform' },
+        { error: 'Invalid wallet object. Required: address, chain (sol|base|eth|bsc), sourcePlatform' },
         { status: 400 }
       );
     }

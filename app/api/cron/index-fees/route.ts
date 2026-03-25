@@ -45,7 +45,7 @@ export async function GET(request: Request) {
 
       const wallets = (creator.wallets as Array<{
         address: string;
-        chain: 'sol' | 'base' | 'eth';
+        chain: Chain;
         source_platform: string;
       }>) ?? [];
 
