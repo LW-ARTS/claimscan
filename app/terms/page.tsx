@@ -132,7 +132,7 @@ export default function TermsPage() {
           an independent software studio. By accessing or using <strong className="text-foreground/80">claimscan.tech</strong> (the &quot;Service&quot;),
           you (&quot;User&quot;, &quot;you&quot;, &quot;your&quot;) agree to be bound by these Terms of Service and all policies incorporated
           herein by reference. For entity identification and data protection inquiries, contact{' '}
-          <strong className="text-foreground/80">legal@claimscan.tech</strong>.
+          <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
         </div>
       </LazySection>
 
@@ -400,7 +400,7 @@ export default function TermsPage() {
               </div>
             </div>
             <p>
-              DMCA notices should be directed to: <strong className="text-foreground/80">legal@claimscan.tech</strong>.
+              DMCA notices should be directed to: <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
               We reserve the right to remove content alleged to be infringing without prior notice and at our sole discretion.
             </p>
           </SectionBlock>
@@ -517,7 +517,7 @@ export default function TermsPage() {
             <p>
               <strong className="text-foreground/90">Data Controller.</strong> LW ARTS is the data controller for all personal
               data processed through the Service. For data protection inquiries, contact our Data Protection Contact at{' '}
-              <strong className="text-foreground/80">dpo@claimscan.tech</strong>.
+              <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
             </p>
 
             <p>
@@ -600,7 +600,7 @@ export default function TermsPage() {
             </div>
             <p className="text-[12px] text-foreground/50">
               We encourage you to review the privacy policies and DPAs of these providers. A current list of sub-processors
-              is available upon request at <strong className="text-foreground/70">dpo@claimscan.tech</strong>.
+              is available upon request at <strong className="text-foreground/70">lwarts@claimscan.tech</strong>.
             </p>
 
             <p>
@@ -648,7 +648,7 @@ export default function TermsPage() {
               ))}
             </div>
             <p>
-              To exercise any of these rights, contact us at <strong className="text-foreground/80">dpo@claimscan.tech</strong>.
+              To exercise any of these rights, contact us at <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
               We will respond to all verifiable requests within thirty (30) days. If we need additional time, we will inform
               you of the reason and extension period (up to an additional sixty (60) days).
             </p>
@@ -658,7 +658,7 @@ export default function TermsPage() {
               California resident, you have the right to: (a) know what personal information we collect and how it is used;
               (b) request deletion of your personal information; (c) opt-out of the sale or sharing of your personal information.
               ClaimScan does <strong className="text-foreground/80">not sell or share</strong> personal information as defined
-              under the CCPA/CPRA. To submit a request, contact <strong className="text-foreground/80">privacy@claimscan.tech</strong>.
+              under the CCPA/CPRA. To submit a request, contact <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
             </p>
 
             <p>
@@ -667,7 +667,7 @@ export default function TermsPage() {
               from the European Economic Area (EEA), United Kingdom, or Switzerland to jurisdictions without an adequacy decision,
               we rely on Standard Contractual Clauses (SCCs) as approved by the European Commission (June 2021 version) and
               supplementary technical measures (encryption in transit and at rest). You may request a copy of our SCCs at{' '}
-              <strong className="text-foreground/80">dpo@claimscan.tech</strong>.
+              <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
             </p>
 
             <p>
@@ -885,11 +885,7 @@ export default function TermsPage() {
             <div className="rounded-xl border border-foreground/[0.06] p-5">
               <div className="space-y-3">
                 {[
-                  { label: 'Legal', value: 'legal@claimscan.tech' },
-                  { label: 'DPO', value: 'dpo@claimscan.tech' },
-                  { label: 'Privacy', value: 'privacy@claimscan.tech' },
-                  { label: 'DMCA', value: 'legal@claimscan.tech' },
-                  { label: 'General', value: 'hello@claimscan.tech' },
+                  { label: 'Email', value: 'lwarts@claimscan.tech' },
                   { label: 'Telegram', value: 't.me/lwarts' },
                   { label: 'X (Twitter)', value: '@lwartss' },
                 ].map((item) => (
