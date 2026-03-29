@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { APP_URL } from '@/lib/constants';
 
 // Regenerate sitemap at most once per hour (ISR)
 export const revalidate = 3600;
@@ -7,13 +8,13 @@ export const revalidate = 3600;
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [
     {
-      url: 'https://claimscan.tech',
+      url: APP_URL,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 1,
     },
     {
-      url: 'https://claimscan.tech/docs',
+      url: `${APP_URL}/docs`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.7,
@@ -42,7 +43,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       if (handle && !seen.has(handle)) {
         seen.add(handle);
         entries.push({
-          url: `https://claimscan.tech/${encodeURIComponent(handle)}`,
+          url: `${APP_URL}/${encodeURIComponent(handle)}`,
           lastModified: new Date(creator.updated_at),
           changeFrequency: 'daily',
           priority: 0.8,

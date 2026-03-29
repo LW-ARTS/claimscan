@@ -1,5 +1,6 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { RATE_LIMIT_GENERAL, RATE_LIMIT_SEARCH, RATE_LIMIT_FEES } from '@/lib/constants';
 
 let generalLimiter: Ratelimit | null = null;
 let searchLimiter: Ratelimit | null = null;
@@ -13,21 +14,21 @@ if (url && token) {
 
   generalLimiter = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(30, '1 m'),
+    limiter: Ratelimit.slidingWindow(RATE_LIMIT_GENERAL, '1 m'),
     prefix: 'claimscan:rl',
     analytics: true,
   });
 
   searchLimiter = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(10, '1 m'),
+    limiter: Ratelimit.slidingWindow(RATE_LIMIT_SEARCH, '1 m'),
     prefix: 'claimscan:rl:search',
     analytics: true,
   });
 
   feesLimiter = new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(5, '1 m'),
+    limiter: Ratelimit.slidingWindow(RATE_LIMIT_FEES, '1 m'),
     prefix: 'claimscan:rl:fees',
     analytics: true,
   });

@@ -3,6 +3,7 @@ import { createServiceClient, verifyCronSecret } from '@/lib/supabase/service';
 import { getNativeTokenPrices, getTokenPrice } from '@/lib/prices';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress } from '@/lib/chains/base';
+import { CLAIM_PENDING_EXPIRY_MS, CLAIM_SUBMITTED_EXPIRY_MS } from '@/lib/constants';
 import type { Chain } from '@/lib/supabase/types';
 
 export const maxDuration = 60;
@@ -68,8 +69,8 @@ export async function GET(request: Request) {
       }
     }
 
-    // Expire stale claim_attempts (pending/signing > 5min = blockhash expired)
-    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    // Expire stale claim_attempts (pending/signing > threshold = blockhash expired)
+    const fiveMinAgo = new Date(Date.now() - CLAIM_PENDING_EXPIRY_MS).toISOString();
     const { count: claimsPending } = await supabase
       .from('claim_attempts')
       .update(
@@ -79,8 +80,8 @@ export async function GET(request: Request) {
       .in('status', ['pending', 'signing'])
       .lt('created_at', fiveMinAgo);
 
-    // Expire submitted claims where updated_at > 2 minutes ago
-    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    // Expire submitted claims where updated_at > threshold
+    const twoMinAgo = new Date(Date.now() - CLAIM_SUBMITTED_EXPIRY_MS).toISOString();
     const { count: claimsExpired } = await supabase
       .from('claim_attempts')
       .update(

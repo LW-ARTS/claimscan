@@ -1,5 +1,6 @@
 import 'server-only';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { CLAIM_HMAC_MAX_AGE_MINUTES } from '@/lib/constants';
 
 function getSecret(): string {
   const secret = process.env.CLAIM_HMAC_SECRET
@@ -31,7 +32,7 @@ export function verifyConfirmToken(
   provided: string,
   claimAttemptId: string,
   wallet: string,
-  maxAgeMinutes = 15
+  maxAgeMinutes = CLAIM_HMAC_MAX_AGE_MINUTES
 ): boolean {
   const dotIdx = provided.indexOf('.');
   if (dotIdx === -1) return false;

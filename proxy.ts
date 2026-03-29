@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import {
+  APP_ORIGINS,
+  APP_URL,
+  RATE_LIMIT_GENERAL,
+  RATE_LIMIT_SEARCH,
+  RATE_LIMIT_FEES,
+  HSTS_HEADER,
+} from '@/lib/constants';
 
 // Lazy-load Upstash rate limiters to avoid Edge bundling issues
 let _generalLimiter: Awaited<typeof import('@/lib/rate-limit')>['generalLimiter'] | undefined;
@@ -44,7 +52,7 @@ let _warnedMissingUpstash = false;
 // NOTE: In serverless/Edge environments, each instance has its own map.
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
-const RATE_LIMIT_MAX = 30; // 30 requests per minute per IP
+const RATE_LIMIT_MAX = RATE_LIMIT_GENERAL;
 
 /**
  * Anti-enumeration: track unique handles (/{handle}) per IP to detect mass lookups.
@@ -160,7 +168,7 @@ function withSecurityHeaders(res: NextResponse): NextResponse {
   res.headers.set('Content-Security-Policy', CSP_HEADER);
   res.headers.set('X-XSS-Protection', '0');
   if (process.env.NODE_ENV === 'production') {
-    res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+    res.headers.set('Strict-Transport-Security', HSTS_HEADER);
   }
   return res;
 }
@@ -189,7 +197,7 @@ function getClientIp(request: NextRequest): string {
 const MAX_BODY_SIZE = 4096;
 
 /** Stricter rate limit for the search endpoint (most valuable to scrapers) */
-const SEARCH_RATE_LIMIT_MAX = 10; // 10 searches per minute per IP
+const SEARCH_RATE_LIMIT_MAX = RATE_LIMIT_SEARCH;
 
 const SCRAPER_UA_RE = new RegExp(
   [
@@ -204,11 +212,8 @@ const SCRAPER_UA_RE = new RegExp(
   'i'
 );
 
-/** Allowed origins for API POST requests (anti-scraping) */
-const ALLOWED_API_ORIGINS = new Set([
-  'https://claimscan.tech',
-  'https://www.claimscan.tech',
-]);
+/** Allowed origins for API POST requests (anti-scraping). Derived from APP_ORIGINS. */
+const ALLOWED_API_ORIGINS = APP_ORIGINS;
 
 /**
  * Tarpit delay — wastes scraper resources by making them wait.
@@ -283,14 +288,13 @@ export async function proxy(request: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
     response.headers.set(
       'Strict-Transport-Security',
-      'max-age=63072000; includeSubDomains; preload'
+      HSTS_HEADER
     );
   }
 
   // CORS — reflect request Origin only if it's in our allowlist (not attacker-controlled)
-  const ALLOWED_ORIGINS = new Set(['https://claimscan.tech', 'https://www.claimscan.tech']);
   const requestOrigin = request.headers.get('origin');
-  const allowedOrigin = requestOrigin && ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : 'https://claimscan.tech';
+  const allowedOrigin = requestOrigin && APP_ORIGINS.has(requestOrigin) ? requestOrigin : APP_URL;
   response.headers.set('Access-Control-Allow-Origin', allowedOrigin);
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Request-Sig');

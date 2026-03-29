@@ -44,8 +44,8 @@ interface HubVerificationsResponse {
 // Public API endpoints (no auth needed)
 // ═══════════════════════════════════════════════
 
-const WARPCAST_API = 'https://client.warpcast.com/v2';
-const FARCASTER_HUB = 'https://hub.pinata.cloud/v1';
+const WARPCAST_API = process.env.WARPCAST_API_URL || 'https://client.warpcast.com/v2';
+const FARCASTER_HUB = process.env.FARCASTER_HUB_URL || 'https://hub.pinata.cloud/v1';
 
 // ═══════════════════════════════════════════════
 // Matching Logic
