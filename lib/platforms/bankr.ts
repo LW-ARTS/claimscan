@@ -277,8 +277,8 @@ async function resolveWalletByAgent(handle: string): Promise<ResolvedWallet[]> {
 // Search + Doppler API (primary — fast, structured)
 // ═══════════════════════════════════════════════
 
-const BANKR_LAUNCHES_API = 'https://api.bankr.bot/token-launches';
-const BANKR_PUBLIC_API = 'https://api.bankr.bot/public/doppler';
+const BANKR_LAUNCHES_API = `${BANKR_API_URL}/token-launches`;
+const BANKR_PUBLIC_API = `${BANKR_API_URL}/public/doppler`;
 const BANKR_BEARER = process.env.BANKR_BEARER_TOKEN;
 
 // ── Doppler in-memory cache ──────────────────────────────

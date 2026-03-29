@@ -26,7 +26,8 @@ export async function GET(request: Request) {
   try {
     // Build the absolute URL to the OG image route
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const host = process.env.VERCEL_URL ?? (process.env.NODE_ENV === 'production' ? 'claimscan.tech' : 'localhost:3001');
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://claimscan.tech';
+    const host = process.env.VERCEL_URL ?? new URL(appUrl).host;
     const ogUrl = `${protocol}://${host}/${encodeURIComponent(handle)}/opengraph-image`;
 
     const response = await fetch(ogUrl, {

@@ -3,7 +3,14 @@ import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { createServiceClient } from '@/lib/supabase/service';
 import { generateBatchClaimTransactions } from '@/lib/platforms/bags-claim';
 import { generateConfirmToken } from '@/lib/claim/hmac';
-import { CLAIMSCAN_FEE_BPS, MIN_FEE_LAMPORTS } from '@/lib/constants';
+import {
+  CLAIMSCAN_FEE_BPS,
+  MIN_FEE_LAMPORTS,
+  MAX_ACTIVE_CLAIMS_PER_WALLET,
+  MAX_MINTS_PER_CLAIM_BATCH,
+  CLAIM_PENDING_EXPIRY_MS,
+  CLAIM_SUBMITTED_EXPIRY_MS,
+} from '@/lib/constants';
 import { trackClaimEvent, trackPerformance, trackFeeCollection } from '@/lib/monitoring';
 import { verifyTurnstile } from '@/lib/turnstile';
 
@@ -36,7 +43,7 @@ export async function POST(request: Request) {
   }
 
   // Validate tokenMints
-  if (!Array.isArray(tokenMints) || tokenMints.length === 0 || tokenMints.length > 10) {
+  if (!Array.isArray(tokenMints) || tokenMints.length === 0 || tokenMints.length > MAX_MINTS_PER_CLAIM_BATCH) {
     return NextResponse.json(
       { error: 'tokenMints must be an array of 1-10 items' },
       { status: 400 }
@@ -65,8 +72,8 @@ export async function POST(request: Request) {
 
   // Inline cleanup: expire stale claims for THIS wallet before checking limits.
   // This self-heals stuck locks without waiting for the daily cron job.
-  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-  const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const fiveMinAgo = new Date(Date.now() - CLAIM_PENDING_EXPIRY_MS).toISOString();
+  const twoMinAgo = new Date(Date.now() - CLAIM_SUBMITTED_EXPIRY_MS).toISOString();
   const [cleanup1, cleanup2] = await Promise.all([
     supabase
       .from('claim_attempts')
@@ -96,7 +103,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 503 });
   }
 
-  if (activeCount !== null && activeCount >= 30) {
+  if (activeCount !== null && activeCount >= MAX_ACTIVE_CLAIMS_PER_WALLET) {
     return NextResponse.json(
       { error: 'Too many active claims. Please wait for existing claims to complete.' },
       { status: 429 }

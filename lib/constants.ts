@@ -94,6 +94,46 @@ export const CLAIMSCAN_FEE_BPS = 85;
 export const MIN_FEE_LAMPORTS = 1_000_000n; // 0.001 SOL
 
 // ═══════════════════════════════════════════════
+// App Configuration
+// ═══════════════════════════════════════════════
+
+/** Canonical app URL. Used for CORS, sitemap, robots, OG images. */
+export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://claimscan.tech';
+/** Allowed origins for CORS and Origin validation (primary + www). */
+export const APP_ORIGINS = new Set([APP_URL, APP_URL.replace('://', '://www.')]);
+
+// ═══════════════════════════════════════════════
+// Rate Limits (shared between proxy.ts and rate-limit.ts)
+// ═══════════════════════════════════════════════
+
+export const RATE_LIMIT_GENERAL = 30;  // req/min — all API routes
+export const RATE_LIMIT_SEARCH = 10;   // req/min — /api/search, /api/resolve
+export const RATE_LIMIT_FEES = 5;      // req/min — /api/fees/live*
+
+// ═══════════════════════════════════════════════
+// Claim Flow
+// ═══════════════════════════════════════════════
+
+export const MAX_ACTIVE_CLAIMS_PER_WALLET = 30;
+export const MAX_MINTS_PER_CLAIM_BATCH = 10;
+/** Pending/signing claims older than this are expired (blockhash invalid). */
+export const CLAIM_PENDING_EXPIRY_MS = 5 * 60 * 1000;
+/** Submitted claims not confirmed within this window are expired. */
+export const CLAIM_SUBMITTED_EXPIRY_MS = 2 * 60 * 1000;
+/** Failed/expired claims can be retried within this window. */
+export const CLAIM_RECOVERY_WINDOW_MS = 15 * 60 * 1000;
+/** HMAC confirm token validity window in minutes. Must match CLAIM_RECOVERY_WINDOW_MS. */
+export const CLAIM_HMAC_MAX_AGE_MINUTES = 15;
+/** Wait time for Solana finalization after confirmed status (typically 6-12s). */
+export const SOLANA_FINALIZATION_WAIT_MS = 15_000;
+
+// ═══════════════════════════════════════════════
+// Security Headers
+// ═══════════════════════════════════════════════
+
+export const HSTS_HEADER = 'max-age=63072000; includeSubDomains; preload';
+
+// ═══════════════════════════════════════════════
 // Timing Constants
 // ═══════════════════════════════════════════════
 

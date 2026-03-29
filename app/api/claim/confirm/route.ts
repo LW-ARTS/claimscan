@@ -4,7 +4,7 @@ import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
 import { createServiceClient } from '@/lib/supabase/service';
 import { invalidatePositionsCache } from '@/lib/platforms/bags-api';
 import { verifyConfirmToken } from '@/lib/claim/hmac';
-import { CLAIMSCAN_FEE_WALLET } from '@/lib/constants';
+import { CLAIMSCAN_FEE_WALLET, CLAIM_RECOVERY_WINDOW_MS, SOLANA_FINALIZATION_WAIT_MS } from '@/lib/constants';
 import type { ClaimAttemptStatus } from '@/lib/supabase/types';
 import { trackClaimEvent, trackFeeCollection } from '@/lib/monitoring';
 
@@ -28,7 +28,7 @@ async function verifyFinalization(
   supabase: ReturnType<typeof createServiceClient>
 ) {
   // Wait for finalization — typically 6-12s after confirmed on Solana
-  await new Promise((r) => setTimeout(r, 15_000));
+  await new Promise((r) => setTimeout(r, SOLANA_FINALIZATION_WAIT_MS));
 
   const connection = new Connection(FINALIZE_RPC, 'finalized');
   const tx = await connection.getTransaction(txSignature, {
@@ -252,14 +252,13 @@ export async function POST(request: Request) {
     );
   }
 
-  // Limit recovery window: failed/expired → submitted only within 15 minutes
-  const RECOVERY_WINDOW_MS = 15 * 60 * 1000;
+  // Limit recovery window: failed/expired → submitted only within the configured window
   if (
     (attempt.status === 'failed' || attempt.status === 'expired') &&
     validatedStatus === 'submitted'
   ) {
     const createdAt = new Date(attempt.created_at).getTime();
-    if (Date.now() - createdAt > RECOVERY_WINDOW_MS) {
+    if (Date.now() - createdAt > CLAIM_RECOVERY_WINDOW_MS) {
       return NextResponse.json(
         { error: 'Recovery window expired — start a new claim' },
         { status: 410 }
