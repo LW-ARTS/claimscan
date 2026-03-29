@@ -20,6 +20,13 @@ export async function GET(request: Request) {
     );
   }
 
+  if (!/^[a-zA-Z0-9_\-\.@]{2,64}$/.test(handle.slice(0, 64))) {
+    return NextResponse.json(
+      { error: 'Invalid handle format' },
+      { status: 400 }
+    );
+  }
+
   // Sanitize handle for filename
   const safeHandle = handle.replace(/[^a-zA-Z0-9_\-\.]/g, '_').slice(0, 64);
 

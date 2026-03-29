@@ -28,7 +28,7 @@ export function Providers({ children }: { children: ReactNode }) {
     if (!endpoint) {
       console.error('[Providers] NEXT_PUBLIC_SOLANA_RPC_URL is not configured');
     } else if (/[?&](api[-_]?key|apikey)=/i.test(endpoint)) {
-      console.warn('[Providers] NEXT_PUBLIC_SOLANA_RPC_URL appears to contain an API key visible to browsers.');
+      console.error('[Providers] SECURITY: NEXT_PUBLIC_SOLANA_RPC_URL appears to contain an API key visible to browsers. Use a read-only key or proxy through /api/balance.');
     }
   }, [endpoint]);
 

@@ -252,7 +252,8 @@ async function fetchFeesByAgent(handle: string, timeoutMs = AGENT_SHORT_TIMEOUT_
 }
 
 async function resolveWalletByAgent(handle: string): Promise<ResolvedWallet[]> {
-  const prompt = `What is the Base/Ethereum wallet address associated with @${handle} on Bankr? Reply with ONLY the 0x address, nothing else.`;
+  const safeHandle = handle.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 50);
+  const prompt = `What is the Base/Ethereum wallet address associated with @${safeHandle} on Bankr? Reply with ONLY the 0x address, nothing else.`;
   const response = await promptBankrAgent(prompt);
   if (!response) return [];
 

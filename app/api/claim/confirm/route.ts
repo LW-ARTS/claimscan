@@ -4,9 +4,40 @@ import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
 import { createServiceClient } from '@/lib/supabase/service';
 import { invalidatePositionsCache } from '@/lib/platforms/bags-api';
 import { verifyConfirmToken } from '@/lib/claim/hmac';
-import { CLAIMSCAN_FEE_WALLET, CLAIM_RECOVERY_WINDOW_MS, SOLANA_FINALIZATION_WAIT_MS } from '@/lib/constants';
+import { CLAIMSCAN_FEE_WALLET, CLAIM_RECOVERY_WINDOW_MS, CLAIM_HMAC_MAX_AGE_MINUTES, SOLANA_FINALIZATION_WAIT_MS } from '@/lib/constants';
 import type { ClaimAttemptStatus } from '@/lib/supabase/types';
 import { trackClaimEvent, trackFeeCollection } from '@/lib/monitoring';
+import { createHash } from 'crypto';
+
+// ═══════════════════════════════════════════════
+// HMAC Token Single-Use (SS-004)
+// Redis-backed consumption tracking prevents replay within the 15-min window.
+// ═══════════════════════════════════════════════
+
+let _hmacRedis: import('@upstash/redis').Redis | null = null;
+try {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (url && token) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Redis } = require('@upstash/redis') as typeof import('@upstash/redis');
+    _hmacRedis = new Redis({ url, token });
+  }
+} catch { /* Redis unavailable — allow through (no regression) */ }
+
+const HMAC_DEDUP_PREFIX = 'claimscan:hmac:used:';
+const HMAC_DEDUP_TTL_MS = CLAIM_HMAC_MAX_AGE_MINUTES * 60 * 1000;
+
+async function consumeHmacToken(token: string): Promise<boolean> {
+  if (!_hmacRedis) return true; // No Redis = allow through (graceful degradation)
+  try {
+    const hash = createHash('sha256').update(token).digest('hex').slice(0, 32);
+    const result = await _hmacRedis.set(`${HMAC_DEDUP_PREFIX}${hash}`, 1, { px: HMAC_DEDUP_TTL_MS, nx: true });
+    return result !== null; // null = key existed = replay
+  } catch {
+    return true; // Redis error = allow through
+  }
+}
 
 // ═══════════════════════════════════════════════
 // Finalization verification (fire-and-forget)
@@ -146,7 +177,7 @@ export async function POST(request: Request) {
       // RPC failure — insert with fee_lamports='0' to track the attempt.
       // Actual amount will be reconciled via cron once RPC is available.
       // Never trust client-supplied rawFeeLamports for unverified records.
-      console.error(`[claim/confirm] FEE_VERIFICATION_FAILED: sig=${feeSig} wallet=${feeWallet} lamports=${rawFeeLamports} — inserting unverified record with amount=0`);
+      console.error(`[claim/confirm] FEE_VERIFICATION_FAILED: sig=${feeSig} wallet=${feeWallet?.slice(0, 6)}...${feeWallet?.slice(-4)} lamports=${rawFeeLamports} — inserting unverified record with amount=0`);
       trackClaimEvent('failure', { reason: 'fee_verification_rpc_error', wallet: feeWallet ?? '', feeLamports: rawFeeLamports ?? '0' });
       try {
         const svc = createServiceClient();
@@ -217,6 +248,12 @@ export async function POST(request: Request) {
   // Verify HMAC token — constant-time comparison prevents timing attacks
   if (!verifyConfirmToken(confirmToken, claimAttemptId, wallet)) {
     return NextResponse.json({ error: 'Invalid confirm token' }, { status: 403 });
+  }
+
+  // Single-use enforcement (SS-004): prevent HMAC token replay within 15-min window
+  const tokenConsumed = await consumeHmacToken(confirmToken);
+  if (!tokenConsumed) {
+    return NextResponse.json({ error: 'Token already used' }, { status: 409 });
   }
 
   const supabase = createServiceClient();

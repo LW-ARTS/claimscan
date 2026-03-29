@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Exo_2, JetBrains_Mono } from 'next/font/google';
 import dynamic from 'next/dynamic';
+import Script from 'next/script';
+import { headers } from 'next/headers';
 import './globals.css';
 import { JsonLd } from './components/JsonLd';
 import { Analytics } from '@vercel/analytics/next';
@@ -117,16 +119,25 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const headersList = await headers();
+  const nonce = headersList.get('x-nonce') ?? '';
+
   return (
     <html lang="en">
       <head>
         <meta name="base:app_id" content="69b2e7675600c39dcfa4fe7b" />
         <JsonLd />
+        {/* Preload Turnstile with CSP nonce — eliminates dynamic script injection in ClaimDialog */}
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+          strategy="beforeInteractive"
+          nonce={nonce}
+        />
       </head>
       <body
         className={`${exo2.variable} ${jetbrainsMono.variable} font-sans antialiased min-h-screen bg-background text-foreground`}
