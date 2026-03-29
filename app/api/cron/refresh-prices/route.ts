@@ -143,7 +143,7 @@ export async function GET(request: Request) {
       totalTokens: entries.length,
     });
   } catch (error) {
-    console.error('Price refresh error:', error);
+    console.error('Price refresh error:', error instanceof Error ? error.message : String(error));
     return NextResponse.json(
       { error: 'Price refresh failed' },
       { status: 500 }

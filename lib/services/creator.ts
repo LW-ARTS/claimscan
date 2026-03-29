@@ -164,9 +164,9 @@ async function freshResolve(
 
     // ── Step 3: Return fresh data ──
     const [{ data: freshCreator }, { data: freshFees }, { data: claimEvents }] = await Promise.all([
-      supabase.from('creators').select('*, wallets(*)').eq('id', creatorId).single(),
-      supabase.from('fee_records').select('*').eq('creator_id', creatorId),
-      supabase.from('claim_events').select('*').eq('creator_id', creatorId).order('claimed_at', { ascending: false }).limit(50),
+      supabase.from('creators').select('id, twitter_handle, github_handle, farcaster_handle, farcaster_fid, display_name, avatar_url, created_at, updated_at, last_token_sync_at, wallets(id, creator_id, address, chain, source_platform, verified, created_at)').eq('id', creatorId).single(),
+      supabase.from('fee_records').select('id, creator_id, creator_token_id, platform, chain, token_address, token_symbol, total_earned, total_claimed, total_unclaimed, total_earned_usd, claim_status, royalty_bps, last_synced_at, created_at').eq('creator_id', creatorId),
+      supabase.from('claim_events').select('id, creator_id, platform, chain, token_address, amount, amount_usd, tx_hash, claimed_at, created_at').eq('creator_id', creatorId).order('claimed_at', { ascending: false }).limit(50),
     ]);
 
     const returnedFees = (freshFees ?? []) as FeeRecord[];
@@ -185,8 +185,8 @@ async function freshResolve(
     if (existingCreatorId) {
       try {
         const [{ data: staleCreator }, { data: staleFees }] = await Promise.all([
-          supabase.from('creators').select('*, wallets(*)').eq('id', existingCreatorId).single(),
-          supabase.from('fee_records').select('*').eq('creator_id', existingCreatorId),
+          supabase.from('creators').select('id, twitter_handle, github_handle, farcaster_handle, farcaster_fid, display_name, avatar_url, created_at, updated_at, last_token_sync_at, wallets(id, creator_id, address, chain, source_platform, verified, created_at)').eq('id', existingCreatorId).single(),
+          supabase.from('fee_records').select('id, creator_id, creator_token_id, platform, chain, token_address, token_symbol, total_earned, total_claimed, total_unclaimed, total_earned_usd, claim_status, royalty_bps, last_synced_at, created_at').eq('creator_id', existingCreatorId),
         ]);
         if (staleCreator) {
           const staleFeeRecords = (staleFees ?? []) as FeeRecord[];

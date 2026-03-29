@@ -21,6 +21,10 @@ function toLamports(val: string | number | null | undefined): bigint {
   if (val == null) return 0n;
   if (typeof val === 'number') {
     if (!Number.isFinite(val) || val < 0) return 0n;
+    if (!Number.isSafeInteger(val)) {
+      log.warn(`toLamports: number ${val} exceeds safe integer range, converting via string`);
+      return toLamports(String(val));
+    }
     return BigInt(Math.floor(val));
   }
   const trimmed = val.trim();

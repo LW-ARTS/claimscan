@@ -147,7 +147,11 @@ export const raydiumAdapter: PlatformAdapter = {
 
       // Attribute to the first token that has a valid mint address
       const firstToken = tokens.find((t) => t.mint || t.tokenMint);
-      const firstMint = firstToken?.mint ?? firstToken?.tokenMint ?? wallet;
+      if (!firstToken) {
+        log.warn('No token with valid mint found — skipping fee report', { wallet: wallet.slice(0, 8) });
+        return [];
+      }
+      const firstMint = firstToken.mint ?? firstToken.tokenMint!;
 
       return [{
         tokenAddress: firstMint,

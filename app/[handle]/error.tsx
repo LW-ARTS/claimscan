@@ -12,7 +12,6 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[ErrorBoundary]', error);
     Sentry.captureException(error);
   }, [error]);
 

@@ -10,14 +10,39 @@ import { pushSSEEvent } from '@/lib/helius/sse-registry';
 
 const WEBHOOK_SECRET = process.env.HELIUS_WEBHOOK_SECRET;
 
-// Replay protection: track processed signatures with 5-minute TTL
-const processedSignatures = new Map<string, number>();
+// Replay protection: Redis-backed dedup persists across cold starts (M3).
+// Falls back to in-memory Map when Redis is unavailable.
+const DEDUP_PREFIX = 'claimscan:webhook:sig:';
 const DEDUP_TTL_MS = 5 * 60 * 1000;
+
+let _redis: import('@upstash/redis').Redis | null = null;
+try {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (url && token) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Redis } = require('@upstash/redis') as typeof import('@upstash/redis');
+    _redis = new Redis({ url, token });
+  }
+} catch { /* Redis unavailable — fall back to in-memory */ }
+
+const processedSignatures = new Map<string, number>();
 const DEDUP_MAX_SIZE = 5000;
 
-function isReplay(signature: string): boolean {
+async function isReplay(signature: string): Promise<boolean> {
+  // Try Redis first — persists across cold starts
+  if (_redis) {
+    try {
+      const result = await _redis.set(`${DEDUP_PREFIX}${signature}`, 1, { px: DEDUP_TTL_MS, nx: true });
+      // SET NX returns 'OK' on success (new key), null if key already exists (replay)
+      return result === null;
+    } catch {
+      // Redis failed — fall through to in-memory
+    }
+  }
+
+  // In-memory fallback (per-instance, resets on cold start)
   const now = Date.now();
-  // Evict stale entries periodically
   if (processedSignatures.size > DEDUP_MAX_SIZE) {
     for (const [sig, ts] of processedSignatures) {
       if (now - ts > DEDUP_TTL_MS) processedSignatures.delete(sig);
@@ -96,8 +121,8 @@ export async function POST(request: Request) {
 
     for (const event of payload) {
       if (totalAccounts >= MAX_TOTAL_ACCOUNTS) break;
-      // Skip already-processed events (replay protection)
-      if (event.signature && isReplay(event.signature)) continue;
+      // Skip already-processed events (replay protection — Redis-backed)
+      if (event.signature && await isReplay(event.signature)) continue;
       const affectedAccounts = new Set<string>();
 
       for (const transfer of (event.nativeTransfers ?? []).slice(0, 100)) {

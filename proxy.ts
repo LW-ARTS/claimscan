@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 // Lazy-load Upstash rate limiters to avoid Edge bundling issues
 let _generalLimiter: Awaited<typeof import('@/lib/rate-limit')>['generalLimiter'] | undefined;
 let _searchLimiter: Awaited<typeof import('@/lib/rate-limit')>['searchLimiter'] | undefined;
+let _feesLimiter: Awaited<typeof import('@/lib/rate-limit')>['feesLimiter'] | undefined;
 let _limiterLoaded = false;
 
 async function getRateLimiters() {
@@ -12,12 +13,13 @@ async function getRateLimiters() {
       const mod = await import('@/lib/rate-limit');
       _generalLimiter = mod.generalLimiter;
       _searchLimiter = mod.searchLimiter;
+      _feesLimiter = mod.feesLimiter;
     } catch {
       // Upstash not available in Edge — use in-memory fallback
     }
     _limiterLoaded = true;
   }
-  return { generalLimiter: _generalLimiter, searchLimiter: _searchLimiter };
+  return { generalLimiter: _generalLimiter, searchLimiter: _searchLimiter, feesLimiter: _feesLimiter };
 }
 
 async function verifyRequestSignature(sig: string | null, path: string): Promise<boolean> {
@@ -144,6 +146,45 @@ function safeCompare(a: string, b: string): boolean {
   return mismatch === 0;
 }
 
+/**
+ * Apply security headers to any response (including error responses).
+ * Ensures HSTS, CSP, X-Frame-Options etc. are present on 4xx/5xx,
+ * not just on successful pass-through responses.
+ */
+function withSecurityHeaders(res: NextResponse): NextResponse {
+  res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.headers.set('X-DNS-Prefetch-Control', 'off');
+  res.headers.set('Permissions-Policy', PERMISSIONS_POLICY);
+  res.headers.set('Content-Security-Policy', CSP_HEADER);
+  res.headers.set('X-XSS-Protection', '0');
+  if (process.env.NODE_ENV === 'production') {
+    res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  }
+  return res;
+}
+
+/**
+ * Resolve client IP from request.
+ * Trust order: Vercel platform IP > x-real-ip > fingerprint fallback.
+ * x-forwarded-for is NOT used — it's client-spoofable outside Vercel's edge.
+ */
+function getClientIp(request: NextRequest): string {
+  const vercelIp = (request as unknown as { ip?: string }).ip;
+  if (vercelIp) return vercelIp;
+  const realIp = request.headers.get('x-real-ip')?.trim();
+  if (realIp) return realIp;
+  // Fingerprint fallback: avoids a single shared bucket for all anonymous traffic.
+  // Not perfect but prevents one attacker from exhausting the bucket for everyone.
+  if (process.env.NODE_ENV === 'production') {
+    const ua = (request.headers.get('user-agent') ?? '').slice(0, 32);
+    const lang = (request.headers.get('accept-language') ?? '').slice(0, 8);
+    return `anon:${ua}:${lang}`;
+  }
+  return '127.0.0.1';
+}
+
 /** Max POST body size (4KB) to prevent memory exhaustion from large payloads */
 const MAX_BODY_SIZE = 4096;
 
@@ -190,6 +231,13 @@ const TARPIT_INDICATORS = [
 /** Pattern to match /{handle} routes (single path segment, not /api, /docs, /_next, etc.) */
 const HANDLE_ROUTE_RE = /^\/([a-zA-Z0-9_\-\.]{1,64})$/;
 
+const PERMISSIONS_POLICY = [
+  'camera=()', 'microphone=()', 'geolocation=()', 'payment=()',
+  'usb=()', 'serial=()', 'battery=()', 'display-capture=()',
+  'accelerometer=()', 'gyroscope=()', 'magnetometer=()',
+  'browsing-topics=()', 'interest-cohort=()',
+].join(', ');
+
 const CSP_HEADER = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://challenges.cloudflare.com",
@@ -227,12 +275,10 @@ export async function proxy(request: NextRequest) {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set('X-DNS-Prefetch-Control', 'on');
-  response.headers.set(
-    'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(), payment=()'
-  );
+  response.headers.set('X-DNS-Prefetch-Control', 'off');
+  response.headers.set('Permissions-Policy', PERMISSIONS_POLICY);
   response.headers.set('Content-Security-Policy', CSP_HEADER);
+  response.headers.set('X-XSS-Protection', '0');
   // Only set HSTS in production to avoid issues with local dev
   if (process.env.NODE_ENV === 'production') {
     response.headers.set(
@@ -260,11 +306,11 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith('/api/cron')) {
     const secret = process.env.CRON_SECRET;
     if (!secret || secret.length === 0) {
-      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+      return withSecurityHeaders(NextResponse.json({ error: 'Server misconfigured' }, { status: 500 }));
     }
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !safeCompare(authHeader, `Bearer ${secret}`)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return withSecurityHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     }
   }
 
@@ -277,17 +323,17 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith('/api/')) {
     const ua = request.headers.get('user-agent')?.toLowerCase() ?? '';
     if (SCRAPER_UA_RE.test(ua)) {
-      return NextResponse.json(
+      return withSecurityHeaders(NextResponse.json(
         { error: 'Automated access is not permitted' },
         { status: 403 }
-      );
+      ));
     }
     // Block requests with no User-Agent (legitimate browsers always send one)
     if (!request.headers.get('user-agent')) {
-      return NextResponse.json(
+      return withSecurityHeaders(NextResponse.json(
         { error: 'User-Agent header is required' },
         { status: 400 }
-      );
+      ));
     }
   }
 
@@ -303,7 +349,7 @@ export async function proxy(request: NextRequest) {
   ) {
     const origin = request.headers.get('origin');
     if (!origin || !ALLOWED_API_ORIGINS.has(origin)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return withSecurityHeaders(NextResponse.json({ error: 'Forbidden' }, { status: 403 }));
     }
   }
 
@@ -318,7 +364,7 @@ export async function proxy(request: NextRequest) {
     const sig = request.headers.get('x-request-sig');
     const isValid = await verifyRequestSignature(sig, pathname);
     if (!isValid) {
-      return NextResponse.json({ error: 'Invalid request signature' }, { status: 403 });
+      return withSecurityHeaders(NextResponse.json({ error: 'Invalid request signature' }, { status: 403 }));
     }
   }
 
@@ -326,58 +372,40 @@ export async function proxy(request: NextRequest) {
   const handleMatch = pathname.match(HANDLE_ROUTE_RE);
   if (handleMatch) {
     const handle = handleMatch[1];
-    const ip = (request as unknown as { ip?: string }).ip
-      ?? request.headers.get('x-real-ip')
-      ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+    const ip = getClientIp(request);
 
-    if (ip && isEnumerating(ip, handle)) {
-      // Tarpit + 429 — waste scraper time before rejecting
+    if (!ip.startsWith('anon:') && isEnumerating(ip, handle)) {
       await sleep(3000);
-      return NextResponse.json(
+      return withSecurityHeaders(NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
         { status: 429, headers: { 'Retry-After': '300' } }
-      );
+      ));
     }
   }
 
-  // Tarpit: add artificial delay for suspicious requests to waste scraper resources.
-  // Applied on API routes and handle routes (not static assets).
-  if (pathname.startsWith('/api/') || handleMatch) {
-    const delay = getTarpitDelayMs(request);
-    if (delay > 0) {
-      await sleep(delay);
-    }
-  }
-
-  // Rate limit public API endpoints and expensive dynamic routes (OG images)
+  // Rate limit BEFORE tarpit (L9): reject over-limit requests immediately
+  // instead of wasting 5s of serverless function time tarpitting them first.
   const isRateLimitedPath =
     (pathname.startsWith('/api/') && !pathname.startsWith('/api/cron')) ||
     pathname.endsWith('/opengraph-image');
 
   if (isRateLimitedPath) {
-    // Use Vercel's runtime-injected IP (not spoofable), falling back to headers
-    // set by trusted reverse proxy. On Vercel, request.ip is injected by the platform.
-    const ip = (request as unknown as { ip?: string }).ip
-      ?? request.headers.get('x-real-ip')
-      ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+    const rateLimitKey = getClientIp(request);
 
-    // If IP cannot be determined in production, the request is suspicious —
-    // create a per-request pseudo-key from available headers to avoid a shared bucket.
-    // In dev (no Vercel IP injection), use localhost fallback.
-    const rateLimitKey = ip
-      || (process.env.NODE_ENV === 'production'
-        ? 'anon:unknown'
-        : `anon:${request.headers.get('user-agent')?.slice(0, 64) ?? 'none'}:${request.headers.get('accept-language')?.slice(0, 16) ?? 'none'}`);
+    const { generalLimiter, searchLimiter, feesLimiter } = await getRateLimiters();
 
-    // Use Upstash Redis (persistent across serverless instances) when configured,
-    // otherwise fall back to in-memory rate limiting (best-effort per-instance).
-    // WARNING: In-memory fallback is NOT reliable in serverless — each cold start resets.
-    const { generalLimiter, searchLimiter } = await getRateLimiters();
-    const upstashLimiter = pathname === '/api/search' ? searchLimiter : generalLimiter;
+    // Path-specific rate limits:
+    // - /api/search, /api/resolve: 10 req/min (identity resolution oracle — M1)
+    // - /api/fees/live*: 5 req/min (triggers 9 adapters × 10 wallets — M2)
+    // - everything else: 30 req/min (general)
+    const isSearchOrResolve = pathname === '/api/search' || pathname === '/api/resolve';
+    const isFeesLive = pathname.startsWith('/api/fees/live');
+    const upstashLimiter = isSearchOrResolve
+      ? searchLimiter
+      : isFeesLive
+        ? feesLimiter
+        : generalLimiter;
 
-    // Fail-closed in production: if Upstash isn't configured, the in-memory
-    // fallback provides almost no protection in serverless. Log once per instance
-    // so ops can detect the misconfiguration via Sentry/Vercel logs.
     if (!upstashLimiter && process.env.NODE_ENV === 'production' && !_warnedMissingUpstash) {
       _warnedMissingUpstash = true;
       console.error(
@@ -389,7 +417,7 @@ export async function proxy(request: NextRequest) {
     if (upstashLimiter) {
       const { success, remaining } = await upstashLimiter.limit(rateLimitKey);
       if (!success) {
-        return NextResponse.json(
+        return withSecurityHeaders(NextResponse.json(
           { error: 'Too many requests. Please try again later.' },
           {
             status: 429,
@@ -398,45 +426,61 @@ export async function proxy(request: NextRequest) {
               'X-RateLimit-Remaining': '0',
             },
           }
-        );
+        ));
       }
       response.headers.set('X-RateLimit-Remaining', String(remaining));
     } else {
       // Fallback: in-memory rate limiting (per-instance, not reliable in serverless).
-      // Use tighter limits than Upstash since each cold start resets the counter,
-      // meaning an attacker gets a fresh allowance per instance.
+      // Tighter limits compensate for per-instance reset on cold start.
       const inMemorySearchLimit = process.env.NODE_ENV === 'production' ? 5 : SEARCH_RATE_LIMIT_MAX;
+      const inMemoryFeesLimit = process.env.NODE_ENV === 'production' ? 3 : 5;
       const inMemoryGeneralLimit = process.env.NODE_ENV === 'production' ? 15 : RATE_LIMIT_MAX;
-      const effectiveLimit = pathname === '/api/search' ? inMemorySearchLimit : inMemoryGeneralLimit;
-      const limitKey = pathname === '/api/search' ? `search:${rateLimitKey}` : rateLimitKey;
+      const effectiveLimit = isSearchOrResolve
+        ? inMemorySearchLimit
+        : isFeesLive
+          ? inMemoryFeesLimit
+          : inMemoryGeneralLimit;
+      const limitKey = isSearchOrResolve
+        ? `search:${rateLimitKey}`
+        : isFeesLive
+          ? `fees:${rateLimitKey}`
+          : rateLimitKey;
       if (isRateLimited(limitKey, effectiveLimit)) {
-        return NextResponse.json(
+        return withSecurityHeaders(NextResponse.json(
           { error: 'Too many requests. Please try again later.' },
           {
             status: 429,
             headers: { 'Retry-After': '60' },
           }
-        );
+        ));
       }
     }
 
     // Reject oversized or unbounded POST bodies before they reach route handlers.
-    // Webhooks may use chunked transfer encoding (no Content-Length), so exclude them.
     if (request.method === 'POST' && !pathname.startsWith('/api/webhooks')) {
       const contentLength = request.headers.get('content-length');
       if (!contentLength) {
-        return NextResponse.json(
+        return withSecurityHeaders(NextResponse.json(
           { error: 'Content-Length header is required' },
           { status: 411 }
-        );
+        ));
       }
       const parsedLength = parseInt(contentLength, 10);
       if (isNaN(parsedLength) || parsedLength > MAX_BODY_SIZE) {
-        return NextResponse.json(
+        return withSecurityHeaders(NextResponse.json(
           { error: 'Request body too large' },
           { status: 413 }
-        );
+        ));
       }
+    }
+  }
+
+  // Tarpit AFTER rate limit: only delay requests that weren't already rejected.
+  // Saves serverless function time for rate-limited requests (L9).
+  if (pathname.startsWith('/api/') || handleMatch) {
+    const delay = getTarpitDelayMs(request);
+    if (delay > 0) {
+      await sleep(delay);
     }
   }
 
