@@ -62,15 +62,15 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
       try {
         if (handle.startsWith('http://') || handle.startsWith('https://')) {
           const url = new URL(handle);
-          if (
-            ['twitter.com', 'www.twitter.com', 'x.com', 'www.x.com', 'github.com', 'www.github.com'].includes(
-              url.hostname
-            )
-          ) {
-            const pathParts = url.pathname.split('/').filter(Boolean);
-            if (pathParts.length > 0) {
-              handle = pathParts[0];
-            }
+          const hostname = url.hostname.toLowerCase();
+          const pathParts = url.pathname.split('/').filter(Boolean);
+          if (['twitter.com', 'www.twitter.com', 'x.com', 'www.x.com'].includes(hostname)) {
+            if (pathParts.length > 0) handle = pathParts[0];
+          } else if (['github.com', 'www.github.com'].includes(hostname)) {
+            // Preserve "github.com/username" so parseSearchQuery can classify as GitHub
+            handle = `github.com${url.pathname}`;
+          } else if (['warpcast.com', 'www.warpcast.com'].includes(hostname)) {
+            if (pathParts.length > 0) handle = `warpcast.com/${pathParts[0]}`;
           }
         }
       } catch {
