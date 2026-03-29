@@ -65,15 +65,8 @@ export function ClaimDialog({
     if (!open || !TURNSTILE_SITE_KEY || !turnstileRef.current) return;
     setTurnstileToken(null);
 
-    const scriptId = 'cf-turnstile-script';
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement('script');
-      script.id = scriptId;
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-      script.async = true;
-      document.head.appendChild(script);
-    }
-
+    // Turnstile script is preloaded in layout.tsx with CSP nonce.
+    // No dynamic script injection needed (SH-002).
     function renderWidget() {
       const w = window as unknown as { turnstile?: { render: (el: HTMLElement, opts: Record<string, unknown>) => string; remove: (id: string) => void } };
       if (!w.turnstile || !turnstileRef.current) return;

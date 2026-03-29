@@ -4,7 +4,10 @@ import { CLAIM_HMAC_MAX_AGE_MINUTES } from '@/lib/constants';
 
 function getSecret(): string {
   const secret = process.env.CLAIM_HMAC_SECRET
-    || (process.env.NODE_ENV !== 'production' ? 'dev-hmac-secret-do-not-use-in-prod' : undefined);
+    || (process.env.NODE_ENV !== 'production' ? (() => {
+      console.error('[hmac] WARNING: Using dev fallback HMAC secret. Set CLAIM_HMAC_SECRET in production/preview.');
+      return 'dev-hmac-secret-do-not-use-in-prod-32ch';
+    })() : undefined);
   if (!secret || secret.length < 32) throw new Error('CLAIM_HMAC_SECRET is required in production (min 32 chars)');
   return secret;
 }

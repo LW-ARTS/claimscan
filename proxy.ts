@@ -155,17 +155,17 @@ function safeCompare(a: string, b: string): boolean {
 }
 
 /**
- * Apply security headers to any response (including error responses).
- * Ensures HSTS, CSP, X-Frame-Options etc. are present on 4xx/5xx,
- * not just on successful pass-through responses.
+ * Single source of truth for all security headers.
+ * Applied to both pass-through responses and error returns.
+ * Accepts a nonce for CSP script-src — eliminates 'unsafe-inline'.
  */
-function withSecurityHeaders(res: NextResponse): NextResponse {
+function applySecurityHeaders(res: NextResponse, nonce: string): NextResponse {
   res.headers.set('X-Frame-Options', 'DENY');
   res.headers.set('X-Content-Type-Options', 'nosniff');
   res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.headers.set('X-DNS-Prefetch-Control', 'off');
   res.headers.set('Permissions-Policy', PERMISSIONS_POLICY);
-  res.headers.set('Content-Security-Policy', CSP_HEADER);
+  res.headers.set('Content-Security-Policy', buildCspHeader(nonce));
   res.headers.set('X-XSS-Protection', '0');
   if (process.env.NODE_ENV === 'production') {
     res.headers.set('Strict-Transport-Security', HSTS_HEADER);
@@ -243,20 +243,27 @@ const PERMISSIONS_POLICY = [
   'browsing-topics=()', 'interest-cohort=()',
 ].join(', ');
 
-const CSP_HEADER = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://challenges.cloudflare.com",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://pbs.twimg.com https://abs.twimg.com https://avatars.githubusercontent.com https://imagedelivery.net https://ipfs.io https://unavatar.io",
-  "font-src 'self' https://fonts.gstatic.com",
-  "connect-src 'self' https://*.supabase.co https://api.coingecko.com https://api.dexscreener.com https://api.jup.ag https://*.ingest.sentry.io https://*.helius-rpc.com wss://*.helius-rpc.com https://api.mainnet-beta.solana.com",
-  "frame-src 'self' https://challenges.cloudflare.com",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "upgrade-insecure-requests",
-].join('; ');
+/**
+ * Build a per-request CSP header with nonce to eliminate 'unsafe-inline'.
+ * 'strict-dynamic' allows scripts loaded by nonce'd scripts (e.g., Turnstile sub-scripts).
+ * 'self' and URL allowlists are kept for CSP2 browser fallback.
+ */
+function buildCspHeader(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval' https://challenges.cloudflare.com`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://pbs.twimg.com https://abs.twimg.com https://avatars.githubusercontent.com https://imagedelivery.net https://ipfs.io https://unavatar.io",
+    "font-src 'self' https://fonts.gstatic.com",
+    "connect-src 'self' https://*.supabase.co https://api.coingecko.com https://api.dexscreener.com https://api.jup.ag https://*.ingest.sentry.io https://*.helius-rpc.com wss://*.helius-rpc.com https://api.mainnet-beta.solana.com",
+    "frame-src 'self' https://challenges.cloudflare.com",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "upgrade-insecure-requests",
+  ].join('; ');
+}
 
 function getTarpitDelayMs(request: NextRequest): number {
   let suspicionScore = 0;
@@ -276,21 +283,12 @@ export async function proxy(request: NextRequest) {
   const response = NextResponse.next();
   const pathname = request.nextUrl.pathname;
 
-  // Security headers
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set('X-DNS-Prefetch-Control', 'off');
-  response.headers.set('Permissions-Policy', PERMISSIONS_POLICY);
-  response.headers.set('Content-Security-Policy', CSP_HEADER);
-  response.headers.set('X-XSS-Protection', '0');
-  // Only set HSTS in production to avoid issues with local dev
-  if (process.env.NODE_ENV === 'production') {
-    response.headers.set(
-      'Strict-Transport-Security',
-      HSTS_HEADER
-    );
-  }
+  // Generate per-request nonce for CSP (eliminates 'unsafe-inline' in script-src)
+  const nonce = btoa(crypto.randomUUID());
+  response.headers.set('x-nonce', nonce);
+
+  // Apply all security headers (single source of truth — SH-001)
+  applySecurityHeaders(response, nonce);
 
   // CORS — reflect request Origin only if it's in our allowlist (not attacker-controlled)
   const requestOrigin = request.headers.get('origin');
@@ -310,11 +308,11 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith('/api/cron')) {
     const secret = process.env.CRON_SECRET;
     if (!secret || secret.length === 0) {
-      return withSecurityHeaders(NextResponse.json({ error: 'Server misconfigured' }, { status: 500 }));
+      return applySecurityHeaders(NextResponse.json({ error: 'Server misconfigured' }, { status: 500 }), nonce);
     }
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !safeCompare(authHeader, `Bearer ${secret}`)) {
-      return withSecurityHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
+      return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }), nonce);
     }
   }
 
@@ -327,17 +325,17 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith('/api/')) {
     const ua = request.headers.get('user-agent')?.toLowerCase() ?? '';
     if (SCRAPER_UA_RE.test(ua)) {
-      return withSecurityHeaders(NextResponse.json(
+      return applySecurityHeaders(NextResponse.json(
         { error: 'Automated access is not permitted' },
         { status: 403 }
-      ));
+      ), nonce);
     }
     // Block requests with no User-Agent (legitimate browsers always send one)
     if (!request.headers.get('user-agent')) {
-      return withSecurityHeaders(NextResponse.json(
+      return applySecurityHeaders(NextResponse.json(
         { error: 'User-Agent header is required' },
         { status: 400 }
-      ));
+      ), nonce);
     }
   }
 
@@ -353,7 +351,7 @@ export async function proxy(request: NextRequest) {
   ) {
     const origin = request.headers.get('origin');
     if (!origin || !ALLOWED_API_ORIGINS.has(origin)) {
-      return withSecurityHeaders(NextResponse.json({ error: 'Forbidden' }, { status: 403 }));
+      return applySecurityHeaders(NextResponse.json({ error: 'Forbidden' }, { status: 403 }), nonce);
     }
   }
 
@@ -368,7 +366,7 @@ export async function proxy(request: NextRequest) {
     const sig = request.headers.get('x-request-sig');
     const isValid = await verifyRequestSignature(sig, pathname);
     if (!isValid) {
-      return withSecurityHeaders(NextResponse.json({ error: 'Invalid request signature' }, { status: 403 }));
+      return applySecurityHeaders(NextResponse.json({ error: 'Invalid request signature' }, { status: 403 }), nonce);
     }
   }
 
@@ -380,10 +378,10 @@ export async function proxy(request: NextRequest) {
 
     if (!ip.startsWith('anon:') && isEnumerating(ip, handle)) {
       await sleep(3000);
-      return withSecurityHeaders(NextResponse.json(
+      return applySecurityHeaders(NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
         { status: 429, headers: { 'Retry-After': '300' } }
-      ));
+      ), nonce);
     }
   }
 
@@ -421,7 +419,7 @@ export async function proxy(request: NextRequest) {
     if (upstashLimiter) {
       const { success, remaining } = await upstashLimiter.limit(rateLimitKey);
       if (!success) {
-        return withSecurityHeaders(NextResponse.json(
+        return applySecurityHeaders(NextResponse.json(
           { error: 'Too many requests. Please try again later.' },
           {
             status: 429,
@@ -430,7 +428,7 @@ export async function proxy(request: NextRequest) {
               'X-RateLimit-Remaining': '0',
             },
           }
-        ));
+        ), nonce);
       }
       response.headers.set('X-RateLimit-Remaining', String(remaining));
     } else {
@@ -450,13 +448,13 @@ export async function proxy(request: NextRequest) {
           ? `fees:${rateLimitKey}`
           : rateLimitKey;
       if (isRateLimited(limitKey, effectiveLimit)) {
-        return withSecurityHeaders(NextResponse.json(
+        return applySecurityHeaders(NextResponse.json(
           { error: 'Too many requests. Please try again later.' },
           {
             status: 429,
             headers: { 'Retry-After': '60' },
           }
-        ));
+        ), nonce);
       }
     }
 
@@ -464,17 +462,17 @@ export async function proxy(request: NextRequest) {
     if (request.method === 'POST' && !pathname.startsWith('/api/webhooks')) {
       const contentLength = request.headers.get('content-length');
       if (!contentLength) {
-        return withSecurityHeaders(NextResponse.json(
+        return applySecurityHeaders(NextResponse.json(
           { error: 'Content-Length header is required' },
           { status: 411 }
-        ));
+        ), nonce);
       }
       const parsedLength = parseInt(contentLength, 10);
       if (isNaN(parsedLength) || parsedLength > MAX_BODY_SIZE) {
-        return withSecurityHeaders(NextResponse.json(
+        return applySecurityHeaders(NextResponse.json(
           { error: 'Request body too large' },
           { status: 413 }
-        ));
+        ), nonce);
       }
     }
   }

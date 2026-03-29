@@ -1,21 +1,24 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('honeypot');
 
 /**
  * Honeypot endpoint — disguised as attractive scraper targets (e.g. /api/v2/data, /api/admin).
  * Legitimate users never hit these paths. Any request here is from a scraper or scanner.
- * Logs the attempt for forensic review in Vercel logs.
+ * Logs the attempt via structured logger for forensic review.
  */
 function logAndReject(request: NextRequest) {
   const ip =
     (request as unknown as { ip?: string }).ip ??
     request.headers.get('x-real-ip') ??
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     'unknown';
   const ua = request.headers.get('user-agent') ?? 'none';
   const path = request.nextUrl.pathname;
 
-  console.warn(`[honeypot] Scraper detected | path=${path.slice(0, 200)} | ip=${ip} | ua=${ua.slice(0, 200)}`);
+  const sanitize = (s: string) => s.replace(/[\r\n\x00-\x1f]/g, '').slice(0, 200);
+  log.warn('Scraper detected', { path: sanitize(path), ip: sanitize(ip), ua: sanitize(ua) });
 
   // Return a convincing 403 that doesn't reveal this is a honeypot
   return NextResponse.json(
