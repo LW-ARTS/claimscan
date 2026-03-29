@@ -228,7 +228,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ ok: true, indexed, tokensIndexed });
   } catch (error) {
-    console.error('Index fees error:', error);
+    console.error('Index fees error:', error instanceof Error ? error.message : String(error));
     return NextResponse.json(
       { error: 'Fee indexing failed' },
       { status: 500 }

@@ -171,6 +171,21 @@ async function detectDisappearedTokens(
 ): Promise<void> {
   if (!existingFees || existingFees.length === 0) return;
 
+  // Guard: if fresh data contains ZERO Bags entries, this is likely an API outage,
+  // not a genuine disappearance. Skip detection to avoid false "fully claimed" updates.
+  const freshBagsCount = freshFees.filter((f) => f.platform === 'bags').length;
+  if (freshBagsCount === 0) {
+    const existingBagsWithUnclaimed = existingFees.filter(
+      (ef) => ef.platform === 'bags' && safeBigInt(ef.total_unclaimed) > 0n
+    ).length;
+    if (existingBagsWithUnclaimed > 0) {
+      log.info('No Bags fees in fresh data but DB has unclaimed Bags records — skipping disappearance detection (possible API outage)', {
+        existingBagsWithUnclaimed,
+      });
+      return;
+    }
+  }
+
   const freshKeys = new Set(freshFees.map((f) => `${f.platform}:${f.chain}:${f.tokenAddress}`));
   const disappeared = existingFees.filter((ef) => {
     if (ef.platform !== 'bags') return false;

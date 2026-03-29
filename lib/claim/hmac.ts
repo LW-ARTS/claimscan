@@ -4,7 +4,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 function getSecret(): string {
   const secret = process.env.CLAIM_HMAC_SECRET
     || (process.env.NODE_ENV !== 'production' ? 'dev-hmac-secret-do-not-use-in-prod' : undefined);
-  if (!secret || secret.length < 16) throw new Error('CLAIM_HMAC_SECRET is required in production (min 16 chars)');
+  if (!secret || secret.length < 32) throw new Error('CLAIM_HMAC_SECRET is required in production (min 32 chars)');
   return secret;
 }
 

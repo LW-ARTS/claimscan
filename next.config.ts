@@ -3,6 +3,11 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
+  compiler: {
+    removeConsole: {
+      exclude: ['error'],
+    },
+  },
   experimental: {
     viewTransition: true,
     optimizePackageImports: ['lucide-react'],

@@ -286,7 +286,7 @@ const Grainient: React.FC<GrainientProps> = ({
       };
       document.addEventListener('visibilitychange', visHandler);
     }).catch((err) => {
-      console.error('[Grainient] Failed to load OGL:', err);
+      console.error('[Grainient] Failed to load OGL:', err instanceof Error ? err.message : String(err));
     });
 
     return () => {

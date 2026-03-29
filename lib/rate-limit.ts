@@ -3,6 +3,7 @@ import { Redis } from '@upstash/redis';
 
 let generalLimiter: Ratelimit | null = null;
 let searchLimiter: Ratelimit | null = null;
+let feesLimiter: Ratelimit | null = null;
 
 const url = process.env.UPSTASH_REDIS_REST_URL;
 const token = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -23,10 +24,17 @@ if (url && token) {
     prefix: 'claimscan:rl:search',
     analytics: true,
   });
+
+  feesLimiter = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(5, '1 m'),
+    prefix: 'claimscan:rl:fees',
+    analytics: true,
+  });
 }
 
 if (!generalLimiter && process.env.NODE_ENV === 'production') {
   console.error('[rate-limit] CRITICAL: Upstash Redis not configured in production. Rate limiting is per-instance only.');
 }
 
-export { generalLimiter, searchLimiter };
+export { generalLimiter, searchLimiter, feesLimiter };

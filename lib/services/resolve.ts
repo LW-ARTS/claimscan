@@ -48,7 +48,7 @@ export async function checkCache(
 
   const { data } = await supabase
     .from('creators')
-    .select('*, wallets(*)')
+    .select('id, twitter_handle, github_handle, farcaster_handle, farcaster_fid, display_name, avatar_url, created_at, updated_at, last_token_sync_at, wallets(id, creator_id, address, chain, source_platform, verified, created_at)')
     .eq(handleColumn, parsed.value)
     .single();
 
@@ -56,8 +56,8 @@ export async function checkCache(
 
   // Fetch fee_records + claim_events in parallel (saves ~1 DB round-trip)
   const [{ data: feeRecords }, { data: claimEvents }] = await Promise.all([
-    supabase.from('fee_records').select('*').eq('creator_id', data.id),
-    supabase.from('claim_events').select('*').eq('creator_id', data.id)
+    supabase.from('fee_records').select('id, creator_id, creator_token_id, platform, chain, token_address, token_symbol, total_earned, total_claimed, total_unclaimed, total_earned_usd, claim_status, royalty_bps, last_synced_at, created_at').eq('creator_id', data.id),
+    supabase.from('claim_events').select('id, creator_id, platform, chain, token_address, amount, amount_usd, tx_hash, claimed_at, created_at').eq('creator_id', data.id)
       .order('claimed_at', { ascending: false }).limit(50),
   ]);
   const allFeeRecords = (feeRecords ?? []) as FeeRecord[];

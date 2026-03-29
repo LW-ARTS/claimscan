@@ -203,7 +203,7 @@ export async function GET(request: Request) {
       durationMs: Date.now() - wallclockStart,
     });
   } catch (error) {
-    console.error('Cleanup error:', error);
+    console.error('Cleanup error:', error instanceof Error ? error.message : String(error));
     return NextResponse.json(
       { error: 'Cleanup failed' },
       { status: 500 }

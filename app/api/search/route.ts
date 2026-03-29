@@ -49,8 +49,11 @@ export async function POST(request: Request) {
       });
     }
 
+    // Strip internal DB properties from the creator object before returning.
+    // fee_records is redundant (returned separately as `fees`) and leaks table names.
+    const { fee_records: _drop, ...creatorPublic } = result.creator as Record<string, unknown>;
     return NextResponse.json({
-      creator: result.creator,
+      creator: creatorPublic,
       wallets: result.wallets,
       fees: result.fees,
       cached: result.cached,

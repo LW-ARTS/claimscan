@@ -67,7 +67,7 @@ function mapChainId(chainId: number | string | undefined): Chain | null {
   return null;
 }
 
-async function clankerFetch<T>(path: string, externalSignal?: AbortSignal): Promise<T | null> {
+async function clankerFetch<T>(path: string, externalSignal?: AbortSignal, attempt = 0): Promise<T | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -78,6 +78,19 @@ async function clankerFetch<T>(path: string, externalSignal?: AbortSignal): Prom
       signal: combinedSignal,
     });
     clearTimeout(timeout);
+    if (res.status === 429) {
+      if (attempt < 2) {
+        const retryAfter = parseInt(res.headers.get('retry-after') ?? '', 10);
+        const delay = !isNaN(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 10_000)
+          : (attempt + 1) * 2000;
+        log.warn(`fetch ${path} rate limited, retrying in ${delay}ms (attempt ${attempt + 1})`);
+        await new Promise((r) => setTimeout(r, delay));
+        return clankerFetch<T>(path, externalSignal, attempt + 1);
+      }
+      log.warn(`fetch ${path} rate limited after ${attempt + 1} attempts`);
+      return null;
+    }
     if (!res.ok) {
       log.warn(`fetch ${path} returned HTTP ${res.status}`);
       return null;
