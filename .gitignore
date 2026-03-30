@@ -74,3 +74,6 @@ DESIGN-CRITIQUE*.md
 FULL_AUDIT*.md
 LAUNCH-PLAYBOOK.md
 scripts/generate_whitepaper.py
+scripts/query_fees.mjs
+tcpdump_log.txt
+*.pptx

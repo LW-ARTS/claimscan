@@ -28,15 +28,37 @@ try {
 const HMAC_DEDUP_PREFIX = 'claimscan:hmac:used:';
 const HMAC_DEDUP_TTL_MS = CLAIM_HMAC_MAX_AGE_MINUTES * 60 * 1000;
 
-async function consumeHmacToken(token: string): Promise<boolean> {
-  if (!_hmacRedis) return true; // No Redis = allow through (graceful degradation)
-  try {
-    const hash = createHash('sha256').update(token).digest('hex').slice(0, 32);
-    const result = await _hmacRedis.set(`${HMAC_DEDUP_PREFIX}${hash}`, 1, { px: HMAC_DEDUP_TTL_MS, nx: true });
-    return result !== null; // null = key existed = replay
-  } catch {
-    return true; // Redis error = allow through
+// In-memory fallback when Redis is unavailable — prevents replay within a single instance
+const _localDedup = new Map<string, number>();
+
+function _pruneLocalDedup() {
+  const now = Date.now();
+  if (_localDedup.size > 500) {
+    for (const [k, exp] of _localDedup) {
+      if (exp < now) _localDedup.delete(k);
+    }
   }
+}
+
+async function consumeHmacToken(token: string): Promise<boolean> {
+  const hash = createHash('sha256').update(token).digest('hex').slice(0, 32);
+
+  if (_hmacRedis) {
+    try {
+      const result = await _hmacRedis.set(`${HMAC_DEDUP_PREFIX}${hash}`, 1, { px: HMAC_DEDUP_TTL_MS, nx: true });
+      return result !== null; // null = key existed = replay
+    } catch {
+      // Redis error — fall through to in-memory dedup
+    }
+  }
+
+  // In-memory fallback (per-instance, resets on cold start but still blocks replays within a warm instance)
+  _pruneLocalDedup();
+  const now = Date.now();
+  const existing = _localDedup.get(hash);
+  if (existing && existing > now) return false; // replay blocked
+  _localDedup.set(hash, now + HMAC_DEDUP_TTL_MS);
+  return true;
 }
 
 // ═══════════════════════════════════════════════
