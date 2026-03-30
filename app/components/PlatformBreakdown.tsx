@@ -183,7 +183,9 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
     if (newIdx !== idx) {
       setActiveTab(tabKeys[newIdx]);
       // Per WAI-ARIA tabs: focus stays on the tab, user presses Tab to enter panel
-      document.getElementById(`${tabsId}-tab-${tabKeys[newIdx]}`)?.focus();
+      const el = document.getElementById(`${tabsId}-tab-${tabKeys[newIdx]}`);
+      el?.focus();
+      el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
   }
 

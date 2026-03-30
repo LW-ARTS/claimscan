@@ -81,7 +81,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => track('share_x_clicked', { handle })}
-        className="flex h-14 w-full items-center justify-center gap-3 bg-foreground text-base font-semibold text-background transition-all duration-200 hover:bg-foreground/85 hover:shadow-[0_4px_20px_rgba(0,0,0,0.15)] active:scale-[0.98]"
+        className="flex h-14 w-full items-center justify-center gap-3 bg-foreground text-base font-semibold text-background transition-[transform,background-color] duration-200 ease-out hover-hover:hover:bg-foreground/85 active:scale-[0.97]"
 
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

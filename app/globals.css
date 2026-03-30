@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant hover-hover (@media (hover: hover) and (pointer: fine));
 
 @theme inline {
   --color-background: var(--background);
@@ -184,7 +185,7 @@
 
   /* Entrance animations */
   .animate-fade-in-up {
-    animation: fadeInUp 0.6s ease-out both;
+    animation: fadeInUp 0.35s cubic-bezier(0.23, 1, 0.32, 1) both;
   }
   .animate-fade-in-down {
     animation: fadeInDown 0.5s ease-out both;
@@ -311,7 +312,7 @@ a:focus-visible,
   justify-content: center;
   background: oklch(0.06 0 0);
   opacity: 1;
-  transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.6s cubic-bezier(0.23, 1, 0.32, 1);
   pointer-events: auto;
 }
 .hero-reveal-overlay[data-phase="exiting"] {
