@@ -170,7 +170,7 @@ export default function DocsPage() {
               { v: '$0', l: 'Cost' },
               { v: '24/7', l: 'Uptime' },
             ].map((s) => (
-              <div key={s.l} className="flex flex-col items-center rounded-xl bg-foreground py-3.5 text-background transition-transform duration-200 hover:scale-105">
+              <div key={s.l} className="flex flex-col items-center rounded-xl bg-foreground py-3.5 text-background transition-transform duration-150 ease-out hover-hover:hover:scale-105 active:scale-[0.97]">
                 <span className="text-xl font-bold tracking-tight">{s.v}</span>
                 <span className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-background/50">{s.l}</span>
               </div>

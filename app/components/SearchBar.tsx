@@ -97,9 +97,9 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
   return (
     <form onSubmit={handleSearch} className="relative w-full">
       <div
-        className={`relative flex items-center gap-2 rounded-xl border glass-strong transition-all duration-300 ${focused
-          ? 'border-white/20 shadow-lg dark:shadow-none'
-          : 'border-white/10 hover:border-white/20'
+        className={`relative flex items-center gap-2 rounded-xl border glass-strong transition-[border-color,box-shadow] duration-200 ease-out ${focused
+          ? 'border-white/20 shadow-[0_0_20px_oklch(0.5_0.1_250/0.1)]'
+          : 'border-white/10 hover-hover:hover:border-white/20'
           } ${isLarge ? 'p-2' : 'p-1'}`}
       >
         <div className="relative flex-1">
@@ -137,7 +137,7 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
           disabled={loading || !canSearch}
           aria-label={loading ? 'Searching...' : 'Scan'}
           aria-busy={loading}
-          className={`flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg font-bold uppercase tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${isLarge
+          className={`flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg font-bold uppercase tracking-wide transition-[transform,opacity] duration-200 ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 ${isLarge
             ? 'h-[44px] min-w-[90px] px-4 text-sm sm:min-w-[100px] sm:px-6 sm:text-base'
             : 'h-[44px] min-w-[90px] px-4 text-sm'
             }`}
