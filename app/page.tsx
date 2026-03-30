@@ -50,6 +50,13 @@ export default function Home() {
 
         {/* Main heading — animated TrueFocus */}
         <h1 className="sr-only">Find unclaimed creator fees across 9 launchpads on Solana and Base</h1>
+        <p className="sr-only">
+          ClaimScan is a free cross-chain fee tracking tool that helps crypto creators find and claim
+          unclaimed earnings across 9 DeFi launchpads including Pump.fun, Bags.fm, Clanker, Zora,
+          Bankr, Believe, RevShare, Coinbarrel, and Raydium on Solana, Base, Ethereum, and BNB Chain.
+          Approximately 40% of creator fees go unclaimed. ClaimScan scans all platforms in under
+          30 seconds and supports claiming directly from the app with zero custody of your private keys.
+        </p>
         <div aria-hidden="true" className="animate-fade-in-up delay-100 flex flex-col items-center gap-1 sm:gap-2">
           <div className="flex items-center justify-center gap-2 sm:gap-3">
             <span className="text-3xl font-black uppercase tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">Track your</span>
@@ -67,7 +74,10 @@ export default function Home() {
         </div>
 
         <p className="animate-fade-in-up delay-200 mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-xl">
-          Paste any @handle or wallet. See what you&apos;ve earned, claimed, and left on the table across {platformEntries.length} launchpads.
+          Paste any @handle or wallet. See what you&apos;ve earned, claimed, and left on the table across {platformEntries.length} launchpads.{' '}
+          <Link href="/docs" className="text-foreground/60 underline decoration-foreground/20 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground/40">
+            Learn how it works
+          </Link>
         </p>
 
         {/* Search bar */}

@@ -99,6 +99,22 @@ export default function DocsPage() {
         ],
       },
       {
+        '@type': 'HowTo',
+        '@id': 'https://claimscan.tech/docs#howto',
+        name: 'How to check unclaimed crypto creator fees',
+        description: 'Use ClaimScan to find and claim uncollected creator fees across 9 DeFi launchpads on Solana, Base, and BNB Chain in under 30 seconds.',
+        totalTime: 'PT30S',
+        tool: { '@type': 'HowToTool', name: 'ClaimScan' },
+        step: [
+          { '@type': 'HowToStep', position: 1, name: 'Enter a handle', text: 'Enter a Twitter, Farcaster, or GitHub username, or a raw wallet address into ClaimScan.' },
+          { '@type': 'HowToStep', position: 2, name: 'Identity resolution', text: 'ClaimScan maps social handles to wallet addresses across all supported chains.' },
+          { '@type': 'HowToStep', position: 3, name: 'Parallel platform scan', text: 'All 9 platforms are queried simultaneously. Results stream in real time as each completes.' },
+          { '@type': 'HowToStep', position: 4, name: 'Fee aggregation', text: 'Earned, claimed, partially claimed, and unclaimed fees are pulled per token. Duplicates filtered.' },
+          { '@type': 'HowToStep', position: 5, name: 'USD conversion', text: 'Live prices fetched from DexScreener and Jupiter. Continuously refreshed.' },
+          { '@type': 'HowToStep', position: 6, name: 'Review your dashboard', text: 'View platform breakdown, chain breakdown, and token-level details. Claim uncollected fees directly.' },
+        ],
+      },
+      {
         '@type': 'BreadcrumbList',
         '@id': 'https://claimscan.tech/docs#breadcrumb',
         itemListElement: [
@@ -245,7 +261,7 @@ export default function DocsPage() {
         <section className="mt-16">
           <Label>How it works</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            From @handle to full breakdown in 30 seconds
+            How to check unclaimed crypto fees in 30 seconds
           </h2>
 
           <ol className="relative mt-8 ml-3.5 border-l border-foreground/10 pl-0">
@@ -280,7 +296,7 @@ export default function DocsPage() {
         <section className="mt-16">
           <Label>Claim Flow</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            Claim directly from ClaimScan
+            How to claim creator fees on Solana and Base
           </h2>
           <p className="mt-4 text-[15px] leading-[1.75] text-foreground/70">
             Connect your wallet and claim uncollected fees without leaving the app. Fully zero-custody:
@@ -416,7 +432,7 @@ export default function DocsPage() {
           <div className="rounded-2xl bg-foreground p-6 sm:p-8">
             <Label><span className="text-background/40">Security &amp; Privacy</span></Label>
             <h2 className="mt-3 text-xl font-bold tracking-tight text-background sm:text-2xl">
-              Trust model
+              Is ClaimScan safe to use?
             </h2>
             <p className="mt-4 text-[15px] leading-[1.75] text-background/55">
               We don&apos;t touch your wallet. We don&apos;t store your data.
