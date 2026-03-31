@@ -6,6 +6,7 @@ import { headers } from 'next/headers';
 import './globals.css';
 import { JsonLd } from './components/JsonLd';
 import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { SiteFooter } from './components/SiteFooter';
 import Link from 'next/link';
 
@@ -181,6 +182,7 @@ export default async function RootLayout({
             <SiteFooter />
           </div>
           <Analytics />
+          <SpeedInsights />
         </Providers>
       </body>
     </html>
