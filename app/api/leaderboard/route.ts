@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { Redis } from '@upstash/redis';
 import { CHAIN_CONFIG, PLATFORM_CONFIG } from '@/lib/constants';
 
 export const maxDuration = 60;
@@ -8,11 +7,23 @@ export const maxDuration = 60;
 const CACHE_KEY = 'claimscan:leaderboard';
 const CACHE_TTL = 600; // 10 minutes
 
-let redis: Redis | null = null;
-const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-if (redisUrl && redisToken) {
-  redis = new Redis({ url: redisUrl, token: redisToken });
+// Lazy Redis init — avoids crashing during Vercel build-time page data collection
+let _redis: import('@upstash/redis').Redis | null | undefined;
+function getRedis(): import('@upstash/redis').Redis | null {
+  if (_redis !== undefined) return _redis;
+  try {
+    const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+    if (url && token) {
+      const { Redis } = require('@upstash/redis') as typeof import('@upstash/redis');
+      _redis = new Redis({ url, token });
+    } else {
+      _redis = null;
+    }
+  } catch {
+    _redis = null;
+  }
+  return _redis;
 }
 
 interface LeaderboardEntry {
@@ -33,9 +44,9 @@ export async function GET(request: Request) {
   const cacheKey = `${CACHE_KEY}:v2:${limit}:${offset}:${platform ?? 'all'}:${chain ?? 'all'}`;
 
   // Try Redis cache
-  if (redis) {
+  if (getRedis()) {
     try {
-      const cached = await redis.get<{ entries: LeaderboardEntry[]; total: number }>(cacheKey);
+      const cached = await getRedis()!.get<{ entries: LeaderboardEntry[]; total: number }>(cacheKey);
       if (cached) {
         return NextResponse.json({ ...cached, offset, limit, cached: true }, {
           headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300' },
@@ -150,8 +161,8 @@ export async function GET(request: Request) {
     const entries = allEntries.slice(offset, offset + limit);
     const result = { entries, total, offset, limit };
 
-    if (redis) {
-      redis.set(cacheKey, result, { ex: CACHE_TTL }).catch(() => {});
+    if (getRedis()) {
+      getRedis()!.set(cacheKey, result, { ex: CACHE_TTL }).catch(() => {});
     }
 
     return NextResponse.json(result, {
