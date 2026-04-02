@@ -1,10 +1,11 @@
 import { createServiceClient } from '@/lib/supabase/service';
-import { PLATFORM_CONFIG } from '@/lib/constants';
+import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
+import { safeBigInt, toUsdValue } from '@/lib/utils';
 import type { Platform, Chain } from '@/lib/supabase/types';
 
 const supabase = createServiceClient();
 
-const VALID_CHAINS: ReadonlySet<string> = new Set(['sol', 'base']);
+const VALID_CHAINS: ReadonlySet<string> = new Set(['sol', 'base', 'eth', 'bsc']);
 const VALID_PLATFORMS: ReadonlySet<string> = new Set(Object.keys(PLATFORM_CONFIG));
 
 function assertChain(val: string): Chain | null {
@@ -31,6 +32,9 @@ export interface DbTokenResult {
   totalClaimed: string;
   totalUnclaimed: string;
   totalEarnedUsd: number | null;
+  feeType: string | null;
+  feeLocked: boolean | null;
+  feeRecipientCount: number | null;
 }
 
 export async function lookupTokenByAddress(
@@ -53,8 +57,8 @@ export async function lookupTokenByAddress(
 
   if (!feeRecord) return null;
 
-  // Fetch creator + wallet in parallel (2 sequential roundtrips total instead of 3)
-  const [{ data: creator }, { data: wallet }] = await Promise.all([
+  // Fetch creator + wallet + fee recipient count in parallel
+  const [{ data: creator }, { data: wallet }, { count: recipientCount }] = await Promise.all([
     supabase
       .from('creators')
       .select('twitter_handle, display_name')
@@ -67,6 +71,10 @@ export async function lookupTokenByAddress(
       .eq('chain', feeRecord.chain)
       .limit(1)
       .single(),
+    supabase
+      .from('fee_recipients')
+      .select('*', { count: 'exact', head: true })
+      .eq('fee_record_id', feeRecord.id),
   ]);
 
   return {
@@ -81,6 +89,9 @@ export async function lookupTokenByAddress(
     totalClaimed: feeRecord.total_claimed,
     totalUnclaimed: feeRecord.total_unclaimed,
     totalEarnedUsd: feeRecord.total_earned_usd,
+    feeType: feeRecord.fee_type ?? null,
+    feeLocked: feeRecord.fee_locked ?? null,
+    feeRecipientCount: recipientCount ?? null,
   };
 }
 
@@ -422,10 +433,13 @@ export async function updateAlertLastNotified(ruleId: string): Promise<void> {
   }
 }
 
-export async function getCreatorUnclaimedUsd(creatorId: string): Promise<number> {
+export async function getCreatorUnclaimedUsd(
+  creatorId: string,
+  prices: { sol: number; eth: number; bnb: number }
+): Promise<number> {
   const { data, error } = await supabase
     .from('fee_records')
-    .select('total_earned_usd')
+    .select('total_unclaimed, chain')
     .eq('creator_id', creatorId)
     .in('claim_status', ['unclaimed', 'partially_claimed']);
 
@@ -434,5 +448,13 @@ export async function getCreatorUnclaimedUsd(creatorId: string): Promise<number>
     return 0;
   }
 
-  return (data ?? []).reduce((sum, row) => sum + (row.total_earned_usd ?? 0), 0);
+  const priceKey: Record<string, keyof typeof prices> = { sol: 'sol', base: 'eth', eth: 'eth', bsc: 'bnb' };
+  let total = 0;
+  for (const row of data ?? []) {
+    const unclaimed = safeBigInt(row.total_unclaimed);
+    if (unclaimed === 0n) continue;
+    const decimals = CHAIN_CONFIG[row.chain as Chain]?.nativeDecimals ?? 18;
+    total += toUsdValue(unclaimed, decimals, prices[priceKey[row.chain]] ?? 0);
+  }
+  return total;
 }

@@ -2,8 +2,10 @@ import { bot } from '../bot';
 import { GrammyError } from 'grammy';
 import { getAdapter } from '@/lib/platforms/index';
 import { getNativeTokenPrices } from '@/lib/prices/index';
+import { CHAIN_CONFIG } from '@/lib/constants';
 import { createServiceClient } from '@/lib/supabase/service';
 import { safeBigInt, toUsdValue } from '@/lib/utils';
+import type { Chain } from '@/lib/supabase/types';
 import {
   getWatchedTokensWithUnclaimed,
   getGroupsForToken,
@@ -18,6 +20,9 @@ import {
 } from '../state/db';
 import { formatClaimNotification } from '../services/format';
 import type { WatchedToken } from '../state/db';
+
+type Prices = { sol: number; eth: number; bnb: number };
+const PRICE_KEY: Record<string, keyof Prices> = { sol: 'sol', base: 'eth', eth: 'eth', bsc: 'bnb' };
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -62,12 +67,13 @@ async function checkAlertRules(): Promise<void> {
   const rules = await getActiveAlertRules();
   if (rules.length === 0) return;
 
+  const prices = await getNativeTokenPrices();
   console.log(`[poll] Checking ${rules.length} alert rule(s)...`);
   let sent = 0;
 
   for (const rule of rules) {
     try {
-      const totalUnclaimed = await getCreatorUnclaimedUsd(rule.creatorId);
+      const totalUnclaimed = await getCreatorUnclaimedUsd(rule.creatorId, prices);
       if (totalUnclaimed >= rule.thresholdUsd) {
         const handle = rule.creatorHandle ?? rule.creatorId.slice(0, 8);
         const msg = [
@@ -164,7 +170,7 @@ export function startPolling(): PollHandle {
 // Process tokens concurrently in batches of POLL_CONCURRENCY
 async function checkTokens(
   tokens: WatchedToken[],
-  prices: { sol: number; eth: number }
+  prices: Prices
 ): Promise<void> {
   const queue = tokens.filter((t) => t.feeRecipientAddress && !isPlatformTripped(t.platform));
 
@@ -181,7 +187,7 @@ async function checkTokens(
 
 async function checkSingleToken(
   token: WatchedToken,
-  prices: { sol: number; eth: number }
+  prices: Prices
 ): Promise<void> {
   try {
     const adapter = getAdapter(token.platform);
@@ -212,8 +218,8 @@ async function checkSingleToken(
     }
 
     // Update snapshot
-    const nativeDecimals = token.chain === 'sol' ? 9 : 18;
-    const nativePrice = token.chain === 'sol' ? prices.sol : prices.eth;
+    const nativeDecimals = CHAIN_CONFIG[token.chain].nativeDecimals;
+    const nativePrice = prices[PRICE_KEY[token.chain]] ?? 0;
     const earned = safeBigInt(tokenFee.totalEarned);
     const earnedUsd = earned > 0n
       ? toUsdValue(earned, nativeDecimals, nativePrice)
@@ -270,14 +276,15 @@ async function notifyGroups(
   token: WatchedToken,
   claimedAmount: string,
   remainingUnclaimed: string,
-  prices: { sol: number; eth: number }
+  prices: Prices
 ): Promise<void> {
   const groups = await getGroupsForToken(token.id);
   if (groups.length === 0) return;
 
-  const nativeSymbol = token.chain === 'sol' ? 'SOL' : 'ETH';
-  const nativeDecimals = token.chain === 'sol' ? 9 : 18;
-  const nativeUsdPrice = token.chain === 'sol' ? prices.sol : prices.eth;
+  const chainConf = CHAIN_CONFIG[token.chain];
+  const nativeSymbol = chainConf.nativeToken;
+  const nativeDecimals = chainConf.nativeDecimals;
+  const nativeUsdPrice = prices[PRICE_KEY[token.chain]] ?? 0;
 
   // Get handle for display
   let feeRecipientHandle: string | null = null;
@@ -297,6 +304,7 @@ async function notifyGroups(
     tokenAddress: token.tokenAddress,
     tokenSymbol: token.tokenSymbol,
     feeRecipientHandle,
+    feeRecipientAddress: token.feeRecipientAddress,
     platform: token.platform,
     claimedAmount,
     nativeSymbol,

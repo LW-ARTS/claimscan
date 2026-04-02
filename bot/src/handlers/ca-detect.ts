@@ -1,4 +1,5 @@
 import type { Context } from 'grammy';
+import type { Chain } from '@/lib/supabase/types';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { isValidEvmAddress } from '@/lib/chains/base';
 import { isOnCooldown, setCooldown, isGroupRateLimited } from '../state/cooldowns';
@@ -9,7 +10,7 @@ import { getMention } from '../utils';
 
 // Solana: base58 address pattern (32-44 chars, no 0/O/I/l)
 const SOLANA_CA_REGEX = /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/g;
-// Base/EVM: 0x-prefixed hex address
+// EVM: 0x-prefixed hex address (Base, BSC, ETH share same format)
 const EVM_CA_REGEX = /\b0x[a-fA-F0-9]{40}\b/g;
 // Strip URLs to avoid false positive matches inside links
 const URL_REGEX = /https?:\/\/\S+/gi;
@@ -28,7 +29,7 @@ export async function handleCaDetect(ctx: Context): Promise<void> {
   const cleaned = text.replace(URL_REGEX, ' ');
 
   // Extract all candidate addresses
-  const candidates: Array<{ address: string; chain: 'sol' | 'base' }> = [];
+  const candidates: Array<{ address: string; chain: Chain | 'evm' }> = [];
 
   const solMatches = cleaned.match(SOLANA_CA_REGEX);
   if (solMatches) {
@@ -43,7 +44,7 @@ export async function handleCaDetect(ctx: Context): Promise<void> {
   if (evmMatches) {
     for (const match of evmMatches) {
       if (isValidEvmAddress(match)) {
-        candidates.push({ address: match, chain: 'base' });
+        candidates.push({ address: match, chain: 'evm' });
       }
     }
   }
