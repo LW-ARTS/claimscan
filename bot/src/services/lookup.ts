@@ -1,7 +1,7 @@
 import { heliusDasRpc } from '@/lib/helius/client';
 import { getAdapter } from '@/lib/platforms/index';
 import { getTokenFees, wethToWei, sumDailyEarningsWei, searchLaunches } from '@/lib/platforms/bankr';
-import { PLATFORM_CONFIG } from '@/lib/constants';
+import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
 import {
   PUMP_PROGRAM_ID,
   PUMPSWAP_PROGRAM_ID,
@@ -46,6 +46,9 @@ export interface LookupResult {
   nativeUsdPrice: number;
   hasUnclaimed: boolean;
   watchedTokenId: string | null;
+  feeType: string | null;
+  feeLocked: boolean | null;
+  feeRecipientCount: number | null;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -60,7 +63,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 export async function lookupToken(
   tokenAddress: string,
-  chain: Chain
+  chain: Chain | 'evm'
 ): Promise<LookupResult | null> {
   try {
     return await withTimeout(doLookup(tokenAddress, chain), LOOKUP_TIMEOUT_MS);
@@ -70,9 +73,10 @@ export async function lookupToken(
   }
 }
 
-async function doLookup(tokenAddress: string, chain: Chain): Promise<LookupResult | null> {
+async function doLookup(tokenAddress: string, chain: Chain | 'evm'): Promise<LookupResult | null> {
   // FAST PATH: Check DB for existing data
-  const dbResult = await lookupTokenByAddress(tokenAddress, chain);
+  // For EVM addresses, try chain-agnostic lookup (covers Base, BSC, ETH)
+  const dbResult = await lookupTokenByAddress(tokenAddress, chain === 'evm' ? undefined : chain);
   if (dbResult) {
     return await enrichResult(dbResult.platform, dbResult.chain, {
       tokenAddress: dbResult.tokenAddress,
@@ -84,15 +88,18 @@ async function doLookup(tokenAddress: string, chain: Chain): Promise<LookupResul
       totalUnclaimed: dbResult.totalUnclaimed,
       totalEarnedUsd: dbResult.totalEarnedUsd,
       creatorId: dbResult.creatorId,
+      feeType: dbResult.feeType,
+      feeLocked: dbResult.feeLocked,
+      feeRecipientCount: dbResult.feeRecipientCount,
     });
   }
 
   // DISCOVERY PATH: On-chain reverse lookup
   if (chain === 'sol') {
     return await discoverSolanaToken(tokenAddress);
-  } else {
-    return await discoverBaseToken(tokenAddress);
   }
+  // 'evm', 'base', 'bsc', 'eth' all go through EVM discovery (detects BSC via chain_id)
+  return await discoverBaseToken(tokenAddress);
 }
 
 // ═══════════════════════════════════════════════
@@ -209,7 +216,14 @@ interface ClankerTokensResponse {
     pool_address: string;
     requestor_address: string;
     type: string;
+    chain_id?: number | string;
   }>;
+}
+
+function mapClankerChainId(chainId: number | string | undefined): Chain {
+  const id = typeof chainId === 'string' ? Number(chainId) : chainId;
+  if (id === 56) return 'bsc';
+  return 'base';
 }
 
 async function discoverBaseToken(tokenAddress: string): Promise<LookupResult | null> {
@@ -230,6 +244,7 @@ async function discoverBaseToken(tokenAddress: string): Promise<LookupResult | n
         (t) => t.contract_address?.toLowerCase() === tokenAddress.toLowerCase()
       );
       if (data && data.requestor_address) {
+        const chain = mapClankerChainId(data.chain_id);
         const adapter = getAdapter('clanker');
         if (adapter?.supportsLiveFees) {
           try {
@@ -238,7 +253,7 @@ async function discoverBaseToken(tokenAddress: string): Promise<LookupResult | n
               (f) => f.tokenAddress.toLowerCase() === tokenAddress.toLowerCase()
             );
             if (tokenFee) {
-              return await enrichResult('clanker', 'base', {
+              return await enrichResult('clanker', chain, {
                 tokenAddress,
                 tokenSymbol: tokenFee.tokenSymbol ?? data.symbol,
                 feeRecipient: data.requestor_address,
@@ -256,7 +271,7 @@ async function discoverBaseToken(tokenAddress: string): Promise<LookupResult | n
         }
 
         // Fallback: we know it's Clanker but couldn't fetch fees
-        return await enrichResult('clanker', 'base', {
+        return await enrichResult('clanker', chain, {
           tokenAddress,
           tokenSymbol: data.symbol,
           feeRecipient: data.requestor_address,
@@ -266,6 +281,9 @@ async function discoverBaseToken(tokenAddress: string): Promise<LookupResult | n
           totalUnclaimed: '0',
           totalEarnedUsd: null,
           creatorId: null,
+          feeType: null,
+          feeLocked: null,
+          feeRecipientCount: null,
         });
       }
     }
@@ -376,6 +394,9 @@ interface RawFeeData {
   totalUnclaimed: string;
   totalEarnedUsd: number | null;
   creatorId: string | null;
+  feeType: string | null;
+  feeLocked: boolean | null;
+  feeRecipientCount: number | null;
 }
 
 async function enrichResult(
@@ -384,12 +405,14 @@ async function enrichResult(
   data: RawFeeData
 ): Promise<LookupResult> {
   const config = PLATFORM_CONFIG[platform];
-  const nativeSymbol = chain === 'sol' ? 'SOL' : 'ETH';
-  const nativeDecimals = chain === 'sol' ? 9 : 18;
+  const chainConf = CHAIN_CONFIG[chain];
+  const nativeSymbol = chainConf.nativeToken;
+  const nativeDecimals = chainConf.nativeDecimals;
 
   // Fetch native prices for USD conversion
   const prices = await getNativeTokenPrices();
-  const nativeUsdPrice = chain === 'sol' ? prices.sol : prices.eth;
+  const priceKey = { sol: 'sol', base: 'eth', eth: 'eth', bsc: 'bnb' } as const;
+  const nativeUsdPrice = prices[priceKey[chain]] ?? 0;
 
   // Convert raw amounts to human-readable native token amounts
   const earned = safeBigInt(data.totalEarned);
@@ -437,7 +460,7 @@ async function enrichResult(
     platform,
     platformName: config.name,
     chain,
-    chainName: chain === 'sol' ? 'Solana' : 'Base',
+    chainName: chainConf.name,
     tokenAddress: data.tokenAddress,
     tokenSymbol: data.tokenSymbol,
     feeRecipient: data.feeRecipient,
@@ -453,5 +476,8 @@ async function enrichResult(
     nativeUsdPrice,
     hasUnclaimed,
     watchedTokenId,
+    feeType: data.feeType ?? null,
+    feeLocked: data.feeLocked ?? null,
+    feeRecipientCount: data.feeRecipientCount ?? null,
   };
 }

@@ -7,7 +7,7 @@ import { lookupToken } from '../services/lookup';
 import { formatCaScanMessage } from '../services/format';
 import type { Chain } from '@/lib/supabase/types';
 
-const VALID_CHAINS = new Set<string>(['sol', 'base']);
+const VALID_CHAINS = new Set<string>(['sol', 'base', 'eth', 'bsc']);
 
 export async function handleCallbacks(ctx: Context): Promise<void> {
   const data = ctx.callbackQuery?.data;

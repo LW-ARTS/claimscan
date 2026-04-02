@@ -7,7 +7,7 @@ import type { InlineKeyboardButton } from 'grammy/types';
 
 const START_TEXT = `<b>🔎 ClaimScan</b>
 
-Track unclaimed creator fees across 10 DeFi launchpads on Solana and Base.
+Track unclaimed creator fees across 9 DeFi launchpads on Solana and Base.
 
 Paste any token CA in the chat and I'll show you the fee breakdown — no command needed.
 
@@ -19,7 +19,7 @@ Paste any token CA in the chat and I'll show you the fee breakdown — no comman
 
 <b>🏷 Platforms</b>
 Pump.fun · Believe · Bags.fm · Clanker · Zora
-Bankr · RevShare · Coinbarrel · Raydium · Heaven`;
+Bankr · RevShare · Coinbarrel · Raydium`;
 
 const START_BUTTONS: InlineKeyboardButton[][] = [
   [
@@ -48,7 +48,7 @@ export async function handleStart(ctx: Context): Promise<void> {
 const HELP_TEXT = `<b>🎮 Commands</b>
 
 <code>/scan @handle</code>
-Full creator fee report — resolves wallets, scans all 10 platforms, shows aggregated fees and top unclaimed tokens.
+Full creator fee report — resolves wallets, scans all 9 platforms, shows aggregated fees and top unclaimed tokens.
 
 <code>/stats</code>
 Shows how many tokens are being monitored for claim notifications in this group.

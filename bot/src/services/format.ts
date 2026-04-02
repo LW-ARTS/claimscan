@@ -1,10 +1,17 @@
 import type { InlineKeyboardButton } from 'grammy/types';
 import type { LookupResult } from './lookup';
 import type { Platform, Chain } from '@/lib/supabase/types';
-import { PLATFORM_CONFIG } from '@/lib/constants';
+import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
 import { safeBigInt, toUsdValue } from '@/lib/utils';
 
 const CLAIMSCAN_URL = 'https://claimscan.tech';
+
+const EXPLORER_URLS: Record<string, string> = {
+  sol: 'https://solscan.io/account/',
+  base: 'https://basescan.org/address/',
+  eth: 'https://etherscan.io/address/',
+  bsc: 'https://bscscan.com/address/',
+};
 
 function truncAddr(address: string): string {
   if (address.length <= 12) return address;
@@ -47,7 +54,7 @@ export function formatCaScanMessage(result: LookupResult): {
   message: string;
   buttons: InlineKeyboardButton[][];
 } {
-  const d = result.chain === 'sol' ? 9 : 18;
+  const d = CHAIN_CONFIG[result.chain].nativeDecimals;
   const sym = result.nativeSymbol;
   const tkn = result.tokenSymbol ? `$${result.tokenSymbol}` : truncAddr(result.tokenAddress);
 
@@ -70,9 +77,20 @@ export function formatCaScanMessage(result: LookupResult): {
     msg += `\n👤 <code>${truncAddr(result.feeRecipient)}</code>\n`;
   }
 
-  msg += `\n💰 Earned        <b>${earnedN} ${sym}</b>  ~${earnedU}\n`;
-  msg += `✅ Claimed        <b>${claimedN} ${sym}</b>  ~${claimedU}\n`;
-  msg += `🔓 Unclaimed    <b>${unclaimedN} ${sym}</b>  ~${unclaimedU}`;
+  if (result.feeType === 'cashback') {
+    msg += `\n💰 Total Earned    <b>${earnedN} ${sym}</b>  ~${earnedU}`;
+    msg += `\n🔄 <i>Auto-distributed — fees sent directly to holders</i>`;
+  } else {
+    msg += `\n💰 Earned        <b>${earnedN} ${sym}</b>  ~${earnedU}\n`;
+    msg += `✅ Claimed        <b>${claimedN} ${sym}</b>  ~${claimedU}\n`;
+    msg += `🔓 Unclaimed    <b>${unclaimedN} ${sym}</b>  ~${unclaimedU}`;
+  }
+
+  const tags: string[] = [];
+  if (result.feeLocked) tags.push('🔒 Locked');
+  if (result.feeRecipientCount && result.feeRecipientCount > 1)
+    tags.push(`👥 ${result.feeRecipientCount} recipients`);
+  if (tags.length > 0) msg += `\n${tags.join('  ·  ')}`;
 
   const buttons: InlineKeyboardButton[][] = [[
     { text: '🔄 Refresh', callback_data: `refresh:${result.tokenAddress}:${result.chain}` },
@@ -80,6 +98,10 @@ export function formatCaScanMessage(result: LookupResult): {
       ? `${CLAIMSCAN_URL}/${encodeURIComponent(result.feeRecipientHandle)}`
       : CLAIMSCAN_URL },
   ]];
+
+  if (result.feeRecipient && EXPLORER_URLS[result.chain]) {
+    buttons.push([{ text: '🔍 Explorer', url: `${EXPLORER_URLS[result.chain]}${result.feeRecipient}` }]);
+  }
 
   return { message: msg, buttons };
 }
@@ -103,7 +125,8 @@ export function formatScanSummary(
   handle: string,
   fees: FeeRecord[],
   solPrice: number,
-  ethPrice: number
+  ethPrice: number,
+  bnbPrice: number
 ): { message: string; buttons: InlineKeyboardButton[][] } {
   if (fees.length === 0) {
     return {
@@ -123,8 +146,8 @@ export function formatScanSummary(
     platforms.add(PLATFORM_CONFIG[fee.platform]?.name ?? fee.platform);
     chains.add(fee.chain);
 
-    const decimals = fee.chain === 'sol' ? 9 : 18;
-    const price = fee.chain === 'sol' ? solPrice : ethPrice;
+    const decimals = CHAIN_CONFIG[fee.chain]?.nativeDecimals ?? 18;
+    const price = fee.chain === 'sol' ? solPrice : fee.chain === 'bsc' ? bnbPrice : ethPrice;
 
     const earned = safeBigInt(fee.total_earned);
     const claimed = safeBigInt(fee.total_claimed);
@@ -140,7 +163,7 @@ export function formatScanSummary(
     .map((f) => {
       const decimals = f.chain === 'sol' ? 9 : 18;
       const price = f.chain === 'sol' ? solPrice : ethPrice;
-      const nSym = f.chain === 'sol' ? 'SOL' : 'ETH';
+      const nSym = CHAIN_CONFIG[f.chain]?.nativeToken ?? 'ETH';
       const unclaimed = safeBigInt(f.total_unclaimed);
       const usd = toUsdValue(unclaimed, decimals, price);
       return {
@@ -154,7 +177,7 @@ export function formatScanSummary(
     .sort((a, b) => b.usd - a.usd)
     .slice(0, 5);
 
-  const chainNames = Array.from(chains).map((c) => c === 'sol' ? 'Solana' : 'Base');
+  const chainNames = Array.from(chains).map((c) => CHAIN_CONFIG[c as Chain]?.name ?? c);
   const tokenCount = fees.length;
 
   let msg = `<b>📊 @${escapeHtml(handle)}</b>\n`;
@@ -186,6 +209,7 @@ export function formatClaimNotification(params: {
   tokenAddress: string;
   tokenSymbol: string | null;
   feeRecipientHandle: string | null;
+  feeRecipientAddress: string | null;
   platform: Platform;
   claimedAmount: string;
   nativeSymbol: string;
@@ -217,6 +241,10 @@ export function formatClaimNotification(params: {
       ? `${CLAIMSCAN_URL}/${encodeURIComponent(params.feeRecipientHandle)}`
       : CLAIMSCAN_URL },
   ]];
+
+  if (params.feeRecipientAddress && EXPLORER_URLS[params.chain]) {
+    buttons.push([{ text: '🔍 Explorer', url: `${EXPLORER_URLS[params.chain]}${params.feeRecipientAddress}` }]);
+  }
 
   return { message: msg, buttons };
 }
