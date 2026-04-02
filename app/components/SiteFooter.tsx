@@ -23,7 +23,7 @@ export function SiteFooter() {
               <span className="text-sm font-semibold text-foreground">ClaimScan</span>
             </div>
             <p className="text-xs text-muted-foreground/60">
-              Track and claim creator fees across Solana and Base
+              Track and claim creator fees across Solana, Base and BSC
             </p>
           </div>
 
