@@ -11,10 +11,8 @@ export const metadata: Metadata = {
 export default async function LeaderboardPage() {
   // Fetch initial data server-side for SEO
   let initialData: { entries: Array<{
-    creator_id: string;
-    twitter_handle: string | null;
+    handle: string;
     display_name: string | null;
-    avatar_url: string | null;
     total_earned_usd: number;
     platform_count: number;
     token_count: number;
