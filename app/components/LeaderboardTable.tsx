@@ -6,10 +6,8 @@ import { formatUsd } from '@/lib/utils';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 
 interface LeaderboardEntry {
-  creator_id: string;
-  twitter_handle: string | null;
+  handle: string;
   display_name: string | null;
-  avatar_url: string | null;
   total_earned_usd: number;
   platform_count: number;
   token_count: number;
@@ -60,11 +58,7 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
     fetchEntries(entries.length, platform, chain, true);
   };
 
-  const resolveHandle = (entry: LeaderboardEntry) =>
-    entry.twitter_handle || entry.display_name || entry.creator_id.slice(0, 8);
-
-  const resolveProfileUrl = (entry: LeaderboardEntry) =>
-    entry.twitter_handle ? `/${entry.twitter_handle}` : `/${entry.creator_id}`;
+  const resolveProfileUrl = (entry: LeaderboardEntry) => `/${entry.handle}`;
 
   return (
     <div>
@@ -108,7 +102,7 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
           <div className="space-y-2 md:hidden">
             {entries.map((entry, idx) => (
               <Link
-                key={entry.creator_id}
+                key={entry.handle}
                 href={resolveProfileUrl(entry)}
                 className="flex items-center gap-3 rounded-xl border border-border/40 bg-card p-3 transition-colors hover:bg-muted/50"
               >
@@ -117,7 +111,7 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-foreground">
-                    {entry.twitter_handle ? `@${entry.twitter_handle}` : entry.display_name || 'Anonymous'}
+                    @{entry.handle}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {entry.platform_count} platform{entry.platform_count !== 1 ? 's' : ''} &middot; {entry.token_count} tokens
@@ -145,7 +139,7 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
               <tbody>
                 {entries.map((entry, idx) => (
                   <tr
-                    key={entry.creator_id}
+                    key={entry.handle}
                     className="border-b border-border transition-colors hover:bg-muted/50"
                     style={idx < 10 ? { animation: `fadeInUp 0.4s ease-out ${idx * 40}ms both` } : undefined}
                   >
@@ -155,10 +149,10 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                     <td className="py-3.5">
                       <Link href={resolveProfileUrl(entry)} className="flex items-center gap-2 transition-colors hover:text-foreground">
                         <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-bold uppercase text-muted-foreground">
-                          {(entry.twitter_handle?.[0] || entry.display_name?.[0] || '?').toUpperCase()}
+                          {entry.handle[0].toUpperCase()}
                         </span>
                         <span className="text-sm font-semibold text-foreground">
-                          {entry.twitter_handle ? `@${entry.twitter_handle}` : entry.display_name || 'Anonymous'}
+                          @{entry.handle}
                         </span>
                       </Link>
                     </td>

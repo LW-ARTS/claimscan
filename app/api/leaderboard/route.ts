@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { Redis } from '@upstash/redis';
-import { CHAIN_CONFIG } from '@/lib/constants';
+import { CHAIN_CONFIG, PLATFORM_CONFIG } from '@/lib/constants';
 
 export const maxDuration = 60;
 
@@ -16,10 +16,8 @@ if (redisUrl && redisToken) {
 }
 
 interface LeaderboardEntry {
-  creator_id: string;
-  twitter_handle: string | null;
+  handle: string;
   display_name: string | null;
-  avatar_url: string | null;
   total_earned_usd: number;
   platform_count: number;
   token_count: number;
@@ -66,11 +64,20 @@ export async function GET(request: Request) {
       .select('creator_id, platform, chain, token_address, total_earned, total_earned_usd')
       .neq('total_earned', '0');
 
+    const VALID_PLATFORMS = new Set(Object.keys(PLATFORM_CONFIG));
+    const VALID_CHAINS = new Set(Object.keys(CHAIN_CONFIG));
+
     if (platform && platform !== 'all') {
-      query = query.eq('platform', platform.replace(/[^a-z]/g, '') as import('@/lib/supabase/types').Platform);
+      if (!VALID_PLATFORMS.has(platform)) {
+        return NextResponse.json({ error: 'Invalid platform' }, { status: 400 });
+      }
+      query = query.eq('platform', platform as import('@/lib/supabase/types').Platform);
     }
     if (chain && chain !== 'all') {
-      query = query.eq('chain', chain.replace(/[^a-z]/g, '') as import('@/lib/supabase/types').Chain);
+      if (!VALID_CHAINS.has(chain)) {
+        return NextResponse.json({ error: 'Invalid chain' }, { status: 400 });
+      }
+      query = query.eq('chain', chain as import('@/lib/supabase/types').Chain);
     }
 
     const { data: feeRecords, error } = await query.limit(50000);
@@ -125,18 +132,19 @@ export async function GET(request: Request) {
     const allEntries = Array.from(creatorMap.entries())
       .filter(([, c]) => c.tokens.size >= 2 && c.total_usd >= 1)
       .sort(([, a], [, b]) => b.total_usd - a.total_usd)
-      .map(([id, c], idx) => {
+      .map(([id, c]) => {
         const info = creatorInfo.get(id);
+        const handle = info?.twitter ?? info?.display ?? null;
+        if (!handle) return null; // Skip creators without a public handle
         return {
-          creator_id: id,
-          twitter_handle: info?.twitter ?? null,
+          handle,
           display_name: info?.display ?? null,
-          avatar_url: null,
           total_earned_usd: Math.round(c.total_usd * 100) / 100,
           platform_count: c.platforms.size,
           token_count: c.tokens.size,
         };
-      });
+      })
+      .filter((e): e is NonNullable<typeof e> => e !== null);
 
     const total = allEntries.length;
     const entries = allEntries.slice(offset, offset + limit);
