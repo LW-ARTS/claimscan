@@ -133,6 +133,11 @@ export async function GET(request: Request) {
         usd = amount * nativePrice;
       }
 
+      // Sanity cap: skip records with obviously broken USD values.
+      // Some adapters (e.g. Clanker) can return inflated total_earned
+      // that produce billions in USD when converted. Cap at $50M per record.
+      if (usd > 50_000_000) usd = 0;
+
       existing.total_usd += usd;
       existing.platforms.add(r.platform);
       existing.tokens.add(r.token_address);
