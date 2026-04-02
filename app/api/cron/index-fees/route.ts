@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient, verifyCronSecret } from '@/lib/supabase/service';
 import { fetchAllFees } from '@/lib/resolve/identity';
+import { readBondingCurve, readSharingConfig } from '@/lib/chains/solana';
+import { PublicKey } from '@solana/web3.js';
 import { safeBigInt } from '@/lib/utils';
-import type { ResolvedWallet } from '@/lib/platforms/types';
+import type { ResolvedWallet, TokenFee } from '@/lib/platforms/types';
 import type { Platform, Chain } from '@/lib/supabase/types';
 
 export const maxDuration = 60;
@@ -104,14 +106,18 @@ export async function GET(request: Request) {
             total_unclaimed: fee.totalUnclaimed,
             total_earned_usd: fee.totalEarnedUsd,
             claim_status:
-              safeBigInt(fee.totalUnclaimed) > 0n && safeBigInt(totalClaimed) > 0n
-                ? 'partially_claimed' as const
-                : safeBigInt(fee.totalUnclaimed) > 0n
-                  ? 'unclaimed' as const
-                  : safeBigInt(totalEarned) > 0n
-                    ? 'claimed' as const
-                    : 'claimed' as const,
+              fee.feeType === 'cashback'
+                ? 'auto_distributed' as const
+                : safeBigInt(fee.totalUnclaimed) > 0n && safeBigInt(totalClaimed) > 0n
+                  ? 'partially_claimed' as const
+                  : safeBigInt(fee.totalUnclaimed) > 0n
+                    ? 'unclaimed' as const
+                    : safeBigInt(totalEarned) > 0n
+                      ? 'claimed' as const
+                      : 'claimed' as const,
             royalty_bps: fee.royaltyBps,
+            fee_type: fee.feeType ?? null,
+            fee_locked: fee.feeLocked ?? null,
             last_synced_at: new Date().toISOString(),
           };
         });
@@ -123,6 +129,93 @@ export async function GET(request: Request) {
         if (upsertError) {
           console.warn(`[index-fees] fee_records upsert failed for creator ${creator.id}:`, upsertError.message);
           continue; // Skip marking as fresh if upsert failed
+        }
+
+        // Upsert fee_recipients for fees with sharing config
+        const feesWithRecipients = fees.filter(
+          (f): f is TokenFee & { feeRecipients: NonNullable<TokenFee['feeRecipients']> } =>
+            !!f.feeRecipients && f.feeRecipients.length > 0
+        );
+        if (feesWithRecipients.length > 0) {
+          // Look up fee_record IDs for these fees
+          const recipientTokenAddrs = feesWithRecipients.map((f) => f.tokenAddress);
+          const { data: feeRecordIds } = await supabase
+            .from('fee_records')
+            .select('id, token_address, platform, chain')
+            .eq('creator_id', creator.id)
+            .in('token_address', recipientTokenAddrs);
+
+          if (feeRecordIds) {
+            const recipientRows = feeRecordIds.flatMap((record) => {
+              const fee = feesWithRecipients.find(
+                (f) => f.tokenAddress === record.token_address && f.platform === record.platform && f.chain === record.chain
+              );
+              if (!fee) return [];
+              return fee.feeRecipients.map((r) => ({
+                fee_record_id: record.id,
+                recipient_address: r.address,
+                share_bps: r.shareBps,
+                unclaimed: r.unclaimed ?? '0',
+              }));
+            });
+
+            if (recipientRows.length > 0) {
+              const { error: recipientError } = await supabase
+                .from('fee_recipients')
+                .upsert(recipientRows, { onConflict: 'fee_record_id,recipient_address' });
+              if (recipientError) {
+                console.warn(`[index-fees] fee_recipients upsert failed:`, recipientError.message);
+              }
+            }
+          }
+        }
+
+        // Enrich Pump.fun fee_records with cashback/sharing data from on-chain
+        if (Date.now() < deadline) {
+          const pumpFees = fees.filter((f) => f.platform === 'pump');
+          if (pumpFees.length > 0) {
+            // Get known Pump mints for this creator
+            const { data: pumpTokens } = await supabase
+              .from('creator_tokens')
+              .select('token_address')
+              .eq('creator_id', creator.id)
+              .eq('platform', 'pump')
+              .limit(20);
+
+            const mints = (pumpTokens ?? []).map((t) => t.token_address);
+            if (mints.length > 0) {
+              let hasCashback = false;
+              let feeLocked: boolean | null = null;
+
+              for (const mintStr of mints.slice(0, 10)) {
+                if (Date.now() > deadline) break;
+                try {
+                  const mint = new PublicKey(mintStr);
+                  const bc = await readBondingCurve(mint);
+                  if (bc?.isCashbackCoin) hasCashback = true;
+
+                  const sc = await readSharingConfig(mint);
+                  if (sc && feeLocked === null) feeLocked = sc.adminRevoked;
+                } catch {
+                  // Skip failed reads
+                }
+              }
+
+              // Update pump fee_records with enrichment data
+              if (hasCashback || feeLocked !== null) {
+                const updates: Record<string, unknown> = {};
+                if (feeLocked !== null) updates.fee_locked = feeLocked;
+
+                if (Object.keys(updates).length > 0) {
+                  await supabase
+                    .from('fee_records')
+                    .update(updates)
+                    .eq('creator_id', creator.id)
+                    .eq('platform', 'pump');
+                }
+              }
+            }
+          }
         }
 
         // Only mark as fresh when fees were actually persisted successfully
@@ -150,7 +243,7 @@ export async function GET(request: Request) {
     if (url.searchParams.get('also') === 'tokens' && Date.now() < deadline) {
       try {
         const { getAllAdapters } = await import('@/lib/platforms');
-        const GPA_PLATFORMS = new Set(['coinbarrel', 'believe', 'revshare']);
+        const GPA_PLATFORMS = new Set(['coinbarrel', 'believe', 'revshare', 'pump']);
         const gpaAdapters = getAllAdapters().filter((a) => GPA_PLATFORMS.has(a.platform));
         const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 

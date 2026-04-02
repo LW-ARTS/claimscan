@@ -110,6 +110,16 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                 <span className="font-mono text-sm font-semibold">
                   {label}
                 </span>
+                {fee.fee_type === 'cashback' && (
+                  <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700" title="This token distributes cashback to traders, not creator fees">
+                    CASHBACK
+                  </span>
+                )}
+                {fee.fee_locked && (
+                  <svg className="h-3.5 w-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-label="Fee config locked" role="img">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                )}
                 {fee.token_address && (
                   <button
                     type="button"
@@ -205,13 +215,23 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                   <div className="flex items-center gap-2">
                     <span
                       className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background"
-                                           aria-hidden="true"
+                      aria-hidden="true"
                     >
                       {badge}
                     </span>
                     <span className="font-sans text-sm font-semibold text-foreground">
                       {label}
                     </span>
+                    {fee.fee_type === 'cashback' && (
+                      <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700" title="This token distributes cashback to traders, not creator fees">
+                        CASHBACK
+                      </span>
+                    )}
+                    {fee.fee_locked && (
+                      <svg className="h-3 w-3 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-label="Fee config locked" role="img">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                      </svg>
+                    )}
                     {fee.token_address && (
                       <button
                         type="button"
@@ -247,7 +267,11 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                   {formatUsd(usd)}
                 </td>
                 <td className="py-3.5 text-center">
-                  {fee.claim_status === 'claimed' ? (
+                  {fee.claim_status === 'auto_distributed' ? (
+                    <span className="inline-block border border-purple-200 bg-purple-50 px-3 py-1 text-[11px] font-medium uppercase tracking-[1px] text-purple-700">
+                      AUTO
+                    </span>
+                  ) : fee.claim_status === 'claimed' ? (
                     <span className="inline-block border border-border px-3 py-1 text-[11px] font-medium uppercase tracking-[1px] text-foreground">
                       CLAIMED
                     </span>

@@ -6,10 +6,10 @@ import { useState, useEffect, useCallback, startTransition, type ReactNode } fro
  * Full-screen reveal animation for the homepage hero.
  *
  * Timeline (1.3 s total):
- *  0.0 s - 0.4 s  Logo scales in with subtle blur clear
- *  0.2 s - 0.5 s  "ClaimScan" text fades in below logo
- *  0.0 s - 0.8 s  Hold (logo + text visible, OVERLAY_HOLD_MS)
- *  0.8 s - 1.3 s  Overlay fades out (OVERLAY_FADE_MS), content animations begin
+ *  0.0 s - 0.2 s  Logo scales in with subtle blur clear
+ *  0.1 s - 0.3 s  "ClaimScan" text fades in below logo
+ *  0.0 s - 0.2 s  Hold (logo + text visible, OVERLAY_HOLD_MS)
+ *  0.2 s - 0.6 s  Overlay fades out (OVERLAY_FADE_MS), content animations begin
  *
  * Only plays once per browser session (sessionStorage).
  * Skips entirely when prefers-reduced-motion is enabled.
@@ -17,9 +17,9 @@ import { useState, useEffect, useCallback, startTransition, type ReactNode } fro
  * Uses pure CSS animations instead of motion/react for smaller bundle.
  */
 
-const OVERLAY_HOLD_MS = 800; // when overlay starts fading out
-const OVERLAY_FADE_MS = 500; // fade-out duration
-const CONTENT_UNBLOCK_MS = 800; // unblock child CSS animations (slightly before overlay fully gone)
+const OVERLAY_HOLD_MS = 200; // when overlay starts fading out
+const OVERLAY_FADE_MS = 400; // fade-out duration
+const CONTENT_UNBLOCK_MS = 200; // unblock child CSS animations (slightly before overlay fully gone)
 
 export function HeroReveal({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<'overlay' | 'exiting' | 'done'>('overlay');

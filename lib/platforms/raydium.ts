@@ -153,6 +153,14 @@ export const raydiumAdapter: PlatformAdapter = {
       }
       const firstMint = firstToken.mint ?? firstToken.tokenMint!;
 
+      // Fee Key NFT detection:
+      // Raydium has 2 fee phases. The bonding curve vault (what we read above)
+      // does NOT require a Fee Key NFT — the creator just signs.
+      // The Fee Key NFT is only needed for post-graduation LP fees (Burn & Earn
+      // via CLMM PersonalPosition). Since we only track bonding curve fees here,
+      // claimRightLost is not applicable. When LP fee tracking is added,
+      // use hasRaydiumFeeKeyNft() from lib/chains/solana.ts.
+
       return [{
         tokenAddress: firstMint,
         tokenSymbol: sanitizeTokenSymbol(firstToken?.symbol) || 'SOL',

@@ -15,6 +15,7 @@ import { handleHelp, handleStart } from './handlers/help';
 import { handleCaDetect } from './handlers/ca-detect';
 import { handleScan } from './handlers/scan';
 import { handleStats } from './handlers/stats';
+import { handleAlert } from './handlers/alert';
 import { handleCallbacks } from './handlers/callbacks';
 import { startPolling } from './workers/poll';
 
@@ -28,6 +29,7 @@ bot.use(requireChannel);
 bot.command('help', handleHelp);
 bot.command('start', handleStart);
 bot.command('scan', handleScan);
+bot.command('alert', handleAlert);
 bot.command('stats', handleStats);
 
 // Register callback query handler (inline buttons)
@@ -61,6 +63,7 @@ async function main() {
   try {
     await bot.api.setMyCommands([
       { command: 'scan', description: 'Full creator fee report by handle' },
+      { command: 'alert', description: 'Set threshold alert for creator fees' },
       { command: 'stats', description: 'Tracked tokens in this group' },
       { command: 'help', description: 'Command reference' },
     ]);

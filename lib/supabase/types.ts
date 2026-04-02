@@ -127,6 +127,8 @@ export interface Database {
           total_earned_usd: number | null;
           claim_status: ClaimStatus;
           royalty_bps: number | null;
+          fee_type: string | null;
+          fee_locked: boolean | null;
           last_synced_at: string;
           created_at: string;
         };
@@ -144,6 +146,8 @@ export interface Database {
           total_earned_usd?: number | null;
           claim_status: ClaimStatus;
           royalty_bps?: number | null;
+          fee_type?: string | null;
+          fee_locked?: boolean | null;
           last_synced_at: string;
           created_at?: string;
         };
@@ -161,10 +165,39 @@ export interface Database {
           total_earned_usd?: number | null;
           claim_status?: ClaimStatus;
           royalty_bps?: number | null;
+          fee_type?: string | null;
+          fee_locked?: boolean | null;
           last_synced_at?: string;
           created_at?: string;
         };
         Relationships: [{ foreignKeyName: 'fee_records_creator_id_fkey'; columns: ['creator_id']; referencedRelation: 'creators'; referencedColumns: ['id'] }];
+      };
+      fee_recipients: {
+        Row: {
+          id: string;
+          fee_record_id: string;
+          recipient_address: string;
+          share_bps: number;
+          unclaimed: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          fee_record_id: string;
+          recipient_address: string;
+          share_bps: number;
+          unclaimed?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          fee_record_id?: string;
+          recipient_address?: string;
+          share_bps?: number;
+          unclaimed?: string;
+          created_at?: string;
+        };
+        Relationships: [{ foreignKeyName: 'fee_recipients_fee_record_id_fkey'; columns: ['fee_record_id']; referencedRelation: 'fee_records'; referencedColumns: ['id'] }];
       };
       claim_events: {
         Row: {

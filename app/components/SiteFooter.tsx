@@ -30,6 +30,13 @@ export function SiteFooter() {
           {/* Right side -- links + social */}
           <div className="flex items-center gap-2">
             <Link
+              href="/leaderboard"
+              className="inline-flex items-center px-3 py-3 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
+            >
+              Leaderboard
+            </Link>
+            <span className="h-3 w-px bg-border/50" aria-hidden="true" />
+            <Link
               href="/docs"
               className="inline-flex items-center px-3 py-3 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
             >

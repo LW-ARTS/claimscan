@@ -27,6 +27,12 @@ export interface CreatorToken {
 // Fee Data
 // ═══════════════════════════════════════════════
 
+export interface FeeRecipient {
+  address: string;
+  shareBps: number;
+  unclaimed?: string;
+}
+
 export interface TokenFee {
   tokenAddress: string;
   tokenSymbol: string | null;
@@ -38,6 +44,14 @@ export interface TokenFee {
   totalEarnedUsd: number | null;
   royaltyBps: number | null;
   feeTokenType?: string;
+  /** 'creator' = standard fees to creator vault, 'cashback' = fees go to traders */
+  feeType?: 'creator' | 'cashback';
+  /** True if fee sharing config is permanently locked (admin_revoked) */
+  feeLocked?: boolean;
+  /** Fee sharing recipients (Pump.fun supports up to 10 wallets) */
+  feeRecipients?: FeeRecipient[];
+  /** True if claim right has been lost (e.g. Raydium Fee Key NFT transferred/burned) */
+  claimRightLost?: boolean;
 }
 
 // ═══════════════════════════════════════════════
