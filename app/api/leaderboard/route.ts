@@ -28,6 +28,7 @@ function getRedis(): import('@upstash/redis').Redis | null {
 
 interface LeaderboardEntry {
   handle: string;
+  handle_type: 'twitter' | 'github';
   display_name: string | null;
   total_earned_usd: number;
   platform_count: number;
@@ -102,11 +103,11 @@ export async function GET(request: Request) {
     const creatorIds = [...new Set((feeRecords ?? []).map((r) => r.creator_id))];
     const { data: creators } = await supabase
       .from('creators')
-      .select('id, twitter_handle, display_name')
+      .select('id, twitter_handle, github_handle, display_name')
       .in('id', creatorIds.slice(0, 1000));
 
     const creatorInfo = new Map(
-      (creators ?? []).map((c) => [c.id, { twitter: c.twitter_handle, display: c.display_name }])
+      (creators ?? []).map((c) => [c.id, { twitter: c.twitter_handle, github: c.github_handle, display: c.display_name }])
     );
 
     // Aggregate by creator, computing USD from raw amounts + native prices
@@ -145,10 +146,15 @@ export async function GET(request: Request) {
       .sort(([, a], [, b]) => b.total_usd - a.total_usd)
       .map(([id, c]) => {
         const info = creatorInfo.get(id);
-        const handle = info?.twitter ?? info?.display ?? null;
+        // Prioritize twitter handle; fall back to github with prefix to avoid confusion
+        const handle = info?.twitter ?? (info?.github ? `gh:${info.github}` : null);
         if (!handle) return null; // Skip creators without a public handle
+        // Profile URL: twitter handles link to /@handle, github to /github:handle
+        const profileHandle = info?.twitter ?? info?.github ?? null;
+        if (!profileHandle) return null;
         return {
-          handle,
+          handle: info?.twitter ?? info?.github ?? '',
+          handle_type: info?.twitter ? 'twitter' as const : 'github' as const,
           display_name: info?.display ?? null,
           total_earned_usd: Math.round(c.total_usd * 100) / 100,
           platform_count: c.platforms.size,

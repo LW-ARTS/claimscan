@@ -12,6 +12,7 @@ export default async function LeaderboardPage() {
   // Fetch initial data server-side for SEO
   let initialData: { entries: Array<{
     handle: string;
+    handle_type: 'twitter' | 'github';
     display_name: string | null;
     total_earned_usd: number;
     platform_count: number;

@@ -7,6 +7,7 @@ import { PLATFORM_CONFIG } from '@/lib/constants';
 
 interface LeaderboardEntry {
   handle: string;
+  handle_type: 'twitter' | 'github';
   display_name: string | null;
   total_earned_usd: number;
   platform_count: number;
@@ -59,6 +60,8 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
   };
 
   const resolveProfileUrl = (entry: LeaderboardEntry) => `/${entry.handle}`;
+  const formatHandle = (entry: LeaderboardEntry) =>
+    entry.handle_type === 'github' ? `${entry.handle} (GitHub)` : `@${entry.handle}`;
 
   return (
     <div>
@@ -111,7 +114,7 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-foreground">
-                    @{entry.handle}
+                    {formatHandle(entry)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {entry.platform_count} platform{entry.platform_count !== 1 ? 's' : ''} &middot; {entry.token_count} tokens
@@ -152,7 +155,7 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                           {entry.handle[0].toUpperCase()}
                         </span>
                         <span className="text-sm font-semibold text-foreground">
-                          @{entry.handle}
+                          {formatHandle(entry)}
                         </span>
                       </Link>
                     </td>
