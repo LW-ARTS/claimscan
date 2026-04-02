@@ -28,5 +28,7 @@ bot.catch(async (err) => {
   // Best-effort user feedback so they don't get silence
   try {
     await ctx.reply('Something went wrong. Please try again in a moment.');
-  } catch { /* if even the reply fails, nothing more to do */ }
+  } catch (replyErr) {
+    console.error('[bot] Failed to send error reply:', replyErr instanceof Error ? replyErr.message : replyErr);
+  }
 });

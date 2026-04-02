@@ -5,6 +5,8 @@ import { getNativeTokenPrices } from '@/lib/prices/index';
 import { CHAIN_CONFIG } from '@/lib/constants';
 import { createServiceClient } from '@/lib/supabase/service';
 import { safeBigInt, toUsdValue } from '@/lib/utils';
+
+const supabase = createServiceClient();
 import type { Chain } from '@/lib/supabase/types';
 import {
   getWatchedTokensWithUnclaimed,
@@ -74,6 +76,7 @@ async function checkAlertRules(): Promise<void> {
   for (const rule of rules) {
     try {
       const totalUnclaimed = await getCreatorUnclaimedUsd(rule.creatorId, prices);
+      if (totalUnclaimed === null) continue; // DB error — skip this rule, don't suppress alerts
       if (totalUnclaimed >= rule.thresholdUsd) {
         const handle = rule.creatorHandle ?? rule.creatorId.slice(0, 8);
         const msg = [
@@ -147,7 +150,7 @@ export function startPolling(): PollHandle {
         console.log(`[poll] Cleaned up ${notifRemoved} old notification(s)`);
       }
     } catch (err) {
-      console.error('[poll] Cycle failed:', err instanceof Error ? err.message : err);
+      console.error('[poll] Cycle failed:', err);
     }
 
     if (running) {
@@ -214,7 +217,12 @@ async function checkSingleToken(
     // Detect claim: claimed amount increased
     if (newClaimed > oldClaimed) {
       const claimedDelta = (newClaimed - oldClaimed).toString();
-      await notifyGroups(token, claimedDelta, tokenFee.totalUnclaimed, prices);
+      const notified = await notifyGroups(token, claimedDelta, tokenFee.totalUnclaimed, prices);
+      if (!notified) {
+        // Notification failed — skip snapshot update so claim is re-detected next cycle
+        console.warn(`[poll] Skipping snapshot update for ${token.tokenAddress} — notification failed`);
+        return;
+      }
     }
 
     // Update snapshot
@@ -272,14 +280,15 @@ async function sendWithRetry(
   }
 }
 
+/** Returns true if at least one group was successfully notified */
 async function notifyGroups(
   token: WatchedToken,
   claimedAmount: string,
   remainingUnclaimed: string,
   prices: Prices
-): Promise<void> {
+): Promise<boolean> {
   const groups = await getGroupsForToken(token.id);
-  if (groups.length === 0) return;
+  if (groups.length === 0) return true; // No groups to notify = success
 
   const chainConf = CHAIN_CONFIG[token.chain];
   const nativeSymbol = chainConf.nativeToken;
@@ -290,14 +299,15 @@ async function notifyGroups(
   let feeRecipientHandle: string | null = null;
   if (token.creatorId) {
     try {
-      const supabase = createServiceClient();
       const { data: creator } = await supabase
         .from('creators')
         .select('twitter_handle, display_name')
         .eq('id', token.creatorId)
         .single();
       feeRecipientHandle = creator?.twitter_handle ?? creator?.display_name ?? null;
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn(`[poll] Failed to resolve handle for creator ${token.creatorId}:`, err instanceof Error ? err.message : err);
+    }
   }
 
   const { message, buttons } = formatClaimNotification({
@@ -314,6 +324,7 @@ async function notifyGroups(
     chain: token.chain,
   });
 
+  let successCount = 0;
   for (const { groupId } of groups) {
     try {
       await sendWithRetry(groupId, message, {
@@ -322,17 +333,21 @@ async function notifyGroups(
         link_preview_options: { is_disabled: true },
       });
       await logNotification(groupId, token.tokenAddress, 'claim_detected');
+      successCount++;
     } catch (err) {
       // Prune groups that permanently reject the bot (403 = kicked/banned)
       if (err instanceof GrammyError && err.error_code === 403) {
         console.warn(`[poll] Bot removed from group ${groupId} — pruning from group_watches`);
         try {
-          const supabase = createServiceClient();
           await supabase.from('group_watches').delete().eq('group_id', groupId);
-        } catch { /* best effort */ }
+        } catch (pruneErr) {
+          console.error(`[poll] Failed to prune group_watches for group ${groupId}:`, pruneErr instanceof Error ? pruneErr.message : pruneErr);
+        }
+        successCount++; // Pruned groups count as handled
       } else {
         console.warn(`[poll] Failed to notify group ${groupId}:`, err instanceof Error ? err.message : err);
       }
     }
   }
+  return successCount > 0;
 }

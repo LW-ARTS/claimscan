@@ -7,15 +7,15 @@ import type { InlineKeyboardButton } from 'grammy/types';
 
 const START_TEXT = `<b>🔎 ClaimScan</b>
 
-Track unclaimed creator fees across 9 DeFi launchpads on Solana and Base.
+Track unclaimed creator fees across 9 DeFi launchpads on Solana, Base, and BSC.
 
-Paste any token CA in the chat and I'll show you the fee breakdown — no command needed.
+Paste any token CA in the chat and I'll show you the fee breakdown, no command needed.
 
 <b>🎮 Commands</b>
-<code>/scan @handle</code> — Full creator fee report
-<code>/alert @handle $500</code> — Notify when unclaimed fees exceed threshold
-<code>/stats</code> — Tracked tokens in this group
-<code>/help</code> — Command reference
+<code>/scan @handle</code> Full creator fee report
+<code>/alert @handle $500</code> Fee threshold alerts
+<code>/stats</code> Tracked tokens in this group
+<code>/help</code> Command reference
 
 <b>🏷 Platforms</b>
 Pump.fun · Believe · Bags.fm · Clanker · Zora
@@ -48,7 +48,7 @@ export async function handleStart(ctx: Context): Promise<void> {
 const HELP_TEXT = `<b>🎮 Commands</b>
 
 <code>/scan @handle</code>
-Full creator fee report — resolves wallets, scans all 9 platforms, shows aggregated fees and top unclaimed tokens.
+Full creator fee report. Resolves wallets, scans all 9 platforms, shows aggregated fees and top unclaimed tokens.
 
 <code>/stats</code>
 Shows how many tokens are being monitored for claim notifications in this group.
@@ -57,12 +57,12 @@ Shows how many tokens are being monitored for claim notifications in this group.
 This message.
 
 <b>💡 CA Auto-detect</b>
-Paste any Solana or Base token address directly in the chat. I'll identify the platform, find the creator, and show you the fee breakdown.
+Paste any Solana, Base, or BSC token address directly in the chat. I'll identify the platform, find the creator, and show you the fee breakdown.
 
 <b>🔔 Threshold Alerts</b>
-<code>/alert @handle $500</code> — Get notified when a creator's unclaimed fees exceed your threshold.
-<code>/alert list</code> — View active alerts in this chat.
-<code>/alert remove @handle</code> — Remove an alert.
+<code>/alert @handle $500</code> Get notified when unclaimed fees exceed your threshold.
+<code>/alert list</code> View active alerts in this chat.
+<code>/alert remove @handle</code> Remove an alert.
 
 <b>🔔 Claim Notifications</b>
 When a scanned token has unclaimed fees, I'll automatically watch it and notify this group when the creator claims.`;

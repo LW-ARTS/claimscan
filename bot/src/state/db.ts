@@ -58,7 +58,7 @@ export async function lookupTokenByAddress(
   if (!feeRecord) return null;
 
   // Fetch creator + wallet + fee recipient count in parallel
-  const [{ data: creator }, { data: wallet }, { count: recipientCount }] = await Promise.all([
+  const [creatorResult, walletResult, recipientResult] = await Promise.all([
     supabase
       .from('creators')
       .select('twitter_handle, display_name')
@@ -76,6 +76,17 @@ export async function lookupTokenByAddress(
       .select('*', { count: 'exact', head: true })
       .eq('fee_record_id', feeRecord.id),
   ]);
+
+  if (creatorResult.error && creatorResult.error.code !== 'PGRST116')
+    console.warn('[db] lookupTokenByAddress creator query failed:', creatorResult.error.message);
+  if (walletResult.error && walletResult.error.code !== 'PGRST116')
+    console.warn('[db] lookupTokenByAddress wallet query failed:', walletResult.error.message);
+  if (recipientResult.error)
+    console.warn('[db] lookupTokenByAddress recipient count failed:', recipientResult.error.message);
+
+  const creator = creatorResult.data;
+  const wallet = walletResult.data;
+  const recipientCount = recipientResult.count;
 
   return {
     creatorId: feeRecord.creator_id,
@@ -216,8 +227,7 @@ export async function getGroupsForToken(tokenId: string): Promise<Array<{ groupI
     .eq('token_id', tokenId);
 
   if (error) {
-    console.error('[db] getGroupsForToken error:', error.message);
-    return [];
+    throw new Error(`[db] getGroupsForToken failed for token ${tokenId}: ${error.message}`);
   }
 
   return (data ?? []).map((row) => ({
@@ -409,17 +419,18 @@ export async function getActiveAlertRules(): Promise<
 }
 
 export async function deleteAlertRule(chatId: number, creatorId: string): Promise<boolean> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('alert_rules')
     .delete()
     .eq('chat_id', chatId)
-    .eq('creator_id', creatorId);
+    .eq('creator_id', creatorId)
+    .select('id');
 
   if (error) {
     console.error('[db] deleteAlertRule error:', error.message);
     return false;
   }
-  return true;
+  return (data?.length ?? 0) > 0;
 }
 
 export async function updateAlertLastNotified(ruleId: string): Promise<void> {
@@ -436,7 +447,7 @@ export async function updateAlertLastNotified(ruleId: string): Promise<void> {
 export async function getCreatorUnclaimedUsd(
   creatorId: string,
   prices: { sol: number; eth: number; bnb: number }
-): Promise<number> {
+): Promise<number | null> {
   const { data, error } = await supabase
     .from('fee_records')
     .select('total_unclaimed, chain')
@@ -445,7 +456,7 @@ export async function getCreatorUnclaimedUsd(
 
   if (error) {
     console.error('[db] getCreatorUnclaimedUsd error:', error.message);
-    return 0;
+    return null;
   }
 
   const priceKey: Record<string, keyof typeof prices> = { sol: 'sol', base: 'eth', eth: 'eth', bsc: 'bnb' };

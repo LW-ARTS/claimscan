@@ -46,14 +46,14 @@ async function shutdown(signal: string) {
   shuttingDown = true;
   console.log(`[bot] ${signal} received — shutting down...`);
 
-  stopPolling();
+  pollHandle?.stop();
   await bot.stop();
 
   console.log('[bot] Shutdown complete');
   process.exit(0);
 }
 
-let stopPolling = () => {};
+let pollHandle: ReturnType<typeof startPolling> | null = null;
 
 // Start bot + polling worker
 async function main() {
@@ -72,8 +72,7 @@ async function main() {
   }
 
   // Start the claim polling worker
-  const pollHandle = startPolling();
-  stopPolling = pollHandle.stop;
+  pollHandle = startPolling();
 
   // Start long polling
   await bot.start({

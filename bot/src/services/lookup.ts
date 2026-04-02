@@ -40,9 +40,6 @@ export interface LookupResult {
   totalUnclaimed: string;
   totalEarnedUsd: number | null;
   nativeSymbol: string;
-  nativeAmount: string;
-  nativeAmountClaimed: string;
-  nativeAmountUnclaimed: string;
   nativeUsdPrice: number;
   hasUnclaimed: boolean;
   watchedTokenId: string | null;
@@ -68,7 +65,12 @@ export async function lookupToken(
   try {
     return await withTimeout(doLookup(tokenAddress, chain), LOOKUP_TIMEOUT_MS);
   } catch (err) {
-    console.error(`[lookup] Failed for ${tokenAddress}:`, err instanceof Error ? err.message : err);
+    const isTimeout = err instanceof Error && err.message === 'lookup timeout';
+    if (isTimeout) {
+      console.warn(`[lookup] Timeout for ${tokenAddress} (${LOOKUP_TIMEOUT_MS}ms)`);
+    } else {
+      console.error(`[lookup] Failed for ${tokenAddress}:`, err);
+    }
     return null;
   }
 }
@@ -179,6 +181,9 @@ async function discoverSolanaToken(tokenAddress: string): Promise<LookupResult |
             totalUnclaimed: tokenFee.totalUnclaimed,
             totalEarnedUsd: tokenFee.totalEarnedUsd,
             creatorId: null,
+            feeType: tokenFee.feeType ?? null,
+            feeLocked: tokenFee.feeLocked ?? null,
+            feeRecipientCount: null,
           });
         }
       } catch (err) {
@@ -197,6 +202,9 @@ async function discoverSolanaToken(tokenAddress: string): Promise<LookupResult |
       totalUnclaimed: '0',
       totalEarnedUsd: null,
       creatorId: null,
+      feeType: null,
+      feeLocked: null,
+      feeRecipientCount: null,
     });
   }
 
@@ -263,6 +271,9 @@ async function discoverBaseToken(tokenAddress: string): Promise<LookupResult | n
                 totalUnclaimed: tokenFee.totalUnclaimed,
                 totalEarnedUsd: tokenFee.totalEarnedUsd,
                 creatorId: null,
+                feeType: null,
+                feeLocked: null,
+                feeRecipientCount: null,
               });
             }
           } catch (err) {
@@ -363,8 +374,8 @@ async function discoverBankrToken(tokenAddress: string): Promise<LookupResult | 
         feeRecipient = match.feeRecipient.walletAddress;
       }
     }
-  } catch {
-    // Non-fatal -- we still have fee data without the handle
+  } catch (err) {
+    console.warn(`[lookup] Bankr handle resolution failed for ${tokenAddress}:`, err instanceof Error ? err.message : err);
   }
 
   return await enrichResult('bankr', 'base', {
@@ -377,6 +388,9 @@ async function discoverBankrToken(tokenAddress: string): Promise<LookupResult | 
     totalUnclaimed: claimableWei,
     totalEarnedUsd: null,
     creatorId: null,
+    feeType: null,
+    feeLocked: null,
+    feeRecipientCount: null,
   });
 }
 
@@ -414,21 +428,8 @@ async function enrichResult(
   const priceKey = { sol: 'sol', base: 'eth', eth: 'eth', bsc: 'bnb' } as const;
   const nativeUsdPrice = prices[priceKey[chain]] ?? 0;
 
-  // Convert raw amounts to human-readable native token amounts
   const earned = safeBigInt(data.totalEarned);
-  const claimed = safeBigInt(data.totalClaimed);
   const unclaimed = safeBigInt(data.totalUnclaimed);
-
-  const divisor = BigInt(10 ** nativeDecimals);
-  const formatNative = (val: bigint): string => {
-    if (val === 0n) return '0';
-    const whole = val / divisor;
-    const remainder = val % divisor;
-    if (remainder === 0n) return `${whole}`;
-    const fracStr = remainder.toString().padStart(nativeDecimals, '0').replace(/0+$/, '');
-    return `${whole}.${fracStr.slice(0, 4)}`;
-  };
-
   const hasUnclaimed = unclaimed > 0n;
 
   // Calculate USD values from native amounts if not already provided
@@ -470,9 +471,6 @@ async function enrichResult(
     totalUnclaimed: data.totalUnclaimed,
     totalEarnedUsd: earnedUsd,
     nativeSymbol,
-    nativeAmount: formatNative(earned),
-    nativeAmountClaimed: formatNative(claimed),
-    nativeAmountUnclaimed: formatNative(unclaimed),
     nativeUsdPrice,
     hasUnclaimed,
     watchedTokenId,
