@@ -299,3 +299,140 @@ export async function getGroupWatchCount(groupId: number): Promise<number> {
   }
   return count ?? 0;
 }
+
+// ═══════════════════════════════════════════════
+// Alert Rules (threshold notifications)
+// ═══════════════════════════════════════════════
+
+export interface AlertRule {
+  id: string;
+  chatId: number;
+  userId: number;
+  creatorId: string;
+  thresholdUsd: number;
+  lastNotifiedAt: string | null;
+  active: boolean;
+}
+
+export async function upsertAlertRule(params: {
+  chatId: number;
+  userId: number;
+  creatorId: string;
+  thresholdUsd: number;
+}): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('alert_rules')
+    .upsert(
+      {
+        chat_id: params.chatId,
+        user_id: params.userId,
+        creator_id: params.creatorId,
+        threshold_usd: params.thresholdUsd,
+        active: true,
+      },
+      { onConflict: 'chat_id,creator_id' }
+    )
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('[db] upsertAlertRule error:', error.message);
+    return null;
+  }
+  return data?.id ?? null;
+}
+
+export async function getAlertRulesForChat(chatId: number): Promise<AlertRule[]> {
+  const { data, error } = await supabase
+    .from('alert_rules')
+    .select('*, creators(twitter_handle, display_name)')
+    .eq('chat_id', chatId)
+    .eq('active', true)
+    .limit(50);
+
+  if (error) {
+    console.error('[db] getAlertRulesForChat error:', error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    chatId: row.chat_id as number,
+    userId: row.user_id as number,
+    creatorId: row.creator_id as string,
+    thresholdUsd: Number(row.threshold_usd),
+    lastNotifiedAt: row.last_notified_at as string | null,
+    active: row.active as boolean,
+  }));
+}
+
+export async function getActiveAlertRules(): Promise<
+  Array<AlertRule & { creatorHandle: string | null }>
+> {
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('alert_rules')
+    .select('*, creators(twitter_handle, display_name)')
+    .eq('active', true)
+    .or(`last_notified_at.is.null,last_notified_at.lt.${oneDayAgo}`)
+    .limit(100);
+
+  if (error) {
+    console.error('[db] getActiveAlertRules error:', error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const creator = row.creators as { twitter_handle?: string; display_name?: string } | null;
+    return {
+      id: row.id as string,
+      chatId: row.chat_id as number,
+      userId: row.user_id as number,
+      creatorId: row.creator_id as string,
+      thresholdUsd: Number(row.threshold_usd),
+      lastNotifiedAt: row.last_notified_at as string | null,
+      active: row.active as boolean,
+      creatorHandle: creator?.twitter_handle ?? creator?.display_name ?? null,
+    };
+  });
+}
+
+export async function deleteAlertRule(chatId: number, creatorId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('alert_rules')
+    .delete()
+    .eq('chat_id', chatId)
+    .eq('creator_id', creatorId);
+
+  if (error) {
+    console.error('[db] deleteAlertRule error:', error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function updateAlertLastNotified(ruleId: string): Promise<void> {
+  const { error } = await supabase
+    .from('alert_rules')
+    .update({ last_notified_at: new Date().toISOString() })
+    .eq('id', ruleId);
+
+  if (error) {
+    console.error('[db] updateAlertLastNotified error:', error.message);
+  }
+}
+
+export async function getCreatorUnclaimedUsd(creatorId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('fee_records')
+    .select('total_earned_usd')
+    .eq('creator_id', creatorId)
+    .in('claim_status', ['unclaimed', 'partially_claimed']);
+
+  if (error) {
+    console.error('[db] getCreatorUnclaimedUsd error:', error.message);
+    return 0;
+  }
+
+  return (data ?? []).reduce((sum, row) => sum + (row.total_earned_usd ?? 0), 0);
+}

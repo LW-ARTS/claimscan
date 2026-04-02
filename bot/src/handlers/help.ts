@@ -13,6 +13,7 @@ Paste any token CA in the chat and I'll show you the fee breakdown — no comman
 
 <b>🎮 Commands</b>
 <code>/scan @handle</code> — Full creator fee report
+<code>/alert @handle $500</code> — Notify when unclaimed fees exceed threshold
 <code>/stats</code> — Tracked tokens in this group
 <code>/help</code> — Command reference
 
@@ -57,6 +58,11 @@ This message.
 
 <b>💡 CA Auto-detect</b>
 Paste any Solana or Base token address directly in the chat. I'll identify the platform, find the creator, and show you the fee breakdown.
+
+<b>🔔 Threshold Alerts</b>
+<code>/alert @handle $500</code> — Get notified when a creator's unclaimed fees exceed your threshold.
+<code>/alert list</code> — View active alerts in this chat.
+<code>/alert remove @handle</code> — Remove an alert.
 
 <b>🔔 Claim Notifications</b>
 When a scanned token has unclaimed fees, I'll automatically watch it and notify this group when the creator claims.`;

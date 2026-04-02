@@ -3,6 +3,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import {
   PUMP_PROGRAM_ID,
   PUMPSWAP_PROGRAM_ID,
+  PUMP_FEES_PROGRAM_ID,
 } from '@/lib/constants';
 
 // ═══════════════════════════════════════════════
@@ -109,6 +110,7 @@ export async function withRpcFallback<T>(
 
 const PUMP_PROGRAM = new PublicKey(PUMP_PROGRAM_ID);
 const PUMPSWAP_PROGRAM = new PublicKey(PUMPSWAP_PROGRAM_ID);
+const PUMP_FEES_PROGRAM = new PublicKey(PUMP_FEES_PROGRAM_ID);
 
 /** SPL Token program for ATA derivation. */
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
@@ -347,5 +349,229 @@ export async function fetchTokenMetadataBatch(
   }
 
   return result;
+}
+
+// ═══════════════════════════════════════════════
+// Pump.fun Fee Model Helpers (Jan-Mar 2026)
+// ═══════════════════════════════════════════════
+
+/**
+ * Derive BondingCurve PDA for a token mint.
+ * Seeds: ["bonding-curve", mint]
+ */
+export function deriveBondingCurve(mint: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('bonding-curve'), mint.toBuffer()],
+    PUMP_PROGRAM
+  );
+}
+
+/**
+ * Derive SharingConfig PDA for a token mint.
+ * Seeds: ["sharing-config", mint] on Fee Program.
+ */
+export function deriveSharingConfig(mint: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('sharing-config'), mint.toBuffer()],
+    PUMP_FEES_PROGRAM
+  );
+}
+
+/**
+ * BondingCurve account layout offsets (after 8-byte Anchor discriminator).
+ * Verified against mainnet account 4m3TmChEPPunVUvpph71DXjSt3UMxxk8813a1U3SZash.
+ * Total size: 150 bytes.
+ *
+ * [0-7]   discriminator
+ * [8-47]  5x u64 (reserves + total_supply)
+ * [48]    complete (bool)
+ * [49-80] creator (Pubkey, 32 bytes)
+ * [81]    is_mayhem_mode (bool)
+ * [82]    is_cashback_coin (bool)
+ * [83-149] remaining fields
+ */
+const BC_OFFSET_COMPLETE = 48;
+const BC_OFFSET_CREATOR = 49;
+const BC_OFFSET_IS_CASHBACK = 82;
+
+export interface BondingCurveInfo {
+  isCashbackCoin: boolean;
+  creator: string;
+  complete: boolean;
+}
+
+/**
+ * Read BondingCurve account to check if token is a cashback coin.
+ * Returns null if account doesn't exist (token may have fully migrated).
+ */
+export async function readBondingCurve(mint: PublicKey): Promise<BondingCurveInfo | null> {
+  const [pda] = deriveBondingCurve(mint);
+  try {
+    const info = await withRpcFallback(
+      (c) => c.getAccountInfo(pda),
+      'bonding-curve-read'
+    );
+    // Minimum 83 bytes: discriminator(8) + 5*u64(40) + complete(1) + creator(32) + 2 bools
+    if (!info?.data || info.data.length < 83) return null;
+    const data = Buffer.from(info.data);
+    return {
+      complete: data[BC_OFFSET_COMPLETE] === 1,
+      creator: new PublicKey(data.subarray(BC_OFFSET_CREATOR, BC_OFFSET_CREATOR + 32)).toBase58(),
+      isCashbackCoin: data.length > BC_OFFSET_IS_CASHBACK ? data[BC_OFFSET_IS_CASHBACK] === 1 : false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * SharingConfig account layout (after 8-byte Anchor discriminator):
+ * bump(u8), version(u8), status(u8 enum), mint(Pubkey 32), admin(Pubkey 32),
+ * admin_revoked(bool), shareholders(Vec<Shareholder>)
+ * Shareholder = address(Pubkey 32) + share_bps(u16)
+ */
+const SC_OFFSET_BUMP = 8;
+const SC_OFFSET_STATUS = SC_OFFSET_BUMP + 2; // skip bump + version
+const SC_OFFSET_MINT = SC_OFFSET_STATUS + 1;
+const SC_OFFSET_ADMIN = SC_OFFSET_MINT + 32;
+const SC_OFFSET_ADMIN_REVOKED = SC_OFFSET_ADMIN + 32;
+const SC_OFFSET_SHAREHOLDERS_LEN = SC_OFFSET_ADMIN_REVOKED + 1;
+const SHAREHOLDER_SIZE = 32 + 2; // Pubkey + u16
+
+export interface SharingConfigInfo {
+  adminRevoked: boolean;
+  status: number; // 0 = Active, 1 = Paused
+  shareholders: Array<{ address: string; shareBps: number }>;
+}
+
+/**
+ * Read SharingConfig account for a token mint.
+ * Returns null if no sharing config exists (single creator, no splits).
+ */
+export async function readSharingConfig(mint: PublicKey): Promise<SharingConfigInfo | null> {
+  const [pda] = deriveSharingConfig(mint);
+  try {
+    const info = await withRpcFallback(
+      (c) => c.getAccountInfo(pda),
+      'sharing-config-read'
+    );
+    if (!info?.data || info.data.length < SC_OFFSET_SHAREHOLDERS_LEN + 4) return null;
+    const data = Buffer.from(info.data);
+
+    // Safety check: verify the mint field matches the expected mint.
+    // If it doesn't, our estimated layout offsets are wrong — bail out.
+    const parsedMint = new PublicKey(data.subarray(SC_OFFSET_MINT, SC_OFFSET_MINT + 32));
+    if (!parsedMint.equals(mint)) return null;
+
+    const adminRevoked = data[SC_OFFSET_ADMIN_REVOKED] === 1;
+    const status = data[SC_OFFSET_STATUS];
+
+    // Read shareholders Vec: 4-byte LE length prefix then N * SHAREHOLDER_SIZE
+    const shareholderCount = data.readUInt32LE(SC_OFFSET_SHAREHOLDERS_LEN);
+    const shareholders: Array<{ address: string; shareBps: number }> = [];
+
+    const dataStart = SC_OFFSET_SHAREHOLDERS_LEN + 4;
+    for (let i = 0; i < shareholderCount; i++) {
+      const offset = dataStart + i * SHAREHOLDER_SIZE;
+      if (offset + SHAREHOLDER_SIZE > data.length) break;
+      const address = new PublicKey(data.subarray(offset, offset + 32)).toBase58();
+      const shareBps = data.readUInt16LE(offset + 32);
+      shareholders.push({ address, shareBps });
+    }
+
+    return { adminRevoked, status, shareholders };
+  } catch {
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Raydium Fee Key NFT Detection
+// ═══════════════════════════════════════════════
+// Raydium LaunchLab has 2 fee phases:
+// 1. Bonding curve: vault PDA [creator, mintB] — no NFT needed, creator signs.
+// 2. Post-graduation (Burn & Earn): Fee Key NFT minted during migration.
+//    CLMM PersonalPosition PDA: ["position", nft_mint, bump]
+//    NFT owner can claim LP fees. If transferred/burned, fees lost permanently.
+//
+// The current adapter only tracks bonding curve fees (phase 1).
+// This helper is for future use when we add post-graduation LP fee tracking.
+
+/** Raydium CLMM program ID. */
+const RAYDIUM_CLMM_PROGRAM = new PublicKey('CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK');
+
+/**
+ * Check if a wallet holds a Raydium CLMM position NFT for a specific pool.
+ * Uses getTokenAccountsByOwner to find NFTs, then checks PersonalPosition PDAs.
+ *
+ * @param wallet - Creator wallet address
+ * @param poolId - CLMM pool address (the graduated token's pool)
+ * @returns true if wallet holds a position NFT for this pool, false otherwise
+ */
+export async function hasRaydiumFeeKeyNft(
+  wallet: PublicKey,
+  poolId: PublicKey
+): Promise<boolean> {
+  try {
+    // Get all token accounts owned by the wallet with amount = 1 (NFTs)
+    const accounts = await withRpcFallback(
+      (c) => c.getParsedTokenAccountsByOwner(wallet, {
+        programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+      }),
+      'raydium-nft-check'
+    );
+
+    // Filter for NFTs (amount = 1, decimals = 0)
+    const nftMints: PublicKey[] = [];
+    for (const acc of accounts.value) {
+      const parsed = acc.account.data.parsed?.info;
+      if (
+        parsed &&
+        parsed.tokenAmount?.uiAmount === 1 &&
+        parsed.tokenAmount?.decimals === 0
+      ) {
+        nftMints.push(new PublicKey(parsed.mint));
+      }
+    }
+
+    if (nftMints.length === 0) return false;
+
+    // Check each NFT mint against PersonalPosition PDA
+    // PDA: ["position", nft_mint] on CLMM program
+    const POSITION_SEED = 'position';
+    const positionPdas = nftMints.map((mint) => {
+      const [pda] = PublicKey.findProgramAddressSync(
+        [Buffer.from(POSITION_SEED), mint.toBuffer()],
+        RAYDIUM_CLMM_PROGRAM
+      );
+      return pda;
+    });
+
+    // Batch fetch position accounts (max 100 per call)
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < positionPdas.length; i += BATCH_SIZE) {
+      const batch = positionPdas.slice(i, i + BATCH_SIZE);
+      const infos = await withRpcFallback(
+        (c) => c.getMultipleAccountsInfo(batch),
+        'raydium-position-check'
+      );
+
+      for (const info of infos) {
+        if (!info?.data || info.data.length < 73) continue;
+        const data = Buffer.from(info.data);
+        // PersonalPosition layout (after 8-byte discriminator):
+        // bump(1) + nft_mint(32) + pool_id(32) = offset 41 for pool_id
+        const accountPoolId = new PublicKey(data.subarray(41, 73));
+        if (accountPoolId.equals(poolId)) {
+          return true; // Found matching position NFT
+        }
+      }
+    }
+
+    return false;
+  } catch {
+    // On any error, assume NFT exists (don't show false warning)
+    return true;
+  }
 }
 

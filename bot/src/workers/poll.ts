@@ -12,6 +12,9 @@ import {
   cleanupStaleWatches,
   cleanupOldNotifications,
   logNotification,
+  getActiveAlertRules,
+  getCreatorUnclaimedUsd,
+  updateAlertLastNotified,
 } from '../state/db';
 import { formatClaimNotification } from '../services/format';
 import type { WatchedToken } from '../state/db';
@@ -54,6 +57,53 @@ interface PollHandle {
   stop: () => void;
 }
 
+/** Check alert rules and send threshold notifications */
+async function checkAlertRules(): Promise<void> {
+  const rules = await getActiveAlertRules();
+  if (rules.length === 0) return;
+
+  console.log(`[poll] Checking ${rules.length} alert rule(s)...`);
+  let sent = 0;
+
+  for (const rule of rules) {
+    try {
+      const totalUnclaimed = await getCreatorUnclaimedUsd(rule.creatorId);
+      if (totalUnclaimed >= rule.thresholdUsd) {
+        const handle = rule.creatorHandle ?? rule.creatorId.slice(0, 8);
+        const msg = [
+          `<b>⚠️ Fee Alert</b>`,
+          ``,
+          `<b>@${handle}</b> has <b>$${totalUnclaimed.toLocaleString(undefined, { maximumFractionDigits: 2 })}</b> in unclaimed fees.`,
+          `Your threshold: $${rule.thresholdUsd.toLocaleString()}`,
+          ``,
+          `<a href="https://claimscan.tech/${handle}">View on ClaimScan →</a>`,
+        ].join('\n');
+
+        await bot.api.sendMessage(rule.chatId, msg, {
+          parse_mode: 'HTML',
+          link_preview_options: { is_disabled: true },
+        });
+        await updateAlertLastNotified(rule.id);
+        sent++;
+      }
+    } catch (err) {
+      if (err instanceof GrammyError && err.error_code === 403) {
+        // Bot was removed from chat — deactivate rule silently
+        console.warn(`[poll] Alert rule ${rule.id}: bot removed from chat ${rule.chatId}`);
+      } else {
+        console.warn(`[poll] Alert rule ${rule.id} failed:`, err instanceof Error ? err.message : err);
+      }
+    }
+  }
+
+  if (sent > 0) {
+    console.log(`[poll] Sent ${sent} threshold alert(s)`);
+  }
+}
+
+// Counter to run alert checks every 3rd cycle (15 min instead of 5 min)
+let alertCycleCounter = 0;
+
 export function startPolling(): PollHandle {
   let running = true;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -72,6 +122,13 @@ export function startPolling(): PollHandle {
         console.log(`[poll] Checking ${tokens.length} watched token(s)...`);
         const prices = await getNativeTokenPrices();
         await checkTokens(tokens, prices);
+      }
+
+      // Check alert rules every 3rd cycle (15 min)
+      alertCycleCounter++;
+      if (alertCycleCounter >= 3) {
+        alertCycleCounter = 0;
+        await checkAlertRules();
       }
 
       const removed = await cleanupStaleWatches(STALE_THRESHOLD_MS);

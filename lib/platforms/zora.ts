@@ -16,11 +16,87 @@ const log = createLogger('zora');
 // ═══════════════════════════════════════════════
 // Zora Adapter
 //
-// Checks ProtocolRewards balance on BOTH Base and ETH mainnet.
-// The same contract 0x7777777F279eba3d3Ad8F4E708545291A6fDBA8B is
-// deployed on both chains. Since EVM addresses work cross-chain,
-// we query both when called for a Base wallet.
+// Two fee sources:
+// 1. Legacy ProtocolRewards (0x7777...BA8B) — ETH on Base + ETH mainnet.
+//    Claimable by creator. Works for pre-Content Coins tokens.
+// 2. Content Coins (Uniswap V4) — fees auto-distributed per swap.
+//    No claim needed. Queried via Zora Coins REST API.
 // ═══════════════════════════════════════════════
+
+const ZORA_API_BASE = 'https://api-sdk.zora.engineering';
+const ZORA_API_TIMEOUT = 10_000;
+
+function getZoraApiKey(): string | null {
+  return process.env.ZORA_API_KEY ?? null;
+}
+
+interface ZoraProfileCoin {
+  name: string;
+  symbol: string;
+  address: string;
+  chainId: number;
+  creatorAddress: string;
+  creatorEarnings?: Array<{
+    amount: { currencyAddress: string; amountRaw: string; amountDecimal: number };
+    amountUsd?: string;
+  }>;
+  marketCap?: string;
+  totalVolume?: string;
+}
+
+/**
+ * Fetch Content Coins created by a wallet from Zora Coins API.
+ * Returns total earnings across all their Content Coins (auto-distributed).
+ */
+async function fetchContentCoinEarnings(wallet: string): Promise<{
+  totalEarningsUsd: number;
+  coinCount: number;
+} | null> {
+  const apiKey = getZoraApiKey();
+  if (!apiKey) return null;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ZORA_API_TIMEOUT);
+
+    const res = await fetch(
+      `${ZORA_API_BASE}/profile/coins?identifier=${wallet}&count=100`,
+      {
+        headers: { 'api-key': apiKey },
+        signal: controller.signal,
+      }
+    );
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      log.warn('Zora Coins API failed', { status: res.status });
+      return null;
+    }
+
+    const data = await res.json();
+    const coins: ZoraProfileCoin[] = data?.data?.profile?.coins?.edges?.map(
+      (e: { node: ZoraProfileCoin }) => e.node
+    ) ?? data?.coins ?? [];
+
+    if (coins.length === 0) return null;
+
+    let totalEarningsUsd = 0;
+    for (const coin of coins) {
+      if (coin.creatorEarnings) {
+        for (const earning of coin.creatorEarnings) {
+          totalEarningsUsd += parseFloat(earning.amountUsd ?? '0');
+        }
+      }
+    }
+
+    return { totalEarningsUsd, coinCount: coins.length };
+  } catch (err) {
+    log.warn('fetchContentCoinEarnings failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
 
 export const zoraAdapter: PlatformAdapter = {
   platform: 'zora',
@@ -55,14 +131,17 @@ export const zoraAdapter: PlatformAdapter = {
     const checksummed = getAddress(wallet);
     const fees: TokenFee[] = [];
 
-    // Query balances + withdraw logs on both chains in parallel
-    const [baseBalance, ethBalance, baseClaimed, ethClaimed] = await Promise.allSettled([
-      getZoraProtocolRewardsBalance(checksummed),
-      getZoraProtocolRewardsBalanceEth(checksummed),
-      getZoraWithdrawLogs(checksummed),
-      getZoraWithdrawLogsEth(checksummed),
-    ]);
+    // Query legacy ProtocolRewards + Content Coins in parallel
+    const [baseBalance, ethBalance, baseClaimed, ethClaimed, contentCoins] =
+      await Promise.allSettled([
+        getZoraProtocolRewardsBalance(checksummed),
+        getZoraProtocolRewardsBalanceEth(checksummed),
+        getZoraWithdrawLogs(checksummed),
+        getZoraWithdrawLogsEth(checksummed),
+        fetchContentCoinEarnings(checksummed),
+      ]);
 
+    // --- Legacy ProtocolRewards (Base) ---
     let baseBal = 0n;
     if (baseBalance.status === 'fulfilled') {
       baseBal = baseBalance.value;
@@ -105,6 +184,23 @@ export const zoraAdapter: PlatformAdapter = {
         totalUnclaimed: ethBal.toString(),
         totalEarnedUsd: null,
         royaltyBps: null,
+      });
+    }
+
+    // --- Content Coins (auto-distributed, no claim needed) ---
+    const ccResult = contentCoins.status === 'fulfilled' ? contentCoins.value : null;
+    if (ccResult && ccResult.totalEarningsUsd > 0) {
+      fees.push({
+        tokenAddress: 'ZORA:coins:base',
+        tokenSymbol: `Content Coins (${ccResult.coinCount})`,
+        chain: 'base',
+        platform: 'zora',
+        totalEarned: '0', // Denominated in $ZORA, tracked as USD only
+        totalClaimed: '0',
+        totalUnclaimed: '0', // Auto-distributed — nothing to claim
+        totalEarnedUsd: ccResult.totalEarningsUsd,
+        royaltyBps: null,
+        feeType: 'cashback', // Signals auto-distribution (no claim button)
       });
     }
 

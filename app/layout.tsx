@@ -133,10 +133,11 @@ export default async function RootLayout({
       <head>
         <meta name="base:app_id" content="69b2e7675600c39dcfa4fe7b" />
         <JsonLd />
-        {/* Preload Turnstile with CSP nonce — eliminates dynamic script injection in ClaimDialog */}
+        {/* Turnstile with CSP nonce — loaded afterInteractive to not block FCP.
+            Only needed when user opens ClaimDialog, not on initial page load. */}
         <Script
           src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
           nonce={nonce}
         />
       </head>

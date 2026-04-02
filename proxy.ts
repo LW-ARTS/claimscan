@@ -290,6 +290,21 @@ export async function proxy(request: NextRequest) {
   // Apply all security headers (single source of truth — SH-001)
   applySecurityHeaders(response, nonce);
 
+  // ═══════════════════════════════════════════════
+  // FAST PATH: Static page GET requests
+  // Skip rate limiting, signature verification, anti-enumeration, and tarpit
+  // for non-API GET requests to known static pages.
+  // These pages don't need protection beyond security headers.
+  // Saves ~200-400ms TTFB on homepage and other static pages.
+  // ═══════════════════════════════════════════════
+  if (
+    request.method === 'GET' &&
+    !pathname.startsWith('/api/') &&
+    !pathname.endsWith('/opengraph-image')
+  ) {
+    return response;
+  }
+
   // CORS — reflect request Origin only if it's in our allowlist (not attacker-controlled)
   const requestOrigin = request.headers.get('origin');
   const allowedOrigin = requestOrigin && APP_ORIGINS.has(requestOrigin) ? requestOrigin : APP_URL;
