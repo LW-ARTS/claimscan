@@ -1,5 +1,5 @@
 import 'server-only';
-import { createPublicClient, http, fallback, type Address } from 'viem';
+import { createPublicClient, http, fallback, getAddress, type Address } from 'viem';
 import { bsc } from 'viem/chains';
 import { CLANKER_BSC_FEE_LOCKER } from '@/lib/constants-evm';
 import { batchClankerFeesGeneric, getClankerClaimLogsGeneric } from './clanker-reads';
@@ -63,6 +63,9 @@ const BSC_LOGS_CHUNK_SIZE = 5_000n;
 const BSC_LOGS_PARALLEL_CHUNKS = 3;
 const BSC_CLAIM_LOGS_TIMEOUT_MS = 15_000;
 
+/** BSC WBNB (canonical wrapped BNB) */
+const BSC_WBNB: Address = getAddress('0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c');
+
 export async function batchClankerFeesBsc(
   owner: Address,
   tokens: Address[]
@@ -70,7 +73,7 @@ export async function batchClankerFeesBsc(
   // Cast needed: viem's PublicClient<Transport, typeof bsc> has chain-specific type params
   // that don't unify with the structural MulticallClient interface, despite satisfying it at runtime.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return batchClankerFeesGeneric(bscClient as any, CLANKER_BSC_FEE_LOCKER, owner, tokens, '[bsc]');
+  return batchClankerFeesGeneric(bscClient as any, CLANKER_BSC_FEE_LOCKER, owner, tokens, '[bsc]', BSC_WBNB);
 }
 
 export async function getClankerClaimLogsBsc(

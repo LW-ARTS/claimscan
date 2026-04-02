@@ -51,17 +51,63 @@ interface LogsBlockClient {
  * Batch read unclaimed fees for multiple tokens via multicall.
  * Chain-agnostic — pass the appropriate client and FeeLocker address.
  */
+/**
+ * Batch read unclaimed WETH fees for multiple Clanker tokens via multicall.
+ * Chain-agnostic — pass the appropriate client, FeeLocker, and WETH address.
+ *
+ * IMPORTANT: availableFees(owner, feeToken) returns fees denominated in the
+ * feeToken currency. We pass WETH (not the Clanker token) to get ETH-denominated
+ * fees. Passing the Clanker token address returns fees in that token's own units,
+ * which produces wildly inflated values when treated as ETH.
+ */
 export async function batchClankerFeesGeneric(
   client: MulticallClient,
   feeLockerAddress: Address,
   owner: Address,
   tokens: Address[],
   tag: string,
+  wethAddress?: Address,
 ): Promise<Array<{ token: Address; available: bigint; claimed: bigint }>> {
   if (tokens.length === 0) return [];
 
+  // Query WETH fees per Clanker token.
+  // availableFees(owner, WETH) returns the total WETH across ALL tokens.
+  // To get per-token breakdown, we query availableFees(owner, clankerToken)
+  // BUT we need WETH-denominated results. The FeeLocker stores fees per
+  // (owner, feeToken) pair. For WETH fees: feeToken = WETH address.
+  //
+  // If wethAddress is provided, query WETH fees (correct).
+  // If not, fall back to token-denominated fees (legacy, may be inaccurate).
+  const feeQueryToken = wethAddress;
+
   const allResults: Array<{ token: Address; available: bigint; claimed: bigint }> = [];
 
+  if (feeQueryToken) {
+    // Query total WETH fees for this owner (single call, not per-token)
+    const contracts = [{
+      address: feeLockerAddress,
+      abi: clankerFeeLockerAbi as readonly unknown[],
+      functionName: 'availableFees' as const,
+      args: [owner, feeQueryToken] as readonly unknown[],
+    }];
+
+    const results = await client.multicall({ contracts, allowFailure: true });
+    const totalWeth = results[0]?.status === 'success' && typeof results[0].result === 'bigint'
+      ? results[0].result
+      : 0n;
+
+    // Distribute evenly across tokens (FeeLocker doesn't break down WETH per token)
+    // This is an approximation — the real split depends on trading volume per token
+    if (totalWeth > 0n && tokens.length > 0) {
+      const perToken = totalWeth / BigInt(tokens.length);
+      for (const token of tokens) {
+        allResults.push({ token, available: perToken, claimed: 0n });
+      }
+    }
+    return allResults;
+  }
+
+  // Legacy fallback: query per-token (returns token-denominated amounts)
   for (let start = 0; start < tokens.length; start += MULTICALL_BATCH_SIZE) {
     const chunk = tokens.slice(start, start + MULTICALL_BATCH_SIZE);
 

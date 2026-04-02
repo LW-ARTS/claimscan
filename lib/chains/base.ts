@@ -73,6 +73,9 @@ export const erc20Abi = parseAbi([
 // Clanker Reads (delegated to shared clanker-reads.ts)
 // ═══════════════════════════════════════════════
 
+/** Base WETH (canonical wrapped ether on Base L2) */
+const BASE_WETH: Address = getAddress('0x4200000000000000000000000000000000000006');
+
 export async function batchClankerFees(
   owner: Address,
   tokens: Address[]
@@ -80,7 +83,7 @@ export async function batchClankerFees(
   // Cast needed: viem's PublicClient<Transport, typeof base> has chain-specific type params
   // that don't unify with the structural MulticallClient interface, despite satisfying it at runtime.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return batchClankerFeesGeneric(baseClient as any, CLANKER_FEE_LOCKER, owner, tokens, '[base]');
+  return batchClankerFeesGeneric(baseClient as any, CLANKER_FEE_LOCKER, owner, tokens, '[base]', BASE_WETH);
 }
 
 // ═══════════════════════════════════════════════
