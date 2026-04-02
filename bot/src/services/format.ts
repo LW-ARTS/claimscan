@@ -135,6 +135,8 @@ export function formatScanSummary(
     };
   }
 
+  const priceMap: Record<string, number> = { sol: solPrice, base: ethPrice, eth: ethPrice, bsc: bnbPrice };
+
   let totalEarnedUsd = 0;
   let totalClaimedUsd = 0;
   let totalUnclaimedUsd = 0;
@@ -147,7 +149,7 @@ export function formatScanSummary(
     chains.add(fee.chain);
 
     const decimals = CHAIN_CONFIG[fee.chain]?.nativeDecimals ?? 18;
-    const price = fee.chain === 'sol' ? solPrice : fee.chain === 'bsc' ? bnbPrice : ethPrice;
+    const price = priceMap[fee.chain] ?? ethPrice;
 
     const earned = safeBigInt(fee.total_earned);
     const claimed = safeBigInt(fee.total_claimed);
@@ -161,8 +163,8 @@ export function formatScanSummary(
   const topUnclaimed = fees
     .filter((f) => safeBigInt(f.total_unclaimed) > 0n)
     .map((f) => {
-      const decimals = f.chain === 'sol' ? 9 : 18;
-      const price = f.chain === 'sol' ? solPrice : ethPrice;
+      const decimals = CHAIN_CONFIG[f.chain]?.nativeDecimals ?? 18;
+      const price = priceMap[f.chain] ?? ethPrice;
       const nSym = CHAIN_CONFIG[f.chain]?.nativeToken ?? 'ETH';
       const unclaimed = safeBigInt(f.total_unclaimed);
       const usd = toUsdValue(unclaimed, decimals, price);

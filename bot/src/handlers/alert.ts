@@ -5,7 +5,6 @@ import {
   deleteAlertRule,
 } from '../state/db';
 import { createServiceClient } from '@/lib/supabase/service';
-
 const supabase = createServiceClient();
 
 /**
@@ -68,7 +67,7 @@ export async function handleAlert(ctx: Context): Promise<void> {
     const { data: creator } = await supabase
       .from('creators')
       .select('id')
-      .or(`twitter_handle.eq.${handle},display_name.eq.${handle}`)
+      .or(`twitter_handle.eq."${handle.replace(/"/g, '')}",display_name.eq."${handle.replace(/"/g, '')}"`)
       .limit(1)
       .single();
 
@@ -108,7 +107,8 @@ export async function handleAlert(ctx: Context): Promise<void> {
   const { data: creator } = await supabase
     .from('creators')
     .select('id')
-    .or(`twitter_handle.eq.${handle},display_name.eq.${handle}`)
+    .or(`twitter_handle.eq."${handle.replace(/"/g, '')}",display_name.eq."${handle.replace(/"/g, '')}"`)
+
     .limit(1)
     .single();
 

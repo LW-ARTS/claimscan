@@ -108,7 +108,7 @@ export async function handleScan(ctx: Context): Promise<void> {
     console.error('[scan] Failed:', err instanceof Error ? err.message : err);
     if (scanningMsgId) await deleteSafe(ctx, scanningMsgId);
     await ctx.reply(
-      '⚠️ Scan failed — RPCs might be congested. Try again in a few seconds.',
+      '⚠️ Scan failed. RPCs might be congested, try again in a few seconds.',
       { parse_mode: 'HTML' }
     );
   }

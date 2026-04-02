@@ -40,11 +40,20 @@ async function checkMembership(userId: number): Promise<boolean> {
     // so they get through immediately after joining without waiting for cache expiry
     if (isMember) cacheMembership(userId, true);
     return isMember;
-  } catch {
-    // If we can't check (bot not admin in channel, rate limited), let them through
+  } catch (err) {
+    console.warn('[require-channel] Membership check failed, allowing access:', err instanceof Error ? err.message : err);
     return true;
   }
 }
+
+// Periodic cleanup of expired cache entries (every 10 minutes)
+const cacheCleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of memberCache) {
+    if (now >= entry.expiresAt) memberCache.delete(key);
+  }
+}, 10 * 60 * 1000);
+cacheCleanupTimer.unref();
 
 export async function requireChannel(ctx: Context, next: NextFunction): Promise<void> {
   const userId = ctx.from?.id;

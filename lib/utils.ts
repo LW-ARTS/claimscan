@@ -48,7 +48,8 @@ export function safeBigInt(val: string | null | undefined): bigint {
     const result = BigInt(intPart || '0');
     // Clamp negatives to 0n — token amounts should never be negative
     return result < 0n ? 0n : result;
-  } catch {
+  } catch (err) {
+    console.warn(`[safeBigInt] Failed to parse: "${val}"`, err instanceof Error ? err.message : err);
     return 0n;
   }
 }
