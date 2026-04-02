@@ -630,6 +630,76 @@ export default function DocsPage() {
         </section>
       </LazySection>
 
+      {/* ═══ API V2 — PAID ENDPOINTS ═══ */}
+      <LazySection rootMargin="300px 0px">
+        <section className="glass mt-16 rounded-2xl p-6 sm:p-8">
+          <Label>API V2 — Paid Endpoints</Label>
+          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
+            Pay-per-query via x402
+          </h2>
+          <p className="mt-4 text-[15px] leading-[1.75] text-foreground/70">
+            ClaimScan V2 API endpoints are protected by the{' '}
+            <a href="https://x402.org" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+              x402 protocol
+            </a>
+            . Pay in USDC per query — no API keys, no subscriptions. Compatible with{' '}
+            <a href="https://openwallet.sh" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+              OWS
+            </a>
+            {' '}wallets and AI agents.
+          </p>
+
+          <div className="mt-6 space-y-4">
+            {[
+              {
+                method: 'GET',
+                path: '/api/v2/fees?wallet=<address>',
+                price: '$0.01',
+                desc: 'Fee report — all platforms, all chains',
+              },
+              {
+                method: 'GET',
+                path: '/api/v2/export?wallet=<address>',
+                price: '$0.05',
+                desc: 'CSV/JSON export of all fees',
+              },
+              {
+                method: 'GET',
+                path: '/api/v2/intelligence?wallet=<address>',
+                price: '$0.02',
+                desc: 'Intelligence report — fees + Allium enrichment',
+              },
+              {
+                method: 'GET',
+                path: '/api/v2/resolve?ows_wallet=<name>',
+                price: 'Free',
+                desc: 'Resolve OWS wallet to multi-chain addresses',
+              },
+            ].map((ep) => (
+              <div key={ep.path} className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                <div className="flex items-center gap-2">
+                  <span className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[11px] font-bold">{ep.method}</span>
+                  <code className="text-[13px] text-foreground/80">{ep.path}</code>
+                  <span className="ml-auto text-[12px] font-bold text-foreground/50">{ep.price}</span>
+                </div>
+                <p className="mt-1.5 text-[13px] text-foreground/50">{ep.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+            <p className="text-[13px] font-bold text-foreground/70">Agent access via OWS CLI</p>
+            <code className="mt-2 block whitespace-pre-wrap text-[12px] text-foreground/50">
+              ows pay request &quot;https://claimscan.tech/api/v2/fees?wallet=0x...&quot; --wallet my-agent
+            </code>
+          </div>
+
+          <p className="mt-4 text-[13px] text-foreground/40">
+            Data sources: ClaimScan (9 launchpads) + Allium (cross-chain transactions &amp; PnL). Settlement on Base via USDC.
+          </p>
+        </section>
+      </LazySection>
+
       {/* ═══ CTA ═══ */}
       <LazySection>
         <section className="mt-20 rounded-2xl bg-foreground py-14 text-center">
