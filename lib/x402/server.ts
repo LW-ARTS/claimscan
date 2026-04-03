@@ -16,8 +16,9 @@ export const x402Server = new x402ResourceServer(facilitator)
 
 export function feeRouteConfig(price: string, description: string): RouteConfig {
   const payTo = PAY_TO || process.env.X402_WALLET_ADDRESS || '';
+  // M-8: Fail closed — paid endpoints must not serve free content when wallet is missing
   if (!payTo && process.env.NODE_ENV === 'production' && !process.env.NEXT_PHASE) {
-    console.error('[x402] X402_WALLET_ADDRESS is not set — paid endpoints will not collect payments.');
+    throw new Error('[x402] X402_WALLET_ADDRESS must be set in production — paid endpoints cannot operate without a payment recipient');
   }
   return {
     accepts: { scheme: 'exact', price, network: NETWORK, payTo },

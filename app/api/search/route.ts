@@ -14,9 +14,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Verify Cloudflare Turnstile token (skipped if not configured)
-    const ip = request.headers.get('x-real-ip')
-      ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    // L-2: Use trusted IP resolution (Vercel platform IP > x-real-ip), not spoofable x-forwarded-for
+    const ip = (request as unknown as { ip?: string }).ip
+      ?? (process.env.VERCEL ? request.headers.get('x-real-ip')?.trim() : null)
       ?? null;
     const turnstile = await verifyTurnstile(body.cfTurnstileToken ?? null, ip);
     if (!turnstile.success) {
