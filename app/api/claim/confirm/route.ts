@@ -52,11 +52,18 @@ async function consumeHmacToken(token: string): Promise<boolean> {
     }
   }
 
-  // In-memory fallback (per-instance, resets on cold start but still blocks replays within a warm instance)
+  // H-3: In production serverless, in-memory dedup is unreliable across cold starts.
+  // Reject rather than allow potential replays on financial state transitions.
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[claim/confirm] HMAC dedup unavailable: Redis down and in-memory is not safe in serverless');
+    return false;
+  }
+
+  // In-memory fallback for development only
   _pruneLocalDedup();
   const now = Date.now();
   const existing = _localDedup.get(hash);
-  if (existing && existing > now) return false; // replay blocked
+  if (existing && existing > now) return false;
   _localDedup.set(hash, now + HMAC_DEDUP_TTL_MS);
   return true;
 }

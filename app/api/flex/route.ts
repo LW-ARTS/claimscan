@@ -32,9 +32,18 @@ export async function GET(request: Request) {
 
   try {
     // Build the absolute URL to the OG image route
+    // H-1: Validate host against allowlist to prevent SSRF via env var misconfiguration
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://claimscan.tech';
     const host = process.env.VERCEL_URL ?? new URL(appUrl).host;
+    if (
+      host !== 'claimscan.tech' &&
+      host !== 'www.claimscan.tech' &&
+      !host.endsWith('.vercel.app')
+    ) {
+      console.error(`[flex] SSRF blocked: resolved host "${host}" is not in allowlist`);
+      return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    }
     const ogUrl = `${protocol}://${host}/${encodeURIComponent(handle)}/opengraph-image`;
 
     const response = await fetch(ogUrl, {

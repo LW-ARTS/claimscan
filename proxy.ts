@@ -22,10 +22,11 @@ async function getRateLimiters() {
       _generalLimiter = mod.generalLimiter;
       _searchLimiter = mod.searchLimiter;
       _feesLimiter = mod.feesLimiter;
+      _limiterLoaded = true; // L-1: Only mark loaded on success so we retry on failure
     } catch {
       // Upstash not available in Edge — use in-memory fallback
+      // Do NOT set _limiterLoaded — retry import on next request
     }
-    _limiterLoaded = true;
   }
   return { generalLimiter: _generalLimiter, searchLimiter: _searchLimiter, feesLimiter: _feesLimiter };
 }
@@ -62,6 +63,7 @@ const RATE_LIMIT_MAX = RATE_LIMIT_GENERAL;
 const enumMap = new Map<string, { handles: Set<string>; resetAt: number }>();
 const ENUM_WINDOW_MS = 300_000; // 5-minute window
 const ENUM_MAX_UNIQUE = 20; // max 20 unique handles per 5 min per IP
+const ENUM_MAX_UNIQUE_ANON = 40; // M-1: higher limit for anon fingerprints (collision-prone)
 
 function isEnumerating(ip: string, handle: string): boolean {
   const now = Date.now();
@@ -79,7 +81,8 @@ function isEnumerating(ip: string, handle: string): boolean {
   }
 
   entry.handles.add(handle);
-  return entry.handles.size > ENUM_MAX_UNIQUE;
+  const max = ip.startsWith('anon:') ? ENUM_MAX_UNIQUE_ANON : ENUM_MAX_UNIQUE;
+  return entry.handles.size > max;
 }
 
 function evictStaleEntries(): void {
@@ -181,8 +184,11 @@ function applySecurityHeaders(res: NextResponse, nonce: string): NextResponse {
 function getClientIp(request: NextRequest): string {
   const vercelIp = (request as unknown as { ip?: string }).ip;
   if (vercelIp) return vercelIp;
-  const realIp = request.headers.get('x-real-ip')?.trim();
-  if (realIp) return realIp;
+  // M-4: Only trust x-real-ip on Vercel (spoofable in other environments)
+  if (process.env.VERCEL) {
+    const realIp = request.headers.get('x-real-ip')?.trim();
+    if (realIp) return realIp;
+  }
   // Fingerprint fallback: avoids a single shared bucket for all anonymous traffic.
   // Not perfect but prevents one attacker from exhausting the bucket for everyone.
   if (process.env.NODE_ENV === 'production') {
@@ -305,10 +311,11 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // CORS — reflect request Origin only if it's in our allowlist (not attacker-controlled)
+  // CORS — reflect request Origin only if it's in our allowlist (M-3: never reflect non-allowed origins)
   const requestOrigin = request.headers.get('origin');
-  const allowedOrigin = requestOrigin && APP_ORIGINS.has(requestOrigin) ? requestOrigin : APP_URL;
-  response.headers.set('Access-Control-Allow-Origin', allowedOrigin);
+  if (requestOrigin && APP_ORIGINS.has(requestOrigin)) {
+    response.headers.set('Access-Control-Allow-Origin', requestOrigin);
+  }
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Request-Sig');
   response.headers.set('Access-Control-Max-Age', '86400');
@@ -391,7 +398,9 @@ export async function proxy(request: NextRequest) {
     const handle = handleMatch[1];
     const ip = getClientIp(request);
 
-    if (!ip.startsWith('anon:') && isEnumerating(ip, handle)) {
+    // M-1: Apply anti-enumeration to all IPs including anonymous fingerprints
+    // Use a higher limit for anon IPs since fingerprints are collision-prone
+    if (isEnumerating(ip, handle)) {
       await sleep(3000);
       return applySecurityHeaders(NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
