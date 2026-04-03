@@ -20,9 +20,8 @@ const CAIP_TO_CHAIN: Record<string, Chain> = {
 function caipToChain(chainId: string): Chain | null {
   if (CAIP_TO_CHAIN[chainId]) return CAIP_TO_CHAIN[chainId];
   if (chainId.startsWith('solana:')) return 'sol';
-  if (chainId.startsWith('eip155:8453')) return 'base';
-  if (chainId.startsWith('eip155:56')) return 'bsc';
-  if (chainId === 'eip155:1') return 'eth';
+  // Default unknown EVM chains to eth (e.g. testnets)
+  if (chainId.startsWith('eip155:')) return 'eth';
   return null;
 }
 
