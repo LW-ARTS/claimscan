@@ -53,7 +53,7 @@ const handler = async (req: NextRequest): Promise<NextResponse<unknown>> => {
     if (typeof f.total_earned_usd === 'number' && Number.isFinite(f.total_earned_usd)) {
       totalEarnedUsd += f.total_earned_usd;
     }
-    if (f.claim_status === 'unclaimed' && typeof f.total_earned_usd === 'number') {
+    if (f.claim_status === 'unclaimed' && typeof f.total_earned_usd === 'number' && Number.isFinite(f.total_earned_usd)) {
       totalUnclaimedUsd += f.total_earned_usd;
     }
   }

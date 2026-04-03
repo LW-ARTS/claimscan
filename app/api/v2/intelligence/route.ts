@@ -131,7 +131,7 @@ const handler = async (req: NextRequest): Promise<NextResponse<unknown>> => {
       errors: alliumErrors.length > 0 ? alliumErrors : null,
     },
 
-    dataSources: ['claimscan', ...(process.env.ALLIUM_API_KEY ? ['allium'] : [])],
+    dataSources: ['claimscan', ...(process.env.ALLIUM_API_KEY && walletsForAllium.length > 0 && alliumErrors.length === 0 ? ['allium'] : [])],
     paidVia: 'x402',
     generatedAt: new Date().toISOString(),
   }, {
