@@ -185,17 +185,18 @@ export default function TermsPage() {
           <SectionBlock id="service-description" number="2" title="Service Description">
             <p>
               ClaimScan is a cross-chain decentralized finance (&quot;DeFi&quot;) analytics platform that aggregates and
-              displays creator fee data across multiple blockchain launchpad platforms on the Solana and Base (Ethereum L2)
-              networks. The Service provides:
+              displays creator fee data across multiple blockchain launchpad platforms on Solana, Base, Ethereum,
+              and BNB Chain. The Service provides:
             </p>
             <div className="rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] p-4">
               <div className="space-y-2">
                 {[
-                  'Identity resolution from social handles (Twitter/X, Farcaster, GitHub) to blockchain wallet addresses',
-                  'Aggregated fee tracking across 9 launchpad platforms (Pump.fun, Bags.fm, Clanker, Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium)',
+                  'Identity resolution from social handles (Twitter/X, Farcaster, GitHub) and OWS wallet names to blockchain wallet addresses across all supported chains',
+                  'Aggregated fee tracking across 10 launchpad platforms (Pump.fun, Bags.fm, Clanker, Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium) on Solana, Base, Ethereum, and BNB Chain',
                   'Real-time USD conversion of on-chain fee data using third-party price feeds',
                   'Claim facilitation for eligible unclaimed fees through zero-custody transaction construction',
                   'Data export and analytics features for creator fee portfolios',
+                  'A paid API (V2) that provides fee reports, data exports, and intelligence reports enriched with cross-chain data from Allium, accessible by developers and AI agents via the x402 payment protocol',
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5 text-[12px]">
                     <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
@@ -324,9 +325,17 @@ export default function TermsPage() {
               </div>
             </div>
             <p>
+              <strong className="text-foreground/90">V2 API Pricing.</strong> ClaimScan V2 API endpoints are paid per request
+              via the x402 protocol. When you or your agent queries a paid endpoint, a USDC payment on Base is required
+              before data is returned. Current prices are $0.01 per fee report, $0.02 per intelligence report, and $0.05
+              per data export. Payment is settled on-chain and verified before the response is delivered. The
+              /api/v2/resolve endpoint is free.
+            </p>
+            <p>
               <strong className="text-foreground/90">Fee Changes.</strong> We reserve the right to modify the fee rate
-              with reasonable advance notice. Any fee changes will be reflected in the Claim Dialog before you approve
-              a transaction.
+              for both claim service fees and V2 API pricing with reasonable advance notice. Claim fee changes will be
+              reflected in the Claim Dialog before you approve a transaction. API pricing changes will be reflected in the
+              HTTP 402 response returned by the x402 protocol.
             </p>
             <p>
               <strong className="text-foreground/90">Blockchain Transaction Fees.</strong> All blockchain transactions initiated
@@ -528,6 +537,7 @@ export default function TermsPage() {
               {[
                 ['Search Queries', 'Anonymized and hashed before storage. Raw search inputs are never persisted in readable form.', 'Legitimate interest (service operation)'],
                 ['Wallet Addresses', 'Processed transiently during scans. While blockchain addresses are pseudonymous and publicly available, they may constitute personal data under certain privacy regulations (e.g., GDPR) when linkable to an identified individual.', 'Contract performance (service delivery)'],
+                ['V2 API Requests', 'Wallet addresses queried via the paid API are processed transiently and not stored beyond caching. Payment data (x402 transactions) is settled on-chain and publicly verifiable.', 'Contract performance (service delivery)'],
                 ['Usage Analytics', 'Anonymized performance and usage metrics collected via Vercel Analytics. No tracking cookies or cross-site tracking.', 'Legitimate interest (service improvement)'],
                 ['Error Logs', 'Application error data collected via Sentry for debugging purposes. Logs are stripped of PII before transmission.', 'Legitimate interest (service reliability)'],
                 ['IP Addresses', 'Processed transiently for rate limiting and abuse prevention. Not stored in persistent logs.', 'Legitimate interest (security)'],
@@ -584,6 +594,7 @@ export default function TermsPage() {
                 ['Jupiter', 'Token price data (Solana)', 'United States'],
                 ['DexScreener', 'Token price data (multi-chain)', 'United States'],
                 ['CoinGecko', 'Native token price data', 'Singapore'],
+                ['Allium', 'Cross-chain wallet data enrichment (V2 API)', 'United States'],
                 ['Unavatar', 'Social media avatar proxy', 'Global (CDN)'],
               ].map(([name, purpose, location], i) => (
                 <div

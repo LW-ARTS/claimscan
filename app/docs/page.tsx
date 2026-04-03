@@ -5,11 +5,11 @@ import { LazySection } from '../components/LazySection';
 export const metadata: Metadata = {
   title: 'ClaimScan Docs: Architecture & Roadmap',
   description:
-    'ClaimScan documentation. V1 creator fee tracking across 9 launchpads. V2 roadmap: token contract lookup, fee recipient discovery, and claim status on Solana, Base, and BNB Chain.',
+    'ClaimScan documentation. Creator fee tracking across 10 launchpads on Solana, Base, Ethereum, and BNB Chain. V2 paid API via x402 for agents and developers.',
   openGraph: {
     title: 'ClaimScan Docs',
     description:
-      'Architecture, security, and roadmap for the cross-chain DeFi fee tracker powering 9 launchpads.',
+      'Architecture, security, and roadmap for the cross-chain DeFi fee tracker powering 10 launchpads.',
     images: [
       {
         url: 'https://claimscan.tech/og-docs.png',
@@ -169,11 +169,11 @@ export default function DocsPage() {
         <section className="glass rounded-2xl p-6 sm:p-8">
           <Label>Overview</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            One search. 9 launchpads. 4 chains.
+            One search. 10 launchpads. 4 chains.
           </h2>
           <p className="mt-4 text-[15px] leading-[1.75] text-foreground/70">
             You launched tokens. Platforms collected fees for you. But nobody told you where the money is.
-            ClaimScan scans 9 launchpads across Solana, Base, and BNB Chain in real time, showing what you&apos;ve
+            ClaimScan scans 10 launchpads across Solana, Base, Ethereum, and BNB Chain in real time, showing what you&apos;ve
             earned, what you&apos;ve claimed, and what&apos;s still sitting uncollected on-chain.
           </p>
 
