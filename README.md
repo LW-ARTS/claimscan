@@ -1,11 +1,13 @@
 <div align="center">
   <img src="assets/icon.png" alt="ClaimScan" width="80" />
   <h1>ClaimScan</h1>
-  <p><strong>Cross-chain creator fee scanner and claimer for DeFi launchpads on Solana and Base</strong></p>
+  <p><strong>Cross-chain creator fee scanner, claimer, and paid intelligence API for DeFi launchpads on Solana, Base, Ethereum, and BNB Chain</strong></p>
 
   <p>
     <img src="https://img.shields.io/badge/Solana-Mainnet-9945FF?logo=solana&logoColor=white" alt="Solana" />
     <img src="https://img.shields.io/badge/Base-Mainnet-0052FF?logo=coinbase&logoColor=white" alt="Base" />
+    <img src="https://img.shields.io/badge/Ethereum-Mainnet-627EEA?logo=ethereum&logoColor=white" alt="Ethereum" />
+    <img src="https://img.shields.io/badge/BNB_Chain-Mainnet-F0B90B?logo=binance&logoColor=white" alt="BNB Chain" />
     <img src="https://img.shields.io/website?url=https%3A%2F%2Fclaimscan.tech&label=claimscan.tech" alt="Website" />
   </p>
 
@@ -18,9 +20,9 @@
 
 ## What is ClaimScan?
 
-ClaimScan is a free tool that scans and claims unclaimed creator fees across 9 DeFi launchpads on Solana and Base.
+ClaimScan is a free tool that scans and claims unclaimed creator fees across 10 DeFi launchpads on Solana, Base, Ethereum, and BNB Chain.
 
-~40% of creator fees go unclaimed. Creators launch tokens, generate volume, earn fees, and never claim them. ClaimScan finds that money and lets you claim it.
+Around 40% of creator fees go unclaimed. Creators launch tokens, generate volume, earn fees, and never collect them. ClaimScan finds that money and lets you claim it.
 
 **Paste any @handle or wallet. Get a full breakdown in under 30 seconds.**
 
@@ -31,7 +33,7 @@ ClaimScan is a free tool that scans and claims unclaimed creator fees across 9 D
 ## How It Works
 
 1. Paste a Twitter handle, GitHub username, Farcaster name, or wallet address
-2. ClaimScan scans 9 launchpads across Solana + Base simultaneously
+2. ClaimScan scans 10 launchpads across Solana, Base, Ethereum, and BNB Chain simultaneously
 3. Full breakdown: earned, claimed, unclaimed in USD with live pricing
 4. Connect your wallet and claim uncollected fees directly from ClaimScan
 
@@ -47,25 +49,25 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 | Platform | Features |
 |----------|----------|
 | Bags.fm | Identity resolution, live polling, **direct claim with Turnstile + priority fees** |
-| Pump.fun | Historical + live fee tracking |
+| Pump.fun | Historical + live fee tracking (V1 and V2 supported) |
 | Believe | Creator fee tracking |
 | RevShare | Revenue share scanning |
 | Coinbarrel | Fee discovery |
-| Raydium | LP fee tracking |
+| Raydium | LaunchLab LP fee tracking |
 
-### Base
-| Platform | Features |
-|----------|----------|
-| Clanker | Farcaster identity + fee tracking |
-| Zora | Creator protocol rewards |
-| Bankr | Fee recipient tracking |
+### Base + Ethereum + BNB Chain
+| Platform | Chain | Features |
+|----------|-------|----------|
+| Clanker | Base + BSC | Farcaster identity + fee tracking across both chains |
+| Zora | Base + Ethereum | Creator protocol rewards, cross-chain |
+| Bankr | Base | Fee recipient tracking |
 
 ## Features
 
 ### Scanning
-- **Cross-chain**: Solana + Base in a single scan
-- **Identity resolution**: Supports multiple handle types and wallet addresses
-- **Real-time streaming**: Scan progress updates as each platform completes
+- **4 chains**: Solana, Base, Ethereum, and BNB Chain in a single scan
+- **Identity resolution**: Twitter, GitHub, Farcaster handles, ENS, and raw wallet addresses
+- **Real-time streaming**: Scan progress updates as each platform completes via SSE
 - **Live polling**: Unclaimed balances auto-update in real time
 - **Dynamic dust filter**: Filters noise using live token prices
 - **Shareable receipts**: OG image cards for social sharing
@@ -94,6 +96,37 @@ V1.5 is the update where ClaimScan went from read-only scanner to full claimer. 
 
 > More platforms coming in V2. Bags.fm is just the start.
 
+### V2 API: Paid Intelligence for Agents and Developers ✦ New
+
+ClaimScan V2 introduces a paid API powered by the [x402 protocol](https://x402.org). Any developer, bot, or AI agent can query ClaimScan data and pay per request in USDC. No API keys, no subscriptions, no accounts. Just pay and receive.
+
+**Endpoints:**
+
+| Endpoint | Price | What you get |
+|----------|-------|--------------|
+| `GET /api/v2/fees?wallet=<address>` | $0.01 | Full fee report across all 10 platforms and 4 chains |
+| `GET /api/v2/export?wallet=<address>` | $0.05 | CSV or JSON export of all fee records |
+| `GET /api/v2/intelligence?wallet=<address>` | $0.02 | Intelligence report: ClaimScan fees + Allium cross-chain enrichment |
+| `GET /api/v2/resolve?ows_wallet=<name>` | Free | Resolve an OWS wallet name into multi-chain addresses |
+
+**How it works:**
+
+1. An agent or developer makes a request to any paid endpoint
+2. ClaimScan responds with HTTP 402 (Payment Required)
+3. The client signs a USDC payment on Base automatically
+4. ClaimScan verifies the payment and returns the data
+
+Compatible with [OWS (Open Wallet Standard)](https://openwallet.sh) for seamless agent access:
+
+```bash
+ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wallet my-agent
+```
+
+**Powered by:**
+- [x402](https://x402.org) for trustless per-request payments in USDC
+- [Allium](https://allium.so) for cross-chain transaction history, PnL, and portfolio context
+- [OWS](https://openwallet.sh) for multi-chain wallet identity and agent-friendly authentication
+
 ### Security
 - **Defense in depth**: Multiple layers of abuse prevention across all endpoints
 - **Bot protection**: Turnstile verification on sensitive operations
@@ -102,9 +135,10 @@ V1.5 is the update where ClaimScan went from read-only scanner to full claimer. 
 - **Tamper-proof claims**: Claim states are immutable once finalized
 - **On-chain verifiable**: Every fee record independently verifiable on-chain
 - **Anti-enumeration**: Rate-limited identity resolution prevents scraping
+- **Honeypot endpoints**: Fake data traps to detect and fingerprint scrapers
 
 ### Performance
-- **Fast scans**: All routes optimized for parallel execution
+- **Fast scans**: All routes optimized for parallel execution across 4 chains
 - **Smart caching**: Multi-layer caching (Redis + DB) keeps data fresh without hammering the chain
 - **Background indexing**: Automated token discovery via Helius DAS webhooks
 - **Graceful degradation**: Partial results instead of timeouts
@@ -114,31 +148,37 @@ V1.5 is the update where ClaimScan went from read-only scanner to full claimer. 
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js + React + TypeScript |
-| Styling | Tailwind CSS + Radix UI + Motion |
+| Framework | Next.js 16 + React 19 + TypeScript |
+| Styling | Tailwind CSS 4 + Radix UI + Motion 12 |
 | Blockchain | Solana (web3.js) + EVM (Viem) |
-| Database | PostgreSQL with row-level security |
-| Cache | Redis (Upstash) with in-memory fallback |
+| Database | Supabase (PostgreSQL with row-level security) |
+| Cache | Upstash Redis with in-memory fallback |
 | Identity | Cross-platform resolution (Twitter, GitHub, Farcaster, wallets) |
 | Pricing | Multi-source aggregation (DexScreener, Jupiter, CoinGecko) |
+| Payments | x402 protocol (USDC on Base) |
+| Intelligence | Allium (cross-chain wallet data) |
+| Wallet Standard | OWS (Open Wallet Standard) for agent access |
 | Monitoring | Sentry + structured logging |
 | Security | Turnstile + HMAC signing + rate limiting + honeypots |
-| Deploy | Vercel (Edge + Serverless) |
+| Deploy | Vercel (Serverless) |
 
 ## Stats
 
-- 9 launchpads supported
-- 2 chains (Solana + Base)
-- <30 second scan time
-- $0 always free
+- 10 launchpads supported
+- 4 chains (Solana + Base + Ethereum + BNB Chain)
+- Under 30 second scan time
+- $0 to scan and claim (always free)
+- Paid API starting at $0.01 per query
 
 ## Roadmap
 
 | Version | Status | Highlights |
 |---------|--------|------------|
-| **V1.5** | **Live** | 9 platforms, **first on-chain claim flow (Bags.fm)**, Turnstile + priority fees, defense-in-depth security, Helius DAS indexing |
-| V2 | Coming Soon | Token Fee Scanner (paste any CA), multi-platform claim |
-| V3 | 2026+ | Automated claim scheduling, creator analytics, portfolio dashboard |
+| V1.0 | Live | 9 platforms, cross-chain scanning, identity resolution |
+| **V1.5** | **Live** | First on-chain claim flow (Bags.fm), Turnstile + priority fees, defense-in-depth security, Helius DAS indexing |
+| **V2.0** | **Live** | 10th platform (Raydium LaunchLab), 4 chains (added ETH + BSC), **paid API via x402**, Allium intelligence, OWS wallet support, Pump.fun V2 |
+| V2.5 | Next | Token Fee Scanner (paste any CA), multi-platform claim |
+| V3 | Planned | Automated claim scheduling, creator analytics, portfolio dashboard |
 
 ## Built By
 
@@ -148,4 +188,4 @@ Fullstack Web3 studio. 408+ crypto projects delivered. $1.6B+ in market cap gene
 
 ## License
 
-Proprietary — All Rights Reserved. See [LICENSE](LICENSE) for full terms. View-only for personal reference. No use, copy, deploy, or derivative works without written permission from LW ARTS.
+Proprietary. All Rights Reserved. See [LICENSE](LICENSE) for full terms. View-only for personal reference. No use, copy, deploy, or derivative works without written permission from LW ARTS.
