@@ -15,7 +15,7 @@ export const metadata: Metadata = {
         url: 'https://claimscan.tech/og-docs.png',
         width: 1200,
         height: 630,
-        alt: 'ClaimScan Docs — Architecture & Roadmap',
+        alt: 'ClaimScan Docs: Architecture & Roadmap',
       },
     ],
   },
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     images: [
       {
         url: 'https://claimscan.tech/og-docs.png',
-        alt: 'ClaimScan Docs — Architecture & Roadmap',
+        alt: 'ClaimScan Docs: Architecture & Roadmap',
       },
     ],
   },
@@ -93,7 +93,7 @@ export default function DocsPage() {
             name: 'Is ClaimScan safe?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Yes. ClaimScan is fully read-only for scanning — no wallet connection required. For claiming, all transactions are built server-side and simulated before signing. ClaimScan never has access to your private keys.',
+              text: 'Yes. ClaimScan is fully read-only for scanning. No wallet connection required. For claiming, all transactions are built server-side and simulated before signing. ClaimScan never has access to your private keys.',
             },
           },
         ],
@@ -630,10 +630,10 @@ export default function DocsPage() {
         </section>
       </LazySection>
 
-      {/* ═══ API V2 — PAID ENDPOINTS ═══ */}
+      {/* ═══ API V2 PAID ENDPOINTS ═══ */}
       <LazySection rootMargin="300px 0px">
         <section className="glass mt-16 rounded-2xl p-6 sm:p-8">
-          <Label>API V2 — Paid Endpoints</Label>
+          <Label>API V2: Paid Endpoints</Label>
           <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
             Pay-per-query via x402
           </h2>
@@ -642,7 +642,7 @@ export default function DocsPage() {
             <a href="https://x402.org" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
               x402 protocol
             </a>
-            . Pay in USDC per query — no API keys, no subscriptions. Compatible with{' '}
+            . Pay in USDC per query. No API keys, no subscriptions. Compatible with{' '}
             <a href="https://openwallet.sh" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
               OWS
             </a>
@@ -655,7 +655,7 @@ export default function DocsPage() {
                 method: 'GET',
                 path: '/api/v2/fees?wallet=<address>',
                 price: '$0.01',
-                desc: 'Fee report — all platforms, all chains',
+                desc: 'Fee report across all platforms and chains',
               },
               {
                 method: 'GET',
@@ -667,7 +667,7 @@ export default function DocsPage() {
                 method: 'GET',
                 path: '/api/v2/intelligence?wallet=<address>',
                 price: '$0.02',
-                desc: 'Intelligence report — fees + Allium enrichment',
+                desc: 'Intelligence report with fees + Allium enrichment',
               },
               {
                 method: 'GET',
