@@ -21,6 +21,7 @@ export function toAlliumChain(csChain: string): string {
 }
 
 async function alliumFetch<T>(path: string, body: ChainAddress[], params?: Record<string, string>): Promise<T> {
+  if (!API_KEY) throw new Error('ALLIUM_API_KEY is not configured.');
   const url = new URL(`${ALLIUM_BASE}/${path}`);
   if (params) {
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
