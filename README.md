@@ -148,11 +148,11 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js 16 + React 19 + TypeScript |
-| Styling | Tailwind CSS 4 + Radix UI + Motion 12 |
+| Framework | Next.js + React + TypeScript |
+| Styling | Tailwind CSS + Radix UI + Motion |
 | Blockchain | Solana (web3.js) + EVM (Viem) |
 | Database | Supabase (PostgreSQL with row-level security) |
-| Cache | Upstash Redis with in-memory fallback |
+| Cache | Redis with in-memory fallback |
 | Identity | Cross-platform resolution (Twitter, GitHub, Farcaster, wallets) |
 | Pricing | Multi-source aggregation (DexScreener, Jupiter, CoinGecko) |
 | Payments | x402 protocol (USDC on Base) |
