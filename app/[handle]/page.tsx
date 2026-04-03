@@ -15,6 +15,7 @@ import type { Chain } from '@/lib/supabase/types';
 // Lazy-load below-fold heavy client components
 const PlatformBreakdown = dynamic(
   () => import('../components/PlatformBreakdown').then((m) => ({ default: m.PlatformBreakdown })),
+  { ssr: false },
 );
 const ScanStatusLog = dynamic(
   () => import('../components/ScanStatusLog').then((m) => ({ default: m.ScanStatusLog })),
