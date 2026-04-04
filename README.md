@@ -94,7 +94,7 @@ V1.5 is the update where ClaimScan went from read-only scanner to full claimer. 
 - **Hardware wallet support**: Full compatibility with Ledger and other hardware signers
 - **Auto-discovery**: Wallet detection via Wallet Standard protocol. No manual wallet imports needed
 
-> More platforms coming in V2. Bags.fm is just the start.
+> More platforms coming in V3. Bags.fm is just the start.
 
 ### V2 API: Paid Intelligence for Agents and Developers ✦ New
 
