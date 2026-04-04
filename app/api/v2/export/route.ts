@@ -3,6 +3,8 @@ import { withX402 } from '@x402/next';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { x402Server, feeRouteConfig } from '@/lib/x402/server';
+import { declareDiscoveryExtension } from '@x402/extensions/bazaar';
+import { PAYMENT_IDENTIFIER, declarePaymentIdentifierExtension } from '@x402/extensions/payment-identifier';
 
 export const maxDuration = 60;
 
@@ -57,7 +59,10 @@ const handler = async (req: NextRequest): Promise<NextResponse<unknown>> => {
   const header = 'platform,chain,token_symbol,token_address,total_earned,total_claimed,total_unclaimed,total_earned_usd,claim_status,last_synced_at';
   const rows = (fees ?? []).map(f =>
     [f.platform, f.chain, f.token_symbol, f.token_address, f.total_earned, f.total_claimed, f.total_unclaimed, f.total_earned_usd, f.claim_status, f.last_synced_at]
-      .map(v => `"${String(v ?? '').replace(/"/g, '""')}"`)
+      .map(v => {
+        const s = String(v ?? '').replace(/"/g, '""');
+        return /^[=+\-@\t\r]/.test(s) ? `"'${s}"` : `"${s}"`;
+      })
       .join(',')
   );
 
@@ -72,6 +77,12 @@ const handler = async (req: NextRequest): Promise<NextResponse<unknown>> => {
 
 export const GET = withX402(
   handler,
-  feeRouteConfig('$0.05', 'ClaimScan fee export — CSV or JSON'),
+  feeRouteConfig('$0.05', 'ClaimScan fee export — CSV or JSON', {
+    ...declareDiscoveryExtension({
+      input: { wallet: '<solana_base58_or_evm_0x_address>', format: 'csv|json' },
+      output: { example: { wallet: '0x...', fees: [], exported_at: '2026-01-01T00:00:00.000Z' } },
+    }),
+    [PAYMENT_IDENTIFIER]: declarePaymentIdentifierExtension(),
+  }),
   x402Server,
 );
