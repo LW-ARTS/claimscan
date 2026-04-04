@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     if (
       host !== 'claimscan.tech' &&
       host !== 'www.claimscan.tech' &&
-      !host.endsWith('.vercel.app')
+      !(/^claimscan[a-z0-9-]*\.vercel\.app$/.test(host))
     ) {
       console.error(`[flex] SSRF blocked: resolved host "${host}" is not in allowlist`);
       return NextResponse.json({ error: 'Internal error' }, { status: 500 });

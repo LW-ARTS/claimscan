@@ -15,7 +15,6 @@ import type {
   ResolvedWallet,
   CreatorToken,
   TokenFee,
-  ClaimEvent,
 } from './types';
 import { createLogger } from '@/lib/logger';
 const log = createLogger('revshare');
@@ -192,9 +191,6 @@ export const revshareAdapter: PlatformAdapter = {
     }
   },
 
-  async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
-    return [];
-  },
 };
 
 /**

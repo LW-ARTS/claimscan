@@ -12,7 +12,6 @@ import { fetchClaimHistory } from '@/lib/helius/transactions';
 import type { Logger } from '@/lib/logger';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
-type _ClaimEventRow = Database['public']['Tables']['claim_events']['Row'];
 type SupabaseClient = ReturnType<typeof import('@/lib/supabase/service').createServiceClient>;
 
 // ═══════════════════════════════════════════════
@@ -141,7 +140,7 @@ export async function persistFees(
             ? 'unclaimed' as const
             : safeBigInt(totalEarned) > 0n
               ? 'claimed' as const
-              : 'claimed' as const,
+              : 'unclaimed' as const,
       royalty_bps: fee.royaltyBps,
       last_synced_at: new Date().toISOString(),
     };
@@ -173,13 +172,18 @@ async function detectDisappearedTokens(
 
   // Guard: if fresh data contains ZERO Bags entries, this is likely an API outage,
   // not a genuine disappearance. Skip detection to avoid false "fully claimed" updates.
+  // Also guard against partial API responses: if fresh count drops below 50% of existing,
+  // the API likely returned incomplete data.
   const freshBagsCount = freshFees.filter((f) => f.platform === 'bags').length;
-  if (freshBagsCount === 0) {
+  const existingBagsCount = existingFees.filter((ef) => ef.platform === 'bags').length;
+  if (freshBagsCount === 0 || (existingBagsCount > 0 && freshBagsCount < existingBagsCount * 0.5)) {
     const existingBagsWithUnclaimed = existingFees.filter(
       (ef) => ef.platform === 'bags' && safeBigInt(ef.total_unclaimed) > 0n
     ).length;
     if (existingBagsWithUnclaimed > 0) {
-      log.info('No Bags fees in fresh data but DB has unclaimed Bags records — skipping disappearance detection (possible API outage)', {
+      log.info('Bags fees count too low vs DB — skipping disappearance detection (possible API outage or partial response)', {
+        freshBagsCount,
+        existingBagsCount,
         existingBagsWithUnclaimed,
       });
       return;

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { Connection } from '@solana/web3.js';
+import * as Sentry from '@sentry/nextjs';
 import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
 import { createServiceClient } from '@/lib/supabase/service';
 import { invalidatePositionsCache } from '@/lib/platforms/bags-api';
@@ -40,15 +40,21 @@ function _pruneLocalDedup() {
   }
 }
 
-async function consumeHmacToken(token: string): Promise<boolean> {
+/** Return type distinguishes genuine replay from infrastructure failure. */
+type ConsumeResult = 'consumed' | 'replay' | 'redis_outage';
+
+async function consumeHmacToken(token: string): Promise<ConsumeResult> {
   const hash = createHash('sha256').update(token).digest('hex').slice(0, 32);
 
   if (_hmacRedis) {
     try {
       const result = await _hmacRedis.set(`${HMAC_DEDUP_PREFIX}${hash}`, 1, { px: HMAC_DEDUP_TTL_MS, nx: true });
-      return result !== null; // null = key existed = replay
-    } catch {
-      // Redis error — fall through to in-memory dedup
+      return result !== null ? 'consumed' : 'replay'; // null = key existed = replay
+    } catch (err) {
+      Sentry.captureException(err instanceof Error ? err : new Error(String(err)), {
+        tags: { claim: 'redis_outage' },
+      });
+      // Redis error — fall through to in-memory dedup (dev) or fail-closed (prod)
     }
   }
 
@@ -56,23 +62,21 @@ async function consumeHmacToken(token: string): Promise<boolean> {
   // Reject rather than allow potential replays on financial state transitions.
   if (process.env.NODE_ENV === 'production') {
     console.error('[claim/confirm] HMAC dedup unavailable: Redis down and in-memory is not safe in serverless');
-    return false;
+    return 'redis_outage';
   }
 
   // In-memory fallback for development only
   _pruneLocalDedup();
   const now = Date.now();
   const existing = _localDedup.get(hash);
-  if (existing && existing > now) return false;
+  if (existing && existing > now) return 'replay';
   _localDedup.set(hash, now + HMAC_DEDUP_TTL_MS);
-  return true;
+  return 'consumed';
 }
 
 // ═══════════════════════════════════════════════
 // Finalization verification (fire-and-forget)
 // ═══════════════════════════════════════════════
-
-const FINALIZE_RPC = process.env.SOLANA_RPC_URL?.split(',')[0] || 'https://api.mainnet-beta.solana.com';
 
 /**
  * After a claim is marked as 'confirmed', wait for on-chain finalization
@@ -90,11 +94,13 @@ async function verifyFinalization(
   // Wait for finalization — typically 6-12s after confirmed on Solana
   await new Promise((r) => setTimeout(r, SOLANA_FINALIZATION_WAIT_MS));
 
-  const connection = new Connection(FINALIZE_RPC, 'finalized');
-  const tx = await connection.getTransaction(txSignature, {
-    commitment: 'finalized',
-    maxSupportedTransactionVersion: 0,
-  });
+  const tx = await withRpcFallback(
+    (c) => c.getTransaction(txSignature, {
+      commitment: 'finalized',
+      maxSupportedTransactionVersion: 0,
+    }),
+    'finalization-verify'
+  );
 
   if (tx && !tx.meta?.err) {
     await supabase
@@ -280,8 +286,11 @@ export async function POST(request: Request) {
   }
 
   // Single-use enforcement (SS-004): prevent HMAC token replay within 15-min window
-  const tokenConsumed = await consumeHmacToken(confirmToken);
-  if (!tokenConsumed) {
+  const tokenResult = await consumeHmacToken(confirmToken);
+  if (tokenResult === 'redis_outage') {
+    return NextResponse.json({ error: 'Service temporarily unavailable, please retry' }, { status: 503 });
+  }
+  if (tokenResult === 'replay') {
     return NextResponse.json({ error: 'Token already used' }, { status: 409 });
   }
 
@@ -373,7 +382,10 @@ export async function POST(request: Request) {
     // This runs after the response is sent so it doesn't block the user.
     if (txSignature) {
       verifyFinalization(txSignature, claimAttemptId, supabase).catch((err) => {
-        console.warn('[claim/confirm] Finalization check failed:', err instanceof Error ? err.message : err);
+        Sentry.captureException(err instanceof Error ? err : new Error(String(err)), {
+          tags: { claim: 'finalization_failed' },
+          extra: { txSignature, claimAttemptId },
+        });
       });
     }
   }

@@ -14,7 +14,6 @@ import type {
   ResolvedWallet,
   CreatorToken,
   TokenFee,
-  ClaimEvent,
 } from './types';
 import { createLogger } from '@/lib/logger';
 const log = createLogger('coinbarrel');
@@ -229,9 +228,8 @@ export const coinbarrelAdapter: PlatformAdapter = {
       const creatorPk = new PublicKey(wallet);
       const fees: TokenFee[] = [];
 
-      // Query bonding curves and pools in parallel
-      const [_curves, pools] = await Promise.allSettled([
-        findBondingCurvesByCreator(creatorPk, signal),
+      // Query pools only — bonding curve GPA result was unused (saves RPC credits)
+      const [pools] = await Promise.allSettled([
         findPoolsByCreator(creatorPk, signal),
       ]);
 
@@ -316,7 +314,4 @@ export const coinbarrelAdapter: PlatformAdapter = {
     }
   },
 
-  async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
-    return [];
-  },
 };

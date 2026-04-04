@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { parseSearchQuery, resolveWallets } from '@/lib/resolve/identity';
+import { verifyTurnstile } from '@/lib/turnstile';
 
 export const maxDuration = 60;
 
@@ -14,6 +15,19 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
+
+    // Turnstile verification (matches /api/search pattern)
+    const ip = (request as unknown as { ip?: string }).ip
+      ?? (process.env.VERCEL ? request.headers.get('x-real-ip')?.trim() : null)
+      ?? null;
+    const turnstile = await verifyTurnstile(body.cfTurnstileToken ?? null, ip);
+    if (!turnstile.success) {
+      return NextResponse.json(
+        { error: turnstile.error ?? 'Captcha verification failed' },
+        { status: 403 }
+      );
+    }
+
     const query = typeof body?.query === 'string' ? body.query.trim() : '';
 
     if (!query || query.length < 2 || query.length > 256) {

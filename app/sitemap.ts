@@ -6,22 +6,25 @@ import { APP_URL } from '@/lib/constants';
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  // Static pages use a fixed date to avoid cache-busting on every revalidation
+  const staticLastModified = new Date('2026-01-01');
+
   const entries: MetadataRoute.Sitemap = [
     {
       url: APP_URL,
-      lastModified: new Date(),
+      lastModified: staticLastModified,
       changeFrequency: 'daily',
       priority: 1,
     },
     {
       url: `${APP_URL}/docs`,
-      lastModified: new Date(),
+      lastModified: staticLastModified,
       changeFrequency: 'monthly',
       priority: 0.7,
     },
     {
       url: `${APP_URL}/terms`,
-      lastModified: new Date(),
+      lastModified: staticLastModified,
       changeFrequency: 'yearly',
       priority: 0.3,
     },

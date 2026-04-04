@@ -7,7 +7,6 @@ import type {
   ResolvedWallet,
   CreatorToken,
   TokenFee,
-  ClaimEvent,
 } from './types';
 import { createLogger } from '@/lib/logger';
 const log = createLogger('bankr');
@@ -482,8 +481,9 @@ export function wethToWei(val: string | null | undefined): string {
   // Only treat as raw wei if 19+ digits (minimum ~1 ETH in wei = 1e18)
   if (/^\d{19,}$/.test(str)) return str;
 
-  const num = parseFloat(str);
-  if (!Number.isFinite(num) || num <= 0) return '0';
+  // Validate using string checks instead of parseFloat to avoid precision loss
+  // for very small values below float64 resolution (e.g. "0.000000000000000001").
+  if (!/^\d+\.?\d*$/.test(str) || str === '0' || str === '0.0') return '0';
 
   const parts = str.split('.');
   const whole = parts[0] || '0';
@@ -662,7 +662,4 @@ export const bankrAdapter: PlatformAdapter = {
     });
   },
 
-  async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
-    return [];
-  },
 };

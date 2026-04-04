@@ -12,6 +12,8 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LazySection } from '../components/LazySection';
 import type { Chain } from '@/lib/supabase/types';
 
+export const revalidate = 1800; // 30 minutes
+
 // Lazy-load below-fold heavy client components
 const PlatformBreakdown = dynamic(
   () => import('../components/PlatformBreakdown').then((m) => ({ default: m.PlatformBreakdown })),

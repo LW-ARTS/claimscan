@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { resolveAndPersistCreator } from '@/lib/services/creator';
 import { verifyTurnstile } from '@/lib/turnstile';
 
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
       headers: { 'Cache-Control': 'private, no-store' },
     });
   } catch (error) {
-    console.error('[search] error:', error instanceof Error ? error.message : error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

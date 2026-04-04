@@ -197,7 +197,7 @@ export async function resolveAndUpsertIdentity(
     }));
     const { error: walletError } = await supabase
       .from('wallets')
-      .upsert(walletRows, { onConflict: 'address,chain' });
+      .upsert(walletRows, { onConflict: 'address,chain', ignoreDuplicates: true });
     if (walletError) {
       log.warn('wallet upsert error', { error: walletError.message });
     }

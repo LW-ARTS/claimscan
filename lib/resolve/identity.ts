@@ -9,6 +9,8 @@ import { safeBigInt } from '@/lib/utils';
 import { EVM_CHAINS } from '@/lib/constants';
 import { isHeliusAvailable } from '@/lib/helius/client';
 import { discoverWalletTokens } from '@/lib/helius/discovery';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('identity');
 
 // ═══════════════════════════════════════════════
 // Identity Detection
@@ -92,8 +94,13 @@ export async function resolveWallets(
       return [{ address: handle, chain: 'sol', sourcePlatform: 'pump' }];
     }
     if (isValidEvmAddress(handle)) {
-      // Normalize to EIP-55 checksummed form to prevent case-sensitive DB duplicates
-      return [{ address: normalizeEvmAddress(handle), chain: 'base', sourcePlatform: 'clanker' }];
+      // Normalize to EIP-55 checksummed form to prevent case-sensitive DB duplicates.
+      // Return BOTH chains so Zora (ETH mainnet) fees are also captured.
+      const normalized = normalizeEvmAddress(handle);
+      return [
+        { address: normalized, chain: 'base', sourcePlatform: 'clanker' },
+        { address: normalized, chain: 'eth', sourcePlatform: 'zora' },
+      ];
     }
     return [];
   }
@@ -108,7 +115,7 @@ export async function resolveWallets(
       resolvers.map((adapter) => adapter.resolveIdentity(handle, provider))
     ),
     resolveFarcasterWallets(handle, provider).catch((err) => {
-      console.warn('[identity] farcaster resolve failed:', err instanceof Error ? err.message : err);
+      log.warn('farcaster resolve failed', { error: err instanceof Error ? err.message : String(err) });
       return [] as ResolvedWallet[];
     }),
   ]);
@@ -137,7 +144,7 @@ export async function resolveWallets(
       }
     } else {
       const platform = resolvers[i]?.platform ?? 'unknown';
-      console.warn(`[identity] ${platform} resolveIdentity failed:`, result.reason);
+      log.warn('resolveIdentity failed', { platform, error: result.reason instanceof Error ? result.reason.message : String(result.reason) });
     }
   }
 
@@ -231,7 +238,7 @@ export async function fetchAllFees(
         }
       }
     } else {
-      console.warn(`[fees] ${meta?.platform} ${meta?.type} failed:`, result.reason);
+      log.warn('fee fetch failed', { platform: meta?.platform, type: meta?.type, error: result.reason instanceof Error ? result.reason.message : String(result.reason) });
     }
   }
 
@@ -262,7 +269,7 @@ export async function fetchAllFees(
           }
         }
       } catch (err) {
-        console.warn('[fees] DAS discovery failed for', wallet.address, err instanceof Error ? err.message : err);
+        log.warn('DAS discovery failed', { wallet: wallet.address, error: err instanceof Error ? err.message : String(err) });
       }
     }
   }
@@ -297,7 +304,7 @@ export async function fetchFeesByHandle(
       allFees.push(...result.value);
     } else {
       const platform = adapters[i]?.platform ?? 'unknown';
-      console.warn(`[fees] ${platform} getFeesByHandle failed:`, result.reason);
+      log.warn('getFeesByHandle failed', { platform, error: result.reason instanceof Error ? result.reason.message : String(result.reason) });
     }
   }
 
@@ -363,7 +370,7 @@ export async function fetchLiveUnclaimedFees(
     }
   } catch (err) {
     if (err instanceof Error && err.message === 'LIVE_AGGREGATION_TIMEOUT') {
-      console.warn(`[fees] live aggregation timed out after ${LIVE_AGGREGATION_TIMEOUT_MS}ms — aborting pending adapters`);
+      log.warn('live aggregation timed out — aborting pending adapters', { timeoutMs: LIVE_AGGREGATION_TIMEOUT_MS });
       controller.abort();
       // Collect results from tasks that already settled.
       // 50ms delay gives abort signals time to propagate before we snapshot.
@@ -383,7 +390,7 @@ export async function fetchLiveUnclaimedFees(
       const meta = taskMeta[i];
       // Don't log abort errors — they're expected on timeout
       if (result.reason?.name !== 'AbortError') {
-        console.warn(`[fees] ${meta?.platform} getLiveUnclaimedFees failed:`, result.reason);
+        log.warn('getLiveUnclaimedFees failed', { platform: meta?.platform, error: result.reason instanceof Error ? result.reason.message : String(result.reason) });
       }
     }
   }

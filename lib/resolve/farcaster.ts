@@ -3,6 +3,8 @@ import { isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import type { ResolvedWallet } from '@/lib/platforms/types';
 import type { IdentityProvider } from '@/lib/supabase/types';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('farcaster');
 
 // ═══════════════════════════════════════════════
 // Warpcast + Farcaster Hub Types
@@ -115,13 +117,13 @@ async function warpcastSearch(query: string, limit = 5): Promise<WarpcastUser[]>
     );
     clearTimeout(timeout);
     if (!res.ok) {
-      console.warn(`[farcaster] Warpcast search returned HTTP ${res.status}`);
+      log.warn('Warpcast search returned non-OK status', { status: res.status });
       return [];
     }
     const data = (await res.json()) as WarpcastSearchResponse;
     return data?.result?.users ?? [];
   } catch (err) {
-    console.warn('[farcaster] Warpcast search failed:', err instanceof Error ? err.message : err);
+    log.warn('Warpcast search failed', { error: err instanceof Error ? err.message : String(err) });
     return [];
   }
 }
@@ -149,7 +151,7 @@ function decodeHubAddress(raw: string, protocol: string): string | null {
         return '0x' + bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
       }
     } catch (err) {
-      console.warn('[farcaster] decodeHubAddress failed:', err instanceof Error ? err.message : err);
+      log.warn('decodeHubAddress failed', { error: err instanceof Error ? err.message : String(err) });
       // Fall through
     }
   }
@@ -174,7 +176,7 @@ async function getVerifiedAddresses(fid: number): Promise<VerifiedAddress[]> {
     );
     clearTimeout(timeout);
     if (!res.ok) {
-      console.warn(`[farcaster] Hub verifications returned HTTP ${res.status}`);
+      log.warn('Hub verifications returned non-OK status', { status: res.status });
       return addresses;
     }
 
@@ -201,7 +203,7 @@ async function getVerifiedAddresses(fid: number): Promise<VerifiedAddress[]> {
       }
     }
   } catch (err) {
-    console.warn('[farcaster] Hub verifications failed:', err instanceof Error ? err.message : err);
+    log.warn('Hub verifications failed', { error: err instanceof Error ? err.message : String(err) });
   }
 
   return addresses;
@@ -301,9 +303,9 @@ export async function resolveFarcasterWallets(
         wallets.push({
           address: verified.address,
           chain: verified.chain,
-          // Use 'bags' for SOL wallets (Bags.fm primary for Solana fees),
-          // 'clanker' for EVM wallets (Clanker primary for Base fees).
-          // Matches the source_platform values used by existing DB records.
+          // sourcePlatform tracks discovery origin for DB routing.
+          // 'bags' for SOL (Bags.fm primary for Solana fees),
+          // 'clanker' for EVM (Clanker primary for Base fees).
           sourcePlatform: verified.chain === 'sol' ? 'bags' : 'clanker',
         });
       }
@@ -311,10 +313,7 @@ export async function resolveFarcasterWallets(
 
     return wallets;
   } catch (err) {
-    console.warn(
-      '[farcaster] resolution failed:',
-      err instanceof Error ? err.message : err
-    );
+    log.warn('resolution failed', { error: err instanceof Error ? err.message : String(err) });
     return [];
   }
 }

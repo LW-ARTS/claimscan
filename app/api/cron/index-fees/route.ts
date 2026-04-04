@@ -114,7 +114,7 @@ export async function GET(request: Request) {
                     ? 'unclaimed' as const
                     : safeBigInt(totalEarned) > 0n
                       ? 'claimed' as const
-                      : 'claimed' as const,
+                      : 'unclaimed' as const,
             royalty_bps: fee.royaltyBps,
             fee_type: fee.feeType ?? null,
             fee_locked: fee.feeLocked ?? null,

@@ -1,14 +1,14 @@
 /**
- * Request signing — lightweight anti-replay and anti-scraping layer.
+ * Request signing — ANTI-SCRAPING MEASURE ONLY.
+ *
+ * NOT a security boundary. The NEXT_PUBLIC_API_SIGN_KEY is exposed in the
+ * client-side bundle by design (NEXT_PUBLIC_ prefix). A determined attacker
+ * can extract the key and forge signatures. This only deters casual scraping.
  *
  * The frontend signs each API request with a rotating HMAC derived from:
  *   - A server-provided secret baked into the JS bundle via NEXT_PUBLIC_API_SIGN_KEY
  *   - The current timestamp (rounded to 30s windows)
  *   - The request path
- *
- * This prevents casual scripted scraping (curl, python-requests) because
- * the signing key is embedded in minified JS and rotates. It does NOT stop
- * a determined attacker who reverse-engineers the bundle — it raises the bar.
  *
  * The signature is sent via X-Request-Sig header: `{timestamp}.{hex-signature}`
  */

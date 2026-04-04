@@ -329,7 +329,7 @@ export async function proxy(request: NextRequest) {
   // Protect cron endpoints with constant-time comparison
   if (pathname.startsWith('/api/cron')) {
     const secret = process.env.CRON_SECRET;
-    if (!secret || secret.length === 0) {
+    if (!secret || secret.length < 32) {
       return applySecurityHeaders(NextResponse.json({ error: 'Server misconfigured' }, { status: 500 }), nonce);
     }
     const authHeader = request.headers.get('authorization');
@@ -424,7 +424,7 @@ export async function proxy(request: NextRequest) {
     // - /api/search, /api/resolve: 10 req/min (identity resolution oracle — M1)
     // - /api/fees/live*: 5 req/min (triggers 9 adapters × 10 wallets — M2)
     // - everything else: 30 req/min (general)
-    const isSearchOrResolve = pathname === '/api/search' || pathname === '/api/resolve';
+    const isSearchOrResolve = pathname === '/api/search' || pathname === '/api/resolve' || pathname === '/api/balance';
     const isFeesLive = pathname.startsWith('/api/fees/live');
     const upstashLimiter = isSearchOrResolve
       ? searchLimiter
