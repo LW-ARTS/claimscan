@@ -75,7 +75,7 @@ export async function GET(request: Request) {
     const chainFilter = chain && chain !== 'all' ? chain : null;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- function added in migration 024, types not yet regenerated
-    const rpc = supabase.rpc as any;
+    const rpc = (supabase as any).rpc.bind(supabase);
     const [{ data: entries, error }, { data: countResult, error: countError }] = await Promise.all([
       rpc('get_leaderboard', {
         p_limit: limit,
