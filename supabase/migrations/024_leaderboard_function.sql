@@ -43,7 +43,7 @@ AS $$
       COUNT(DISTINCT fr.platform) AS platform_count,
       COUNT(DISTINCT fr.token_address) AS token_count
     FROM fee_records fr
-    LEFT JOIN prices p ON p.chain = fr.chain::TEXT
+    LEFT JOIN prices p ON p.chain::TEXT = fr.chain::TEXT
     WHERE fr.total_earned != '0'
       AND (p_platform IS NULL OR fr.platform::TEXT = p_platform)
       AND (p_chain IS NULL OR fr.chain::TEXT = p_chain)
@@ -96,7 +96,7 @@ AS $$
         END
       ) AS total_usd
     FROM fee_records fr
-    LEFT JOIN prices p ON p.chain = fr.chain::TEXT
+    LEFT JOIN prices p ON p.chain::TEXT = fr.chain::TEXT
     WHERE fr.total_earned != '0'
       AND (p_platform IS NULL OR fr.platform::TEXT = p_platform)
       AND (p_chain IS NULL OR fr.chain::TEXT = p_chain)
