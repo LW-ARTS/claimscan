@@ -113,8 +113,15 @@ ClaimScan V2 introduces a paid API powered by the [x402 protocol](https://x402.o
 
 1. An agent or developer makes a request to any paid endpoint
 2. ClaimScan responds with HTTP 402 (Payment Required)
-3. The client signs a USDC payment on Base automatically
-4. ClaimScan verifies the payment and returns the data
+3. The client signs a USDC payment on Base Mainnet automatically
+4. ClaimScan verifies the payment via facilitator and returns the data
+
+All endpoints are discoverable through the x402 **bazaar extension**. An AI agent can find ClaimScan, read the input/output schema, pay, and consume the data without any human setup.
+
+**Built into the protocol layer:**
+- **Bazaar discovery**: Every paid endpoint publishes its schema so AI agents can find and use it autonomously
+- **Idempotency**: Payment-identifier extension prevents duplicate charges when clients retry
+- **Payment observability**: Every verify, settle, and failure event is logged with structured tracing and forwarded to Sentry
 
 Compatible with [OWS (Open Wallet Standard)](https://openwallet.sh) for seamless agent access:
 
@@ -123,7 +130,7 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 ```
 
 **Powered by:**
-- [x402](https://x402.org) for trustless per-request payments in USDC
+- [x402](https://x402.org) for trustless per-request payments in USDC on Base Mainnet
 - [Allium](https://allium.so) for cross-chain transaction history, PnL, and portfolio context
 - [OWS](https://openwallet.sh) for multi-chain wallet identity and agent-friendly authentication
 
@@ -136,6 +143,7 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 - **On-chain verifiable**: Every fee record independently verifiable on-chain
 - **Anti-enumeration**: Rate-limited identity resolution prevents scraping
 - **Honeypot endpoints**: Fake data traps to detect and fingerprint scrapers
+- **CSV injection protection**: All export values sanitized against formula injection before reaching spreadsheets
 
 ### Performance
 - **Fast scans**: All routes optimized for parallel execution across 4 chains
@@ -155,7 +163,7 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 | Cache | Redis with in-memory fallback |
 | Identity | Cross-platform resolution (Twitter, GitHub, Farcaster, wallets) |
 | Pricing | Multi-source aggregation (DexScreener, Jupiter, CoinGecko) |
-| Payments | x402 protocol (USDC on Base) |
+| Payments | x402 protocol (USDC on Base Mainnet) + bazaar discovery + payment-identifier |
 | Intelligence | Allium (cross-chain wallet data) |
 | Wallet Standard | OWS (Open Wallet Standard) for agent access |
 | Monitoring | Sentry + structured logging |
@@ -176,7 +184,8 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 |---------|--------|------------|
 | V1.0 | Live | 9 platforms, cross-chain scanning, identity resolution |
 | **V1.5** | **Live** | First on-chain claim flow (Bags.fm), Turnstile + priority fees, defense-in-depth security, Helius DAS indexing |
-| **V2.0** | **Live** | 10th platform (Raydium LaunchLab), 4 chains (added ETH + BSC), **paid API via x402**, Allium intelligence, OWS wallet support, Pump.fun V2 |
+| **V2.0** | **Live** | 10th platform (Raydium LaunchLab), 4 chains (added ETH + BSC), **paid API via x402 on Base Mainnet**, Allium intelligence, OWS wallet support, Pump.fun V2 |
+| **V2.1** | **Live** | x402 hardening: bazaar extension for agent discovery, payment-identifier for idempotency, lifecycle hooks, CSV injection protection, mainnet facilitator |
 | V2.5 | Next | Token Fee Scanner (paste any CA), multi-platform claim |
 | V3 | Planned | Automated claim scheduling, creator analytics, portfolio dashboard |
 
