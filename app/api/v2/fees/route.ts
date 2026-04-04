@@ -3,6 +3,8 @@ import { withX402 } from '@x402/next';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { x402Server, feeRouteConfig } from '@/lib/x402/server';
+import { declareDiscoveryExtension } from '@x402/extensions/bazaar';
+import { PAYMENT_IDENTIFIER, declarePaymentIdentifierExtension } from '@x402/extensions/payment-identifier';
 
 export const maxDuration = 60;
 
@@ -79,6 +81,12 @@ const handler = async (req: NextRequest): Promise<NextResponse<unknown>> => {
 
 export const GET = withX402(
   handler,
-  feeRouteConfig('$0.01', 'ClaimScan fee report — all platforms, all chains'),
+  feeRouteConfig('$0.01', 'ClaimScan fee report — all platforms, all chains', {
+    ...declareDiscoveryExtension({
+      input: { wallet: '<solana_base58_or_evm_0x_address>' },
+      output: { example: { wallet: '0x...', fees: [], summary: { totalEarnedUsd: 0, totalRecords: 0, platforms: [], chains: [] } } },
+    }),
+    [PAYMENT_IDENTIFIER]: declarePaymentIdentifierExtension(),
+  }),
   x402Server,
 );
