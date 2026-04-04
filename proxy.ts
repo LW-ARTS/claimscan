@@ -502,9 +502,13 @@ export async function proxy(request: NextRequest) {
   }
 
   // Tarpit AFTER rate limit: only delay requests that weren't already rejected.
-  // Saves serverless function time for rate-limited requests (L9).
+  // M-5: Cap handle route tarpit to 500ms — full 5s reserved for API routes only.
+  // Handle routes are user-facing pages; burning 5s of serverless budget hurts more than it helps.
   if (pathname.startsWith('/api/') || handleMatch) {
-    const delay = getTarpitDelayMs(request);
+    let delay = getTarpitDelayMs(request);
+    if (handleMatch && !pathname.startsWith('/api/')) {
+      delay = Math.min(delay, 500);
+    }
     if (delay > 0) {
       await sleep(delay);
     }

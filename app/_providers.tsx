@@ -22,20 +22,10 @@ export function Providers({ children }: { children: ReactNode }) {
     setMounted(true);
   }, []);
 
-  const endpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
-
-  useEffect(() => {
-    if (!endpoint) {
-      console.error('[Providers] NEXT_PUBLIC_SOLANA_RPC_URL is not configured');
-    } else if (/[?&](api[-_]?key|apikey)=/i.test(endpoint)) {
-      console.error('[Providers] SECURITY: NEXT_PUBLIC_SOLANA_RPC_URL appears to contain an API key visible to browsers. Use a read-only key or proxy through /api/balance.');
-    }
-  }, [endpoint]);
-
-  const rpcUrl = useMemo(
-    () => endpoint || 'https://api.mainnet-beta.solana.com',
-    [endpoint]
-  );
+  // M-9: Use free public RPC for wallet adapter (client-side only).
+  // No client components call the RPC directly — wallets use their own RPCs for send/confirm.
+  // Paid RPC keys stay server-side only (SOLANA_RPC_URL, without NEXT_PUBLIC_ prefix).
+  const rpcUrl = 'https://api.mainnet-beta.solana.com';
 
   const wallets = useMemo(() => [], []);
 

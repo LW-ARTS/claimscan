@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { CHAIN_CONFIG, PLATFORM_CONFIG } from '@/lib/constants';
+import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
 
 export const maxDuration = 60;
 
@@ -42,7 +42,17 @@ export async function GET(request: Request) {
   const platform = url.searchParams.get('platform');
   const chain = url.searchParams.get('chain');
 
-  const cacheKey = `${CACHE_KEY}:v2:${limit}:${offset}:${platform ?? 'all'}:${chain ?? 'all'}`;
+  // Validate filters
+  const VALID_PLATFORMS = new Set(Object.keys(PLATFORM_CONFIG));
+  const VALID_CHAINS = new Set(Object.keys(CHAIN_CONFIG));
+  if (platform && platform !== 'all' && !VALID_PLATFORMS.has(platform)) {
+    return NextResponse.json({ error: 'Invalid platform' }, { status: 400 });
+  }
+  if (chain && chain !== 'all' && !VALID_CHAINS.has(chain)) {
+    return NextResponse.json({ error: 'Invalid chain' }, { status: 400 });
+  }
+
+  const cacheKey = `${CACHE_KEY}:v3:${limit}:${offset}:${platform ?? 'all'}:${chain ?? 'all'}`;
 
   // Try Redis cache
   if (getRedis()) {
@@ -59,118 +69,45 @@ export async function GET(request: Request) {
   const supabase = createServiceClient();
 
   try {
-    // Fetch native token prices for USD conversion
-    const { data: prices } = await supabase
-      .from('token_prices')
-      .select('chain, token_address, price_usd')
-      .in('token_address', ['SOL', 'ETH', 'BNB']);
+    // M-7: Use Postgres function instead of fetching 50k rows and aggregating in JS.
+    // The function joins fee_records + creators + token_prices and returns pre-ranked results.
+    const platformFilter = platform && platform !== 'all' ? platform : null;
+    const chainFilter = chain && chain !== 'all' ? chain : null;
 
-    const priceMap: Record<string, number> = {};
-    for (const p of prices ?? []) {
-      priceMap[p.chain] = Number(p.price_usd);
-    }
-
-    // Fetch all fee_records with earned > 0
-    let query = supabase
-      .from('fee_records')
-      .select('creator_id, platform, chain, token_address, total_earned, total_earned_usd')
-      .neq('total_earned', '0');
-
-    const VALID_PLATFORMS = new Set(Object.keys(PLATFORM_CONFIG));
-    const VALID_CHAINS = new Set(Object.keys(CHAIN_CONFIG));
-
-    if (platform && platform !== 'all') {
-      if (!VALID_PLATFORMS.has(platform)) {
-        return NextResponse.json({ error: 'Invalid platform' }, { status: 400 });
-      }
-      query = query.eq('platform', platform as import('@/lib/supabase/types').Platform);
-    }
-    if (chain && chain !== 'all') {
-      if (!VALID_CHAINS.has(chain)) {
-        return NextResponse.json({ error: 'Invalid chain' }, { status: 400 });
-      }
-      query = query.eq('chain', chain as import('@/lib/supabase/types').Chain);
-    }
-
-    const { data: feeRecords, error } = await query.limit(50000);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- function added in migration 024, types not yet regenerated
+    const rpc = supabase.rpc as any;
+    const [{ data: entries, error }, { data: countResult, error: countError }] = await Promise.all([
+      rpc('get_leaderboard', {
+        p_limit: limit,
+        p_offset: offset,
+        p_platform: platformFilter,
+        p_chain: chainFilter,
+      }),
+      rpc('get_leaderboard_count', {
+        p_platform: platformFilter,
+        p_chain: chainFilter,
+      }),
+    ]);
 
     if (error) {
-      console.error('[leaderboard] query failed:', error.message);
+      console.error('[leaderboard] rpc failed:', error.message);
       return NextResponse.json({ error: 'Database query failed' }, { status: 500 });
     }
-
-    // Fetch creator info
-    const creatorIds = [...new Set((feeRecords ?? []).map((r) => r.creator_id))];
-    const { data: creators } = await supabase
-      .from('creators')
-      .select('id, twitter_handle, github_handle, display_name')
-      .in('id', creatorIds.slice(0, 1000));
-
-    const creatorInfo = new Map(
-      (creators ?? []).map((c) => [c.id, { twitter: c.twitter_handle, github: c.github_handle, display: c.display_name }])
-    );
-
-    // Aggregate by creator, computing USD from raw amounts + native prices
-    const creatorMap = new Map<string, {
-      total_usd: number;
-      platforms: Set<string>;
-      tokens: Set<string>;
-    }>();
-
-    for (const r of feeRecords ?? []) {
-      const existing = creatorMap.get(r.creator_id) ?? {
-        total_usd: 0,
-        platforms: new Set<string>(),
-        tokens: new Set<string>(),
-      };
-
-      // Use total_earned_usd if available, otherwise compute from raw amount
-      let usd = r.total_earned_usd ? Number(r.total_earned_usd) : 0;
-      if (!usd && r.total_earned !== '0') {
-        const nativePrice = priceMap[r.chain] ?? 0;
-        const decimals = CHAIN_CONFIG[r.chain as keyof typeof CHAIN_CONFIG]?.nativeDecimals ?? 18;
-        const amount = Number(BigInt(r.total_earned)) / 10 ** decimals;
-        usd = amount * nativePrice;
-      }
-
-      // Sanity cap: skip records with obviously broken USD values.
-      // Some adapters (e.g. Clanker) can return inflated total_earned
-      // that produce billions in USD when converted. Cap at $50M per record.
-      if (usd > 50_000_000) usd = 0;
-
-      existing.total_usd += usd;
-      existing.platforms.add(r.platform);
-      existing.tokens.add(r.token_address);
-
-      creatorMap.set(r.creator_id, existing);
+    if (countError) {
+      console.error('[leaderboard] count rpc failed:', countError.message);
     }
 
-    // Anti-gaming: min 2 tokens, min $1 total (relaxed for early data)
-    const allEntries = Array.from(creatorMap.entries())
-      .filter(([, c]) => c.tokens.size >= 2 && c.total_usd >= 1)
-      .sort(([, a], [, b]) => b.total_usd - a.total_usd)
-      .map(([id, c]) => {
-        const info = creatorInfo.get(id);
-        // Prioritize twitter handle; fall back to github with prefix to avoid confusion
-        const handle = info?.twitter ?? (info?.github ? `gh:${info.github}` : null);
-        if (!handle) return null; // Skip creators without a public handle
-        // Profile URL: twitter handles link to /@handle, github to /github:handle
-        const profileHandle = info?.twitter ?? info?.github ?? null;
-        if (!profileHandle) return null;
-        return {
-          handle: info?.twitter ?? info?.github ?? '',
-          handle_type: info?.twitter ? 'twitter' as const : 'github' as const,
-          display_name: info?.display ?? null,
-          total_earned_usd: Math.round(c.total_usd * 100) / 100,
-          platform_count: c.platforms.size,
-          token_count: c.tokens.size,
-        };
-      })
-      .filter((e): e is NonNullable<typeof e> => e !== null);
+    const mapped: LeaderboardEntry[] = (entries ?? []).map((e: Record<string, unknown>) => ({
+      handle: String(e.handle),
+      handle_type: e.handle_type as 'twitter' | 'github',
+      display_name: e.display_name ? String(e.display_name) : null,
+      total_earned_usd: Number(e.total_earned_usd),
+      platform_count: Number(e.platform_count),
+      token_count: Number(e.token_count),
+    }));
 
-    const total = allEntries.length;
-    const entries = allEntries.slice(offset, offset + limit);
-    const result = { entries, total, offset, limit };
+    const total = typeof countResult === 'number' ? countResult : (mapped.length + offset);
+    const result = { entries: mapped, total, offset, limit };
 
     if (getRedis()) {
       getRedis()!.set(cacheKey, result, { ex: CACHE_TTL }).catch(() => {});
