@@ -83,6 +83,30 @@ export async function getNativeTokenPrices(): Promise<{
       log.warn(`Returning stale native prices (${ageMin}min old)`);
       return { sol: lastKnownNativePrices.sol, eth: lastKnownNativePrices.eth, bnb: lastKnownNativePrices.bnb, stale: true };
     }
+    // Cold start fallback: read last known prices from DB
+    try {
+      const { createServiceClient } = await import('@/lib/supabase/service');
+      const supabase = createServiceClient();
+      const { data: rows } = await supabase
+        .from('token_prices')
+        .select('token_address, price_usd')
+        .in('token_address', ['SOL', 'ETH', 'BNB']);
+      if (rows && rows.length > 0) {
+        const priceMap: Record<string, number> = {};
+        for (const row of rows) {
+          priceMap[row.token_address] = row.price_usd;
+        }
+        const dbPrices = {
+          sol: sanitizePrice(priceMap['SOL']) ?? 0,
+          eth: sanitizePrice(priceMap['ETH']) ?? 0,
+          bnb: sanitizePrice(priceMap['BNB']) ?? 0,
+        };
+        log.warn('Using DB fallback native prices (cold start)');
+        return { ...dbPrices, stale: true };
+      }
+    } catch (dbErr) {
+      log.error('DB fallback for native prices also failed', { error: dbErr instanceof Error ? dbErr.message : String(dbErr) });
+    }
     return { sol: 0, eth: 0, bnb: 0, stale: true };
   }
 }
@@ -161,19 +185,20 @@ export async function getTokenPriceWithSource(
   chain: Chain,
   tokenAddress: string
 ): Promise<{ price: number; source: TokenPrice['source'] }> {
-  // Sequential waterfall: DexScreener first, Jupiter only on failure (Solana only)
-  const dexPrice = await fetchDexScreenerPrice(chain, tokenAddress);
-  if (dexPrice !== null) {
-    return { price: dexPrice, source: 'dexscreener' };
-  }
-
+  // For Solana tokens, race both sources in parallel
   if (chain === 'sol') {
-    const jupPrice = await fetchJupiterPrice(tokenAddress);
-    if (jupPrice !== null) {
-      return { price: jupPrice, source: 'jupiter' };
-    }
+    const [dex, jup] = await Promise.allSettled([
+      fetchDexScreenerPrice(chain, tokenAddress),
+      fetchJupiterPrice(tokenAddress),
+    ]);
+    if (dex.status === 'fulfilled' && dex.value !== null) return { price: dex.value, source: 'dexscreener' };
+    if (jup.status === 'fulfilled' && jup.value !== null) return { price: jup.value, source: 'jupiter' };
+    return { price: 0, source: 'none' };
   }
 
+  // For non-Solana, DexScreener only
+  const dexPrice = await fetchDexScreenerPrice(chain, tokenAddress);
+  if (dexPrice !== null) return { price: dexPrice, source: 'dexscreener' };
   return { price: 0, source: 'none' };
 }
 

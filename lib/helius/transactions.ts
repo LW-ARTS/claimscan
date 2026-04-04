@@ -9,6 +9,8 @@ import {
   COINBARREL_PROGRAM_ID,
   RAYDIUM_LAUNCHLAB_PROGRAM_ID,
 } from '@/lib/constants';
+import { createLogger } from '@/lib/logger';
+const log = createLogger('helius-txns');
 
 // ═══════════════════════════════════════════════
 // Enhanced Transactions — Claim History Parser
@@ -116,11 +118,18 @@ export async function fetchClaimHistory(
         transfer.tokenAmount > 0 &&
         transfer.fromUserAccount !== wallet
       ) {
+        // Helius returns tokenAmount as JS number — precision loss for > 2^53.
+        if (!Number.isSafeInteger(transfer.tokenAmount)) {
+          log.warn('tokenAmount exceeds safe integer range, precision may be lost', {
+            tokenAmount: transfer.tokenAmount,
+            tokenMint: transfer.mint,
+          });
+        }
         claims.push({
           tokenAddress: transfer.mint,
           chain: 'sol',
           platform,
-          amount: transfer.tokenAmount.toString(),
+          amount: BigInt(Math.trunc(transfer.tokenAmount)).toString(),
           amountUsd: null,
           txHash: tx.signature,
           claimedAt: new Date(tx.timestamp * 1000).toISOString(),
@@ -245,7 +254,13 @@ export async function fetchTokenClaimTotal(
           transfer.mint === tokenMint &&
           transfer.tokenAmount > 0
         ) {
-          // Note: Helius returns tokenAmount as JS number — precision loss for > 2^53.
+          // Helius returns tokenAmount as JS number — precision loss for > 2^53.
+          if (!Number.isSafeInteger(transfer.tokenAmount)) {
+            log.warn('tokenAmount exceeds safe integer range, precision may be lost', {
+              tokenAmount: transfer.tokenAmount,
+              tokenMint: transfer.mint,
+            });
+          }
           total += BigInt(Math.trunc(transfer.tokenAmount));
         }
       }

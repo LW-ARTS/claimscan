@@ -11,7 +11,6 @@ import type {
   ResolvedWallet,
   CreatorToken,
   TokenFee,
-  ClaimEvent,
 } from './types';
 import { createLogger } from '@/lib/logger';
 const log = createLogger('believe');
@@ -55,16 +54,20 @@ function bnToBigInt(bn: unknown): bigint {
  * Shared GPA call — fetches all pools by creator once and caches briefly.
  * All adapter methods use this instead of making separate GPA calls.
  */
-async function getPoolsByCreatorCached(wallet: string): Promise<PoolEntry[]> {
+async function getPoolsByCreatorCached(wallet: string, signal?: AbortSignal): Promise<PoolEntry[]> {
   const cached = poolCache.get(wallet);
   if (cached && Date.now() - cached.ts < POOL_CACHE_TTL_MS) {
     return cached.pools;
   }
 
+  // Bail early if the caller's signal is already aborted
+  if (signal?.aborted) return cached?.pools ?? [];
+
   const client = DynamicBondingCurveClient.create(getConnection());
   const pools = await raceGpaTimeout(
     client.state.getPoolsByCreator(new PublicKey(wallet)),
-    'believe-pools'
+    'believe-pools',
+    signal
   );
 
   const result = (pools ?? []) as PoolEntry[];
@@ -154,7 +157,7 @@ export const believeAdapter: PlatformAdapter = {
     if (!isValidSolanaAddress(wallet)) return [];
 
     try {
-      const pools = await getPoolsByCreatorCached(wallet);
+      const pools = await getPoolsByCreatorCached(wallet, signal);
       if (pools.length === 0) return [];
 
       // Collect all pools with unclaimed fees — including migrated pools.
@@ -253,9 +256,6 @@ export const believeAdapter: PlatformAdapter = {
     }
   },
 
-  async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
-    return [];
-  },
 };
 
 /**
@@ -275,14 +275,31 @@ function isMigrated(account: Record<string, unknown>): boolean {
  * A `timedOut` flag prevents the late-resolving promise from writing
  * stale data into the cache.
  */
-function raceGpaTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+function raceGpaTimeout<T>(promise: Promise<T>, label: string, signal?: AbortSignal): Promise<T> {
   let timerId: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timerId = setTimeout(() => {
       reject(new Error(`${label} timed out after ${GPA_TIMEOUT_MS}ms`));
     }, GPA_TIMEOUT_MS);
   });
-  return Promise.race([promise, timeoutPromise]).finally(() => {
+
+  // If the caller provides an AbortSignal, also race against it
+  const racers: Promise<T>[] = [promise, timeoutPromise];
+  if (signal) {
+    racers.push(
+      new Promise<never>((_, reject) => {
+        if (signal.aborted) {
+          reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+        } else {
+          signal.addEventListener('abort', () => {
+            reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+          }, { once: true });
+        }
+      })
+    );
+  }
+
+  return Promise.race(racers).finally(() => {
     clearTimeout(timerId);
   });
 }

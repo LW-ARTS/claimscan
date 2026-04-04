@@ -27,7 +27,7 @@ test.describe('Profile Page', () => {
     // Navigation header
     await expect(page.getByText('ClaimScan')).toBeVisible();
 
-    // Footer
-    await expect(page.getByText(/data sourced from/i)).toBeVisible();
+    // Footer — verify platform summary text renders
+    await expect(page.getByText(/Solana · Base · 9 platforms/)).toBeVisible();
   });
 });

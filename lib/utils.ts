@@ -43,8 +43,17 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 export function safeBigInt(val: string | null | undefined): bigint {
   if (!val || val.trim() === '') return 0n;
   try {
+    let str = val.trim();
+    // Handle scientific notation (e.g. "1e9", "1.5e18") — BigInt() can't parse these.
+    // Note: values above Number.MAX_SAFE_INTEGER (2^53) will lose precision through Number().
+    // This is acceptable for display/aggregation; storage paths use sanitizeAmountString.
+    if (/[eE]/.test(str)) {
+      const num = Number(str);
+      if (!isFinite(num)) return 0n;
+      str = num.toFixed(0);
+    }
     // Handle decimal strings by truncating to integer part
-    const intPart = val.includes('.') ? val.split('.')[0] : val;
+    const intPart = str.includes('.') ? str.split('.')[0] : str;
     const result = BigInt(intPart || '0');
     // Clamp negatives to 0n — token amounts should never be negative
     return result < 0n ? 0n : result;

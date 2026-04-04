@@ -10,8 +10,8 @@ export function WalletButton() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  // Don't render anything until client-side (wallet context may not be available during SSR)
-  if (!mounted) return null;
+  // Render a skeleton placeholder until client-side to prevent CLS
+  if (!mounted) return <div className="h-10 w-[140px] rounded-lg bg-muted animate-pulse" />;
 
   return <WalletButtonInner />;
 }

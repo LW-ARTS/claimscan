@@ -29,15 +29,16 @@ export async function GET(req: NextRequest) {
       return new NextResponse(null, { status: 502 });
     }
 
+    // Allowlist content types BEFORE reading body to prevent proxying HTML/JS from upstream
+    const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif']);
+    const rawCt = res.headers.get('content-type') ?? '';
+    const ct = rawCt.split(';')[0].trim();
+    if (!ALLOWED_IMAGE_TYPES.has(ct)) return new NextResponse(null, { status: 502 });
+
     const buf = await res.arrayBuffer();
     if (buf.byteLength > MAX_AVATAR_BYTES) {
       return new NextResponse(null, { status: 502 });
     }
-
-    // Allowlist content types to prevent proxying HTML/JS from upstream
-    const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif']);
-    const rawCt = res.headers.get('content-type') ?? 'image/jpeg';
-    const ct = ALLOWED_IMAGE_TYPES.has(rawCt.split(';')[0].trim()) ? rawCt : 'image/jpeg';
 
     return new NextResponse(buf, {
       status: 200,

@@ -17,7 +17,6 @@ import type {
   ResolvedWallet,
   CreatorToken,
   TokenFee,
-  ClaimEvent,
 } from './types';
 import { createLogger } from '@/lib/logger';
 const log = createLogger('pump');
@@ -79,6 +78,9 @@ export const pumpAdapter: PlatformAdapter = {
 
       // For each token found in wallet, verify it was created by this wallet
       // by reading the BondingCurve account's creator field
+      if (data.items.length > 50) {
+        log.warn('creator has 50+ tokens, truncating', { wallet, totalTokens: data.items.length });
+      }
       const results: CreatorToken[] = [];
       const checks = data.items.slice(0, 50).map(async (asset) => {
         try {
@@ -183,7 +185,4 @@ export const pumpAdapter: PlatformAdapter = {
     }
   },
 
-  async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
-    return [];
-  },
 };

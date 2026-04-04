@@ -245,8 +245,14 @@ export const bagsAdapter: PlatformAdapter = {
       // Live polling: O(1) from position data — zero extra API calls.
       const data = await getClaimablePositionsCached(wallet, signal);
 
+      // Apply same dust filter as getHistoricalFees/getFeesByHandle for consistency
+      const { sol: solPrice } = await getNativeTokenPrices();
+      const dustLamports = solPrice > 0
+        ? BigInt(Math.floor((MIN_UNCLAIMED_USD / solPrice) * 1e9))
+        : 0n;
+
       const fees = data
-        .map((p) => positionToFee(p))
+        .map((p) => positionToFee(p, dustLamports))
         .filter((f): f is TokenFee => f !== null);
 
       return enrichSolanaTokenSymbols(fees);

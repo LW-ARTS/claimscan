@@ -23,6 +23,9 @@ export async function GET(request: Request) {
 
   const supabase = createServiceClient();
 
+  // Wallclock guard — stop processing before maxDuration to avoid hard timeout
+  const deadline = Date.now() + 55_000; // 55s of 60s budget
+
   try {
     // Update native token prices (SOL, ETH)
     const nativePrices = await getNativeTokenPrices();
@@ -99,6 +102,10 @@ export async function GET(request: Request) {
     const priceRows: { chain: Chain; token_address: string; token_symbol: string; price_usd: number; updated_at: string }[] = [];
 
     for (let i = 0; i < entries.length; i += 10) {
+      if (Date.now() > deadline) {
+        console.warn(`[refresh-prices] wallclock guard: processed ${priceRows.length} tokens, stopping early`);
+        break;
+      }
       const batch = entries.slice(i, i + 10);
       const results = await Promise.allSettled(
         batch.map(async (t) => {

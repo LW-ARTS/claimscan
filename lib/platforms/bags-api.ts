@@ -1,4 +1,5 @@
 import 'server-only';
+import * as Sentry from '@sentry/nextjs';
 import { BAGS_API_BASE } from '@/lib/constants';
 import { createLogger } from '@/lib/logger';
 const log = createLogger('bags-api');
@@ -151,6 +152,7 @@ export async function bagsFetch<T>(
       if (res.status === 401 || res.status === 403) {
         const keyIdx = keys.indexOf(apiKey);
         log.error(`CRITICAL: API key #${keyIdx} returned HTTP ${res.status} for ${path} — possible key revocation`);
+        Sentry.captureMessage('Bags API authentication failure', { level: 'fatal', extra: { status: res.status, keyIdx, path } });
       } else if (res.status >= 500) {
         log.error(`fetch ${path} returned HTTP ${res.status} (server error)`);
       } else {

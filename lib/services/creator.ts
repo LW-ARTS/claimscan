@@ -25,12 +25,56 @@ export interface ResolveResult {
 }
 
 // ═══════════════════════════════════════════════
-// In-flight deduplication (instance-local)
+// In-flight deduplication (instance-local + Redis distributed lock)
 // ═══════════════════════════════════════════════
 
 const inFlight = new Map<string, Promise<ResolveResult>>();
 
 const RESOLVE_TIMEOUT_MS = parseInt(process.env.RESOLVE_TIMEOUT_MS ?? '55000', 10);
+
+// Lazy Redis init for distributed lock (cache stampede protection)
+let _redis: import('@upstash/redis').Redis | null | undefined;
+async function getRedis(): Promise<import('@upstash/redis').Redis | null> {
+  if (_redis !== undefined) return _redis;
+  try {
+    const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+    if (url && token) {
+      const { Redis } = await import('@upstash/redis');
+      _redis = new Redis({ url, token });
+    } else {
+      _redis = null;
+    }
+  } catch {
+    _redis = null;
+  }
+  return _redis;
+}
+
+/**
+ * Try to acquire a distributed lock for a resolve key.
+ * Returns true if we got the lock, false if another instance is already resolving.
+ */
+async function tryAcquireLock(dedupeKey: string): Promise<boolean> {
+  const redis = await getRedis();
+  if (!redis) return true; // No Redis = always proceed (instance-local dedup only)
+  try {
+    const result = await redis.set(`claimscan:resolve:lock:${dedupeKey}`, '1', { nx: true, ex: 60 });
+    return result === 'OK';
+  } catch {
+    return true; // Redis failure = proceed (fail open, instance-local dedup still active)
+  }
+}
+
+async function releaseLock(dedupeKey: string): Promise<void> {
+  const redis = await getRedis();
+  if (!redis) return;
+  try {
+    await redis.del(`claimscan:resolve:lock:${dedupeKey}`);
+  } catch {
+    // Best-effort — lock will expire via TTL
+  }
+}
 
 // ═══════════════════════════════════════════════
 // Public API — resolveAndPersistCreator
@@ -46,8 +90,26 @@ export async function resolveAndPersistCreator(query: string): Promise<ResolveRe
   const parsed = parseSearchQuery(query);
   const dedupeKey = `${parsed.provider}:${parsed.value}`;
 
+  // Instance-local dedup
   const existing = inFlight.get(dedupeKey);
   if (existing) return existing;
+
+  // Distributed lock: prevent multiple serverless instances from resolving the same key.
+  // If lock is held, try cache first; if cache misses, proceed with resolve anyway
+  // (distributed lock is an optimization, not a correctness guarantee).
+  const gotLock = await tryAcquireLock(dedupeKey);
+  if (!gotLock) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const log = createLogger('creator');
+    const supabase = createServiceClient();
+    const cache = await checkCache(parsed, supabase, log);
+    if (cache.hit) {
+      log.info('distributed lock held, serving cached data', { dedupeKey });
+      return { creator: cache.creator, wallets: cache.wallets, fees: cache.fees, claimEvents: cache.claimEvents, resolveMs: 0, cached: true };
+    }
+    log.info('distributed lock held but cache miss, proceeding with resolve', { dedupeKey });
+    // Fall through to normal resolve — better than returning empty
+  }
 
   let timeoutId: ReturnType<typeof setTimeout>;
   const promise = Promise.race([
@@ -70,6 +132,7 @@ export async function resolveAndPersistCreator(query: string): Promise<ResolveRe
     return await promise;
   } finally {
     inFlight.delete(dedupeKey);
+    await releaseLock(dedupeKey);
   }
 }
 

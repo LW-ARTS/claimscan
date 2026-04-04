@@ -91,7 +91,7 @@ export async function POST(request: Request) {
   if (cleanup1.error) console.error('[claim/bags] Stale pending/signing cleanup failed:', cleanup1.error.message);
   if (cleanup2.error) console.error('[claim/bags] Stale submitted cleanup failed:', cleanup2.error.message);
 
-  // DB-based rate limit: max 30 active claims per wallet
+  // DB-based rate limit: max 10 active claims per wallet
   const { count: activeCount, error: countError } = await supabase
     .from('claim_attempts')
     .select('id', { count: 'exact', head: true })

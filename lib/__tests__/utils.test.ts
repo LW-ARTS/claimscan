@@ -58,6 +58,22 @@ describe('safeBigInt', () => {
   it('returns 0n for whitespace-only string', () => {
     expect(safeBigInt('   ')).toBe(0n);
   });
+
+  it('handles scientific notation "1e9"', () => {
+    expect(safeBigInt('1e9')).toBe(1000000000n);
+  });
+
+  it('handles scientific notation with decimal "1.5e18"', () => {
+    expect(safeBigInt('1.5e18')).toBe(1500000000000000000n);
+  });
+
+  it('returns 0n for Infinity-producing notation "1e999"', () => {
+    expect(safeBigInt('1e999')).toBe(0n);
+  });
+
+  it('handles very large 24-digit integer string', () => {
+    expect(safeBigInt('999999999999999999999999')).toBe(999999999999999999999999n);
+  });
 });
 
 // ─── formatTokenAmount ──────────────────────────────────

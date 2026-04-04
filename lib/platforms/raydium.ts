@@ -9,7 +9,6 @@ import type {
   ResolvedWallet,
   CreatorToken,
   TokenFee,
-  ClaimEvent,
 } from './types';
 import { createLogger } from '@/lib/logger';
 const log = createLogger('raydium');
@@ -145,14 +144,6 @@ export const raydiumAdapter: PlatformAdapter = {
 
       if (unclaimed <= 0n) return [];
 
-      // Attribute to the first token that has a valid mint address
-      const firstToken = tokens.find((t) => t.mint || t.tokenMint);
-      if (!firstToken) {
-        log.warn('No token with valid mint found — skipping fee report', { wallet: wallet.slice(0, 8) });
-        return [];
-      }
-      const firstMint = firstToken.mint ?? firstToken.tokenMint!;
-
       // Fee Key NFT detection:
       // Raydium has 2 fee phases. The bonding curve vault (what we read above)
       // does NOT require a Fee Key NFT — the creator just signs.
@@ -161,9 +152,13 @@ export const raydiumAdapter: PlatformAdapter = {
       // claimRightLost is not applicable. When LP fee tracking is added,
       // use hasRaydiumFeeKeyNft() from lib/chains/solana.ts.
 
+      // Report as SOL earnings from the vault, not attributed to any specific token.
+      // The vault PDA is [creator, WSOL_MINT] — one vault per creator shared by
+      // ALL their LaunchLab tokens. Attributing to a single token is wrong when
+      // the creator has multiple tokens.
       return [{
-        tokenAddress: firstMint,
-        tokenSymbol: sanitizeTokenSymbol(firstToken?.symbol) || 'SOL',
+        tokenAddress: WSOL_MINT.toBase58(),
+        tokenSymbol: 'SOL',
         chain: 'sol',
         platform: 'raydium',
         // totalEarned = unclaimed since claimed tracking was removed
@@ -181,7 +176,4 @@ export const raydiumAdapter: PlatformAdapter = {
     }
   },
 
-  async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
-    return [];
-  },
 };

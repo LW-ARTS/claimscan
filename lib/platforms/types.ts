@@ -128,6 +128,7 @@ export interface PlatformAdapter {
 
   /**
    * Get claim history (individual claim transactions).
+   * Optional — only implemented by adapters with real claim event data.
    */
-  getClaimHistory(wallet: string): Promise<ClaimEvent[]>;
+  getClaimHistory?(wallet: string): Promise<ClaimEvent[]>;
 }

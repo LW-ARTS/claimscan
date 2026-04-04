@@ -115,18 +115,23 @@ export async function GET(request: Request) {
           .from('creator_tokens')
           .upsert(discoveredTokens, { onConflict: 'token_address,chain', ignoreDuplicates: true });
 
-        if (error) {
-          console.warn(`[index-tokens] upsert failed for creator ${creator.id}:`, error.message);
-        } else {
+        if (!error) {
           totalTokens += discoveredTokens.length;
+          // Mark this creator as freshly indexed only on success
+          await supabase
+            .from('creators')
+            .update({ last_token_sync_at: new Date().toISOString() })
+            .eq('id', creator.id);
+        } else {
+          console.warn(`[index-tokens] upsert failed for creator ${creator.id}:`, error.message);
         }
+      } else {
+        // No tokens discovered — still mark as synced so we don't retry immediately
+        await supabase
+          .from('creators')
+          .update({ last_token_sync_at: new Date().toISOString() })
+          .eq('id', creator.id);
       }
-
-      // Mark this creator as freshly indexed so the next cron run skips them
-      await supabase
-        .from('creators')
-        .update({ last_token_sync_at: new Date().toISOString() })
-        .eq('id', creator.id);
 
       totalCreators++;
     }

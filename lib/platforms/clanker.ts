@@ -10,7 +10,6 @@ import type {
   ResolvedWallet,
   CreatorToken,
   TokenFee,
-  ClaimEvent,
 } from './types';
 import { createLogger } from '@/lib/logger';
 const log = createLogger('clanker');
@@ -280,7 +279,4 @@ export const clankerAdapter: PlatformAdapter = {
     return fees.filter((f) => safeBigInt(f.totalUnclaimed) > 0n);
   },
 
-  async getClaimHistory(_wallet: string): Promise<ClaimEvent[]> {
-    return [];
-  },
 };

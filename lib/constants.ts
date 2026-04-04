@@ -100,8 +100,12 @@ export const MIN_FEE_LAMPORTS = 1_000_000n; // 0.001 SOL
 
 /** Canonical app URL. Used for CORS, sitemap, robots, OG images. */
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://claimscan.tech';
-/** Allowed origins for CORS and Origin validation (primary + www). */
-export const APP_ORIGINS = new Set([APP_URL, APP_URL.replace('://', '://www.')]);
+/** Allowed origins for CORS and Origin validation (primary + www + Vercel preview). */
+export const APP_ORIGINS = new Set([
+  APP_URL,
+  APP_URL.replace('://', '://www.'),
+  ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
+]);
 
 // ═══════════════════════════════════════════════
 // Rate Limits (shared between proxy.ts and rate-limit.ts)
@@ -115,7 +119,7 @@ export const RATE_LIMIT_FEES = 5;      // req/min — /api/fees/live*
 // Claim Flow
 // ═══════════════════════════════════════════════
 
-export const MAX_ACTIVE_CLAIMS_PER_WALLET = 30;
+export const MAX_ACTIVE_CLAIMS_PER_WALLET = 10;
 export const MAX_MINTS_PER_CLAIM_BATCH = 10;
 /** Pending/signing claims older than this are expired (blockhash invalid). */
 export const CLAIM_PENDING_EXPIRY_MS = 5 * 60 * 1000;
