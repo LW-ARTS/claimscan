@@ -122,7 +122,7 @@ export default async function Home() {
     >
     <div data-page="home" className="flex min-h-0 flex-col items-center pt-12 pb-[21px] sm:min-h-[calc(75vh-4rem)] sm:justify-center sm:pt-24 sm:pb-[21px]">
       {/* Hero: badge + heading + subtitle + search (narrow center) */}
-      <div className="relative w-full max-w-3xl text-center">
+      <div className="relative w-full max-w-3xl px-5 text-center sm:px-8">
         {/* Badge */}
         <div className="animate-fade-in-up mb-6 flex justify-center sm:mb-8">
           <span className="inline-flex items-center gap-2.5 rounded-[20px] border border-[#FFFFFF12] bg-[#FFFFFF08] px-4 py-1.5">
@@ -346,8 +346,8 @@ export default async function Home() {
                   )}
                   <span className="text-sm font-semibold text-[var(--text-primary)]">@{entry.handle}</span>
                 </span>
-                <span className="w-32 whitespace-nowrap text-right text-sm font-bold tracking-tight text-[var(--text-primary)]">
-                  {formatUsd(entry.total_earned_usd)}
+                <span className="w-32 whitespace-nowrap text-right text-sm font-bold text-[var(--text-primary)]">
+                  {formatUsd(entry.total_earned_usd).replace(/\.\d+K$/, 'K')}
                 </span>
                 <span className="hidden w-24 text-center text-sm text-[var(--text-secondary)] sm:block">
                   {entry.platform_count}
