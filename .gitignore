@@ -41,6 +41,11 @@ yarn-error.log*
 .claude/
 .playwright-mcp/
 .worktrees/
+.agents/
+.kiro/
+.superpowers/
+.windsurf/
+skills-lock.json
 
 # vercel
 .vercel
@@ -78,3 +83,5 @@ scripts/generate_whitepaper.py
 scripts/query_fees.mjs
 tcpdump_log.txt
 *.pptx
+supabase/.temp/
+security-scan/
