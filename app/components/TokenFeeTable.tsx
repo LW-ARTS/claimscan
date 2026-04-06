@@ -97,7 +97,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
         return (
           <div
             key={fee.id}
-            className="rounded-xl border border-border/40 bg-card p-3.5"
+            className="card-hover rounded-xl border border-border/40 bg-card p-3.5"
             style={idx < 8 ? { animation: `fadeInUp 0.4s ease-out ${idx * 50}ms both` } : undefined}
           >
             <div className="flex items-center justify-between">
@@ -124,7 +124,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                     onClick={() => handleCopy(fee.id, fee.token_address!)}
                     aria-label={copiedId === fee.id ? 'Copied' : failedId === fee.id ? 'Copy failed' : 'Copy contract address'}
                     title="Copy contract address"
-                    className="inline-flex cursor-pointer items-center justify-center rounded p-3 -m-1.5 text-muted-foreground/60 transition-all hover:text-foreground active:scale-90"
+                    className="pressable inline-flex cursor-pointer items-center justify-center rounded p-3 -m-1.5 text-muted-foreground/60 hover:text-foreground"
                   >
                     {copiedId === fee.id ? (
                       <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -164,7 +164,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
               <button
                 onClick={() => onClaimToken(fee.token_address)}
                 aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
-                className="mt-3 w-full cursor-pointer rounded-xl bg-foreground py-2.5 text-xs font-bold uppercase tracking-wider text-background transition-all duration-200 hover:shadow-[0_0_16px_rgba(255,255,255,0.08)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]"
+                className="pressable hover-glow-primary mt-3 w-full cursor-pointer rounded-xl bg-foreground py-2.5 text-xs font-bold uppercase tracking-wider text-background duration-200"
               >
                 <span className="flex items-center justify-center gap-1.5">
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
@@ -206,7 +206,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
             return (
               <tr
                 key={fee.id}
-                className={`border-b border-[var(--border-subtle)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-hover)] ${idx % 2 === 0 ? 'bg-[#FFFFFF06]' : ''}`}
+                className={`row-hover border-b border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] ${idx % 2 === 0 ? 'bg-[#FFFFFF06]' : ''}`}
                 style={idx < 10 ? { animation: `fadeInUp 0.4s ease-out ${idx * 40}ms both` } : undefined}
               >
                 <td className="py-3.5 pl-2 pr-0">
@@ -236,7 +236,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                         onClick={() => handleCopy(fee.id, fee.token_address!)}
                         aria-label={copiedId === fee.id ? 'Copied' : 'Copy contract address'}
                         title="Copy contract address"
-                        className="inline-flex items-center justify-center rounded p-3 -m-2 cursor-pointer text-muted-foreground/60 transition-colors hover:text-foreground active:scale-90"
+                        className="pressable inline-flex items-center justify-center rounded p-3 -m-2 cursor-pointer text-muted-foreground/60 hover:text-foreground"
                       >
                         {copiedId === fee.id ? (
                           <svg className="h-3 w-3 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -289,7 +289,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                       <button
                         onClick={() => onClaimToken(fee.token_address)}
                         aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
-                        className="inline-flex cursor-pointer items-center gap-1.5 bg-foreground px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[1px] text-background transition-all hover:bg-foreground/90 active:scale-95"
+                        className="pressable hover-glow-primary inline-flex cursor-pointer items-center gap-1.5 bg-foreground px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[1px] text-background hover:bg-foreground/90"
                                              >
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -316,7 +316,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="cursor-pointer rounded-[8px] border border-[var(--border-default)] px-3 py-1.5 text-[13px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed"
+            className="pressable hover-glow cursor-pointer rounded-[8px] border border-[var(--border-default)] px-3 py-1.5 text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed"
           >
             &larr; Prev
           </button>
@@ -326,7 +326,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
           <button
             onClick={() => { setCurrentPage((p) => Math.min(totalPages, p + 1)); track('fee_page_changed', { page: currentPage + 1 }); }}
             disabled={currentPage === totalPages}
-            className="cursor-pointer rounded-[8px] border border-[var(--border-default)] px-3 py-1.5 text-[13px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed"
+            className="pressable hover-glow cursor-pointer rounded-[8px] border border-[var(--border-default)] px-3 py-1.5 text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed"
           >
             Next &rarr;
           </button>

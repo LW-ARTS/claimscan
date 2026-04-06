@@ -55,10 +55,10 @@ function TabButton({
       id={`${tabsId}-tab-${tabKey}`}
       tabIndex={active ? 0 : -1}
       onClick={onClick}
-      className={`inline-flex cursor-pointer items-center gap-2 px-4 py-3 text-[13px] font-medium transition-colors sm:py-2 ${
+      className={`pressable inline-flex cursor-pointer items-center gap-2 px-4 py-3 text-[13px] font-medium sm:py-2 ${
         active
-          ? 'bg-foreground text-background'
-          : 'border border-border text-foreground hover:bg-muted active:scale-[0.97]'
+          ? 'hover-glow-primary bg-foreground text-background'
+          : 'hover-glow border border-border text-foreground hover:bg-muted'
       }`}
     >
       {children}
@@ -272,10 +272,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
             <button
               key={ch}
               onClick={() => setChainFilter(ch)}
-              className={`rounded-[6px] px-3 py-1.5 text-[13px] font-medium transition-colors ${
+              className={`pressable rounded-[6px] px-3 py-1.5 text-[13px] font-medium ${
                 chainFilter === ch
-                  ? 'bg-white text-[var(--text-inverse)]'
-                  : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
+                  ? 'hover-glow-primary bg-white text-[var(--text-inverse)]'
+                  : 'hover-glow bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
               }`}
             >
               {ch === 'all' ? 'All' : CHAIN_CONFIG[ch]?.name ?? ch}
@@ -309,10 +309,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
                 aria-checked={isActive}
                 tabIndex={isActive ? 0 : -1}
                 onClick={() => setStatusFilter(status as typeof statusFilter)}
-                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`pressable hover-glow inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive
                     ? 'bg-[var(--bg-surface-hover)] border border-[var(--border-accent)] text-[var(--text-primary)]'
-                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] active:scale-[0.97]'
+                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)]'
                 }`}
               >
                 {status}
@@ -338,10 +338,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
             id={`${tabsId}-tab-all`}
             tabIndex={activeTab === 'all' ? 0 : -1}
             onClick={() => setActiveTab('all')}
-            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium transition-colors ${
+            className={`pressable hover-glow inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium ${
               activeTab === 'all'
                 ? 'bg-[var(--bg-surface-hover)] border border-[var(--border-accent)] text-[var(--text-primary)]'
-                : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] active:scale-[0.97]'
+                : 'bg-[var(--bg-surface)] text-[var(--text-secondary)]'
             }`}
           >
             All
@@ -362,10 +362,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
                 id={`${tabsId}-tab-${platform}`}
                 tabIndex={isActive ? 0 : -1}
                 onClick={() => setActiveTab(platform)}
-                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                className={`pressable hover-glow inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium ${
                   isActive
                     ? 'bg-[var(--bg-surface-hover)] border border-[var(--border-accent)] text-[var(--text-primary)]'
-                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] active:scale-[0.97]'
+                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)]'
                 }`}
               >
                 <PlatformIcon platform={platform} className="h-3.5 w-3.5" aria-hidden />
@@ -428,10 +428,10 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
                   confirmTimerRef.current = setTimeout(() => setConfirmingClaimAll(false), 5000);
                 }
               }}
-              className={`flex h-12 w-full cursor-pointer items-center justify-center text-sm font-semibold uppercase tracking-[1px] transition-all duration-200 active:scale-[0.97] ${
+              className={`pressable hover-glow-primary flex h-12 w-full cursor-pointer items-center justify-center text-sm font-semibold uppercase tracking-[1px] duration-200 ${
                 confirmingClaimAll
                   ? 'bg-foreground/90 text-background ring-2 ring-foreground/20'
-                  : 'bg-foreground text-background hover:bg-foreground/85 hover:shadow-[0_4px_20px_rgba(255,255,255,0.1)]'
+                  : 'bg-foreground text-background hover:bg-foreground/85'
               }`}
             >
               {confirmingClaimAll

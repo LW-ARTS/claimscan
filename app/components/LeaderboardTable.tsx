@@ -4,6 +4,30 @@ import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { formatUsd } from '@/lib/utils';
 
+function CreatorAvatar({ handle, handleType }: { handle: string; handleType: string }) {
+  const [error, setError] = useState(false);
+  const isTwitter = handleType === 'twitter';
+
+  if (!isTwitter || error) {
+    return (
+      <span className="avatar-ring inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[11px] font-bold uppercase text-[var(--text-secondary)]">
+        {handle[0].toUpperCase()}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={`https://unavatar.io/x/${handle}`}
+      alt=""
+      className="avatar-ring h-7 w-7 shrink-0 rounded-full object-cover"
+      onError={() => setError(true)}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+    />
+  );
+}
+
 interface LeaderboardEntry {
   handle: string;
   handle_type: 'twitter' | 'github';
@@ -69,8 +93,8 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
 
   const getRowClass = (idx: number): string => {
     const rank = pageOffset + idx + 1;
-    const base = 'border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-surface-hover)]';
-    if (rank === 1) return `${base} bg-[#FFFFFF0A] shadow-[0_0_20px_#FFFFFF10] border-l-2 border-l-white relative`;
+    const base = 'row-hover border-b border-[var(--border-subtle)] hover:bg-[var(--bg-surface-hover)]';
+    if (rank === 1) return `${base} pulse-glow bg-[#FFFFFF0A] border-l-2 border-l-white relative`;
     if (rank === 2) return `${base} bg-[#FFFFFF06] border-l-[3px] border-l-[#FFFFFF30]`;
     if (rank === 3) return `${base} bg-[#FFFFFF04] border-l-[3px] border-l-[#FFFFFF20]`;
     // Alternating for rank 4+
@@ -79,7 +103,14 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
 
   const getRankDisplay = (idx: number): React.ReactNode => {
     const rank = pageOffset + idx + 1;
-    if (rank === 1) return <span className="flex items-center gap-1">{'\u{1F3C6}'} {rank}</span>;
+    if (rank === 1) return (
+      <span className="flex items-center gap-2.5 text-[18px] font-extrabold text-white">
+        <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+        </svg>
+        {rank}
+      </span>
+    );
     return rank;
   };
 
@@ -93,15 +124,16 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
       ) : (
         <>
           {/* Mobile cards */}
-          <div className="space-y-2 md:hidden">
+          <div className="stagger-in space-y-2 md:hidden">
             {entries.map((entry, idx) => (
               <Link
                 key={entry.handle}
                 href={resolveProfileUrl(entry)}
-                className="flex items-center gap-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-3 transition-colors hover:bg-[var(--bg-surface-hover)]"
+                style={idx < 6 ? { ['--stagger-index' as string]: idx } : undefined}
+                className={`pressable row-hover flex items-center gap-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-3 hover:bg-[var(--bg-surface-hover)] ${pageOffset + idx === 0 ? 'pulse-glow' : ''}`}
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[var(--text-inverse)] text-xs font-bold">
-                  {pageOffset + idx + 1 === 1 ? `\u{1F3C6}` : pageOffset + idx + 1}
+                <span className="avatar-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[var(--text-inverse)] text-xs font-bold">
+                  {pageOffset + idx + 1}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
@@ -126,8 +158,8 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                   <th scope="col" className="w-12 py-3 pl-4 text-left text-[11px] font-medium uppercase tracking-[1px] text-[var(--text-tertiary)]">#</th>
                   <th scope="col" className="py-3 text-left text-[11px] font-medium uppercase tracking-[1px] text-[var(--text-tertiary)]">Trader</th>
                   <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-[var(--text-tertiary)]">Total Fees</th>
-                  <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-[1px] text-[var(--text-tertiary)]">Top Platform</th>
-                  <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-[1px] text-[var(--text-tertiary)]">Chains</th>
+                  <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-[1px] text-[var(--text-tertiary)]">Platforms</th>
+                  <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-[1px] text-[var(--text-tertiary)]">Tokens</th>
                   <th scope="col" className="w-10 py-3 pr-4" aria-label="View profile" />
                 </tr>
               </thead>
@@ -138,14 +170,12 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                     className={`${getRowClass(idx)} text-[var(--text-primary)]`}
                     style={idx < 10 ? { animation: `fadeInUp 0.4s ease-out ${idx * 40}ms both` } : undefined}
                   >
-                    <td className="py-3.5 pl-4 text-sm font-bold tabular-nums text-[var(--text-tertiary)]">
+                    <td className={`py-3.5 pl-4 text-sm font-bold tabular-nums text-[var(--text-tertiary)] ${pageOffset + idx === 0 ? 'pr-4' : 'pr-1'}`}>
                       {getRankDisplay(idx)}
                     </td>
                     <td className="py-3.5">
-                      <Link href={resolveProfileUrl(entry)} className="flex items-center gap-2 transition-colors hover:text-[var(--text-primary)]">
-                        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[11px] font-bold uppercase text-[var(--text-secondary)]">
-                          {entry.handle[0].toUpperCase()}
-                        </span>
+                      <Link href={resolveProfileUrl(entry)} className="flex items-center gap-2.5 hover:text-[var(--text-primary)]">
+                        <CreatorAvatar handle={entry.handle} handleType={entry.handle_type} />
                         <span className="text-sm font-semibold text-[var(--text-primary)]">
                           {formatHandle(entry)}
                         </span>
@@ -157,11 +187,8 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                     <td className="py-3.5 text-center text-sm tabular-nums text-[var(--text-primary)]">
                       {entry.platform_count}
                     </td>
-                    <td className="py-3.5 text-center">
-                      <span className="inline-flex items-center gap-1">
-                        <span className="inline-block h-2 w-2 rounded-full bg-white" />
-                        <span className="inline-block h-2 w-2 rounded-full bg-[var(--text-tertiary)]" />
-                      </span>
+                    <td className="py-3.5 text-center text-sm tabular-nums text-[var(--text-secondary)]">
+                      {entry.token_count}
                     </td>
                     <td className="py-3.5 pr-4 text-right text-sm text-[var(--text-tertiary)]">
                       <Link href={resolveProfileUrl(entry)} aria-label={`View ${entry.handle} profile`}>
@@ -188,8 +215,8 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                       disabled={loading}
                       className={
                         p === currentPage
-                          ? 'rounded-[6px] bg-white text-[var(--text-inverse)] px-3 py-1.5 text-[13px] font-medium'
-                          : 'rounded-[6px] bg-[var(--bg-surface)] text-[var(--text-secondary)] px-3 py-1.5 text-[13px] transition-colors hover:bg-[var(--bg-surface-hover)]'
+                          ? 'pressable hover-glow-primary rounded-[6px] bg-white text-[var(--text-inverse)] px-3 py-1.5 text-[13px] font-medium'
+                          : 'pressable hover-glow rounded-[6px] bg-[var(--bg-surface)] text-[var(--text-secondary)] px-3 py-1.5 text-[13px] hover:bg-[var(--bg-surface-hover)]'
                       }
                     >
                       {p}

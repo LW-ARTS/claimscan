@@ -81,7 +81,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => track('share_x_clicked', { handle })}
-        className="flex h-14 w-full items-center justify-center gap-3 bg-foreground text-base font-semibold text-background transition-[transform,background-color] duration-200 ease-out hover-hover:hover:bg-foreground/85 active:scale-[0.97]"
+        className="pressable hover-glow-primary flex h-14 w-full items-center justify-center gap-3 bg-foreground text-base font-semibold text-background hover:bg-foreground/85"
 
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -95,7 +95,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
         <button
           onClick={handleSaveImage}
           disabled={saving}
-          className={`flex h-14 flex-1 items-center justify-center gap-2.5 border text-sm font-medium transition-all active:scale-[0.97] ${
+          className={`pressable hover-glow flex h-14 flex-1 items-center justify-center gap-2.5 border text-sm font-medium ${
             saveFailed ? 'border-destructive/30 text-destructive' : saved ? 'border-foreground text-foreground' : saving ? 'border-border text-muted-foreground cursor-wait opacity-60' : 'border-border text-foreground cursor-pointer hover:bg-muted'
           }`}
   
@@ -125,7 +125,7 @@ export function ShareButton({ handle, totalEarnedUsd, platformCount }: ShareButt
         </button>
         <button
           onClick={handleCopyLink}
-          className={`flex h-14 flex-1 cursor-pointer items-center justify-center gap-2.5 border text-sm font-medium transition-all active:scale-[0.97] ${
+          className={`pressable hover-glow flex h-14 flex-1 cursor-pointer items-center justify-center gap-2.5 border text-sm font-medium ${
             copied ? 'border-foreground text-foreground' : 'border-border text-foreground hover:bg-muted'
           }`}
   

@@ -1,5 +1,5 @@
-// JSON-LD structured data component for SEO
-// Uses dangerouslySetInnerHTML for proper script injection (content is fully static/hardcoded — no user input)
+// JSON-LD structured data component for SEO.
+// Content is fully static/hardcoded. No user input.
 export function JsonLd() {
   const data = JSON.stringify({
     '@context': 'https://schema.org',

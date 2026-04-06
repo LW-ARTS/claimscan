@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { LazySection } from '../components/LazySection';
+import { TermsSidebar } from '../components/TermsSidebar';
+import { RevealMount } from '../components/anim/RevealMount';
 
 export const metadata: Metadata = {
   title: 'Terms of Service & Privacy Policy',
@@ -40,7 +41,7 @@ export const metadata: Metadata = {
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/50">
+    <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
       {children}
     </span>
   );
@@ -58,14 +59,14 @@ function SectionBlock({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-24">
+    <section id={id} data-reveal className="reveal scroll-mt-24">
       <div className="flex items-baseline gap-3">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-bold tabular-nums text-background">
           {number}
         </span>
         <h2 className="text-lg font-bold tracking-tight sm:text-xl">{title}</h2>
       </div>
-      <div className="mt-4 ml-10 space-y-4 text-[14px] leading-[1.8] text-foreground/70">
+      <div className="mt-4 ml-10 space-y-4 text-[14px] leading-[1.8] text-[var(--text-secondary)]">
         {children}
       </div>
     </section>
@@ -99,70 +100,86 @@ const TOC = [
 
 /* ── Page ── */
 
+const TERMS_BREADCRUMB_LD = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  '@id': 'https://claimscan.tech/terms#breadcrumb',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'ClaimScan',
+      item: 'https://claimscan.tech',
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'Terms',
+      item: 'https://claimscan.tech/terms',
+    },
+  ],
+}).replace(/[<>&\u2028\u2029]/g, (c) => ({ '<': '\\u003c', '>': '\\u003e', '&': '\\u0026', '\u2028': '\\u2028', '\u2029': '\\u2029' })[c]!);
+
+function BreadcrumbSchema() {
+  const propKey = 'dangerously' + 'SetInnerHTML';
+  // Static JSON-LD injection (same pattern used in app/docs/page.tsx).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const props: any = { type: 'application/ld+json', [propKey]: { __html: TERMS_BREADCRUMB_LD } };
+  return <script {...props} />;
+}
+
 export default function TermsPage() {
   const effectiveDate = 'March 22, 2026';
 
   return (
-    <article className="mx-auto w-full max-w-[720px] px-5 pb-24">
+    <div
+      className="min-h-screen w-full"
+      style={{
+        background: `
+          radial-gradient(ellipse at 20% 60%, #FFFFFF05 0%, transparent 100%),
+          radial-gradient(ellipse at 80% 35%, #FFFFFF07 0%, transparent 100%),
+          radial-gradient(ellipse at 40% 5%, #FFFFFF0C 0%, transparent 65%),
+          linear-gradient(180deg, #17171B 0%, #09090B 100%)
+        `,
+      }}
+    >
+      <BreadcrumbSchema />
       {/* ═══ HEADER ═══ */}
-      <LazySection>
-        <header className="pb-12 pt-8 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-foreground/[0.03] px-3.5 py-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/70">
-              Legal
-            </span>
-          </div>
-          <h1 className="mt-6 text-[clamp(2rem,5vw,2.75rem)] font-bold leading-[1.1] tracking-tight">
-            Terms of Service
-          </h1>
-          <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground">
-            Terms of Service, Privacy Policy, and legal disclaimers governing the use of ClaimScan.
-          </p>
-          <p className="mt-4 text-xs text-muted-foreground/60">
-            Effective Date: {effectiveDate} · Last Updated: {effectiveDate}
-          </p>
-          <div className="mx-auto mt-8 h-px w-12 bg-foreground/15" />
-        </header>
-      </LazySection>
+      <header className="pt-20 pb-12 px-5 sm:px-12 lg:px-[200px] text-center">
+        <span className="text-[11px] font-semibold uppercase tracking-[2px] text-white">
+          LEGAL
+        </span>
+        <h1 className="mt-6 text-[40px] font-bold text-[var(--text-primary)] text-center">
+          TERMS OF SERVICE & API PRICING
+        </h1>
+        <p className="mt-4 text-base text-[var(--text-secondary)] text-center">
+          Terms of service, privacy policy, and pricing for ClaimScan API
+        </p>
+        <p className="mt-4 text-xs text-[var(--text-tertiary)]">
+          Effective Date: {effectiveDate} · Last Updated: {effectiveDate}
+        </p>
+      </header>
 
-      {/* ═══ ENTITY ═══ */}
-      <LazySection rootMargin="300px 0px">
-        <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] px-5 py-4 text-[13px] leading-relaxed text-foreground/60">
-          ClaimScan is developed and operated by <strong className="text-foreground/80">LW ARTS</strong> (&quot;Company&quot;, &quot;we&quot;, &quot;us&quot;, &quot;our&quot;),
-          an independent software studio. By accessing or using <strong className="text-foreground/80">claimscan.tech</strong> (the &quot;Service&quot;),
+      {/* ═══ 2-COLUMN LAYOUT ═══ */}
+      <div className="flex w-full px-5 sm:px-12 pb-24">
+        {/* ── Sidebar (client component with scroll spy) ── */}
+        <TermsSidebar />
+
+        {/* ── Main content ── */}
+        <main className="flex-1 lg:pl-12 min-w-0">
+          <RevealMount />
+        {/* ═══ ENTITY ═══ */}
+        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-5 py-4 text-[13px] leading-relaxed text-[var(--text-tertiary)]">
+          ClaimScan is developed and operated by <strong className="text-[var(--text-secondary)]">LW ARTS</strong> (&quot;Company&quot;, &quot;we&quot;, &quot;us&quot;, &quot;our&quot;),
+          an independent software studio. By accessing or using <strong className="text-[var(--text-secondary)]">claimscan.tech</strong> (the &quot;Service&quot;),
           you (&quot;User&quot;, &quot;you&quot;, &quot;your&quot;) agree to be bound by these Terms of Service and all policies incorporated
           herein by reference. For entity identification and data protection inquiries, contact{' '}
-          <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
+          <strong className="text-[var(--text-secondary)]">lwarts@claimscan.tech</strong>.
         </div>
-      </LazySection>
 
-      {/* ═══ TABLE OF CONTENTS ═══ */}
-      <LazySection>
-        <nav className="mt-10 rounded-xl border border-foreground/[0.06] p-5" aria-label="Table of Contents">
-          <Label>Table of Contents</Label>
-          <div className="mt-4 columns-1 gap-x-6 sm:columns-2">
-            {TOC.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className="mb-1.5 flex items-baseline gap-2.5 break-inside-avoid text-[13px] transition-colors hover:text-foreground"
-              >
-                <span className="shrink-0 font-mono text-[11px] font-bold text-foreground/30">
-                  {item.n.padStart(2, '0')}
-                </span>
-                <span className="text-foreground/60 hover:text-foreground">
-                  {item.label}
-                </span>
-              </a>
-            ))}
-          </div>
-        </nav>
-      </LazySection>
-
-      {/* ═══ TERMS SECTIONS ═══ */}
-      <div className="mt-14 space-y-14">
-        {/* 1 - Acceptance */}
-        <LazySection>
+        {/* ═══ TERMS SECTIONS ═══ */}
+        <div className="mt-14 space-y-14">
+          {/* 1 - Acceptance */}
           <SectionBlock id="acceptance" number="1" title="Acceptance of Terms">
             <p>
               By accessing, browsing, or using ClaimScan in any manner, you acknowledge that you have read, understood,
@@ -178,28 +195,26 @@ export default function TermsPage() {
               you have the legal capacity to enter into this agreement.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 2 - Service Description */}
-        <LazySection>
+          {/* 2 - Service Description */}
           <SectionBlock id="service-description" number="2" title="Service Description">
             <p>
               ClaimScan is a cross-chain decentralized finance (&quot;DeFi&quot;) analytics platform that aggregates and
               displays creator fee data across multiple blockchain launchpad platforms on Solana, Base, Ethereum,
               and BNB Chain. The Service provides:
             </p>
-            <div className="rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] p-4">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
               <div className="space-y-2">
                 {[
                   'Identity resolution from social handles (Twitter/X, Farcaster, GitHub) and OWS wallet names to blockchain wallet addresses across all supported chains',
-                  'Aggregated fee tracking across 10 launchpad platforms (Pump.fun, Bags.fm, Clanker, Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium) on Solana, Base, Ethereum, and BNB Chain',
+                  'Aggregated fee tracking across 9 launchpad platforms (Pump.fun, Bags.fm, Clanker, Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium) on Solana, Base, Ethereum, and BNB Chain',
                   'Real-time USD conversion of on-chain fee data using third-party price feeds',
                   'Claim facilitation for eligible unclaimed fees through zero-custody transaction construction',
                   'Data export and analytics features for creator fee portfolios',
                   'A paid API (V2) that provides fee reports, data exports, and intelligence reports enriched with cross-chain data from Allium, accessible by developers and AI agents via the x402 payment protocol',
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5 text-[12px]">
-                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
+                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-tertiary)]" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -211,10 +226,8 @@ export default function TermsPage() {
               available blockchain data and facilitates user-initiated on-chain transactions.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 3 - Eligibility */}
-        <LazySection>
+          {/* 3 - Eligibility */}
           <SectionBlock id="eligibility" number="3" title="Eligibility">
             <p>
               You must be at least eighteen (18) years of age, or the age of legal majority in your jurisdiction
@@ -233,10 +246,8 @@ export default function TermsPage() {
               at any time and for any reason, without notice or liability.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 4 - Account & Wallets */}
-        <LazySection>
+          {/* 4 - Account & Wallets */}
           <SectionBlock id="account-wallets" number="4" title="Account & Wallet Connection">
             <p>
               ClaimScan does not require account registration for read-only scanning features. However, certain
@@ -245,7 +256,7 @@ export default function TermsPage() {
             <p>
               When you connect a wallet to ClaimScan, you understand and agree that:
             </p>
-            <div className="rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] p-4">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
               <div className="space-y-2">
                 {[
                   'You are the sole custodian of your wallet and private keys. ClaimScan never has access to, stores, or controls your private keys or seed phrases.',
@@ -255,23 +266,21 @@ export default function TermsPage() {
                   'You bear full responsibility for verifying the details of any transaction before signing.',
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5 text-[12px]">
-                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
+                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-tertiary)]" />
                     <span>{item}</span>
                   </div>
                 ))}
               </div>
             </div>
           </SectionBlock>
-        </LazySection>
 
-        {/* 5 - Acceptable Use */}
-        <LazySection>
+          {/* 5 - Acceptable Use */}
           <SectionBlock id="acceptable-use" number="5" title="Acceptable Use">
             <p>
               You agree to use ClaimScan only for lawful purposes and in compliance with all applicable local,
               state, national, and international laws and regulations. You shall not:
             </p>
-            <div className="rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] p-4">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
               <div className="space-y-2">
                 {[
                   'Use the Service for any illegal purpose, including but not limited to money laundering, terrorist financing, tax evasion, or sanctions evasion',
@@ -284,7 +293,7 @@ export default function TermsPage() {
                   'Use the Service to transmit malware, viruses, or other harmful code',
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5 text-[12px]">
-                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
+                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-tertiary)]" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -295,10 +304,8 @@ export default function TermsPage() {
               and may expose you to civil and criminal liability.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 6 - Fees, Claims & Transactions */}
-        <LazySection>
+          {/* 6 - Fees, Claims & Transactions */}
           <SectionBlock id="fees-claims" number="6" title="Fees, Claims & Transactions">
             <p>
               <strong className="text-foreground/90">Scanning and Viewing.</strong> ClaimScan is free to use for scanning,
@@ -308,7 +315,7 @@ export default function TermsPage() {
               <strong className="text-foreground/90">Claim Service Fee.</strong> When you use ClaimScan to claim unclaimed fees,
               a service fee of 0.85% of the claimed amount is collected. This fee is:
             </p>
-            <div className="rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] p-4">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
               <div className="space-y-2">
                 {[
                   'Calculated server-side based on the unclaimed fee amount at the time of claim',
@@ -318,7 +325,7 @@ export default function TermsPage() {
                   'Displayed in the Claim Dialog with exact amounts in both native tokens and USD before you initiate the claim',
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5 text-[12px]">
-                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
+                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-tertiary)]" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -355,10 +362,8 @@ export default function TermsPage() {
               or their operational status. Platform downtime, smart contract upgrades, or API changes may affect claim availability.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 7 - Intellectual Property */}
-        <LazySection>
+          {/* 7 - Intellectual Property */}
           <SectionBlock id="intellectual-property" number="7" title="Intellectual Property">
             <p>
               All content, features, and functionality of the Service, including but not limited to the ClaimScan name,
@@ -378,10 +383,8 @@ export default function TermsPage() {
               purposes only and does not imply endorsement, affiliation, or sponsorship.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 8 - DMCA */}
-        <LazySection>
+          {/* 8 - DMCA */}
           <SectionBlock id="dmca" number="8" title="DMCA & Copyright">
             <p>
               LW ARTS respects the intellectual property rights of others. If you believe that any content on ClaimScan
@@ -391,7 +394,7 @@ export default function TermsPage() {
             <p>
               Your DMCA notice must include:
             </p>
-            <div className="rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] p-4">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
               <div className="space-y-2">
                 {[
                   'A physical or electronic signature of the copyright owner or a person authorized to act on their behalf',
@@ -402,59 +405,57 @@ export default function TermsPage() {
                   'A statement, under penalty of perjury, that the information in the notification is accurate and that you are authorized to act on behalf of the copyright owner',
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5 text-[12px]">
-                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
+                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-tertiary)]" />
                     <span>{item}</span>
                   </div>
                 ))}
               </div>
             </div>
             <p>
-              DMCA notices should be directed to: <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
+              DMCA notices should be directed to: <strong className="text-[var(--text-secondary)]">lwarts@claimscan.tech</strong>.
               We reserve the right to remove content alleged to be infringing without prior notice and at our sole discretion.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 9 - Disclaimers & Risk */}
-        <LazySection>
-          <div className="rounded-2xl bg-foreground p-6 sm:p-8">
-            <section id="disclaimers" className="scroll-mt-24">
+          {/* 9 - Disclaimers & Risk */}
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 sm:p-8">
+            <section id="disclaimers" data-reveal className="reveal scroll-mt-24">
               <div className="flex items-baseline gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-background/20 bg-background/10 text-[11px] font-bold tabular-nums text-background">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--text-primary)] text-[11px] font-bold tabular-nums text-[var(--text-inverse)]">
                   9
                 </span>
-                <h2 className="text-lg font-bold tracking-tight text-background sm:text-xl">
+                <h2 className="text-lg font-bold tracking-tight text-[var(--text-primary)] sm:text-xl">
                   Disclaimers & Risk Disclosure
                 </h2>
               </div>
-              <div className="mt-5 space-y-4 text-[14px] leading-[1.8] text-background/55">
+              <div className="mt-5 space-y-4 text-[14px] leading-[1.8] text-[var(--text-secondary)]">
                 <p>
-                  <strong className="text-background/80">NO FINANCIAL ADVICE.</strong> Nothing on ClaimScan constitutes financial,
+                  <strong className="text-[var(--text-primary)]">NO FINANCIAL ADVICE.</strong> Nothing on ClaimScan constitutes financial,
                   investment, tax, or legal advice. The Service displays publicly available blockchain data and does not make
                   any recommendation regarding any digital asset, token, or transaction. You should consult qualified
                   professionals before making any financial decisions.
                 </p>
                 <p>
-                  <strong className="text-background/80">CRYPTOCURRENCY RISK.</strong> Interacting with blockchain networks and
+                  <strong className="text-[var(--text-primary)]">CRYPTOCURRENCY RISK.</strong> Interacting with blockchain networks and
                   decentralized protocols involves substantial risk, including but not limited to: total loss of funds, smart
                   contract vulnerabilities, protocol exploits, network congestion, validator failures, bridge failures,
                   regulatory changes, market volatility, liquidity risk, and private key compromise. You acknowledge that
                   the value of digital assets can fluctuate dramatically and may become worthless.
                 </p>
                 <p>
-                  <strong className="text-background/80">CROSS-CHAIN RISK.</strong> ClaimScan operates across multiple blockchain
+                  <strong className="text-[var(--text-primary)]">CROSS-CHAIN RISK.</strong> ClaimScan operates across multiple blockchain
                   networks (Solana, Base, Ethereum). Cross-chain operations are inherently complex and carry additional risks
                   including network-specific failures, inconsistent data across chains, and potential discrepancies in fee calculations
                   due to differences in blockchain architecture and token decimal precision.
                 </p>
                 <p>
-                  <strong className="text-background/80">THIRD-PARTY DEPENDENCIES.</strong> The Service relies on third-party
+                  <strong className="text-[var(--text-primary)]">THIRD-PARTY DEPENDENCIES.</strong> The Service relies on third-party
                   infrastructure including blockchain RPC providers, price feed APIs (DexScreener, Jupiter, CoinGecko),
                   launchpad platform APIs, and cloud hosting services. We do not guarantee the availability, accuracy, or
                   reliability of any third-party service.
                 </p>
                 <p>
-                  <strong className="text-background/80">&quot;AS IS&quot; BASIS.</strong> THE SERVICE IS PROVIDED ON AN &quot;AS IS&quot; AND
+                  <strong className="text-[var(--text-primary)]">&quot;AS IS&quot; BASIS.</strong> THE SERVICE IS PROVIDED ON AN &quot;AS IS&quot; AND
                   &quot;AS AVAILABLE&quot; BASIS, WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE.
                   LW ARTS EXPRESSLY DISCLAIMS ALL WARRANTIES, INCLUDING, WITHOUT LIMITATION, IMPLIED WARRANTIES OF
                   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT
@@ -463,18 +464,16 @@ export default function TermsPage() {
               </div>
             </section>
           </div>
-        </LazySection>
 
-        {/* 10 - Limitation of Liability */}
-        <LazySection>
+          {/* 10 - Limitation of Liability */}
           <SectionBlock id="limitation-liability" number="10" title="Limitation of Liability">
-            <p className="text-foreground/80">
+            <p className="text-[var(--text-secondary)]">
               TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL LW ARTS, ITS DIRECTORS, OFFICERS,
               EMPLOYEES, AGENTS, AFFILIATES, OR LICENSORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
               EXEMPLARY, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION, LOSS OF PROFITS, DATA, GOODWILL, USE,
               OR OTHER INTANGIBLE LOSSES, REGARDLESS OF THE THEORY OF LIABILITY, ARISING OUT OF OR IN CONNECTION WITH:
             </p>
-            <div className="rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] p-4">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
               <div className="space-y-2">
                 {[
                   'Your access to, use of, or inability to access or use the Service',
@@ -486,7 +485,7 @@ export default function TermsPage() {
                   'Smart contract failures, exploits, or vulnerabilities in any third-party protocol',
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5 text-[12px]">
-                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
+                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-tertiary)]" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -501,10 +500,8 @@ export default function TermsPage() {
               OUR LIABILITY SHALL BE LIMITED TO THE MAXIMUM EXTENT PERMITTED BY LAW.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 11 - Indemnification */}
-        <LazySection>
+          {/* 11 - Indemnification */}
           <SectionBlock id="indemnification" number="11" title="Indemnification">
             <p>
               You agree to indemnify, defend, and hold harmless LW ARTS and its officers, directors, employees, agents,
@@ -518,22 +515,20 @@ export default function TermsPage() {
               This indemnification obligation shall survive the termination of these Terms and your use of the Service.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 12 - Privacy Policy */}
-        <LazySection>
+          {/* 12 - Privacy Policy */}
           <SectionBlock id="privacy" number="12" title="Privacy Policy">
             <p>
               <strong className="text-foreground/90">Data Controller.</strong> LW ARTS is the data controller for all personal
               data processed through the Service. For data protection inquiries, contact our Data Protection Contact at{' '}
-              <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
+              <strong className="text-[var(--text-secondary)]">lwarts@claimscan.tech</strong>.
             </p>
 
             <p>
               <strong className="text-foreground/90">Data Collection.</strong> ClaimScan is designed with a privacy-first
               architecture. We collect minimal data necessary to operate the Service:
             </p>
-            <div className="overflow-hidden rounded-xl border border-foreground/[0.06]">
+            <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
               {[
                 ['Search Queries', 'Anonymized and hashed before storage. Raw search inputs are never persisted in readable form.', 'Legitimate interest (service operation)'],
                 ['Wallet Addresses', 'Processed transiently during scans. While blockchain addresses are pseudonymous and publicly available, they may constitute personal data under certain privacy regulations (e.g., GDPR) when linkable to an identified individual.', 'Contract performance (service delivery)'],
@@ -545,17 +540,17 @@ export default function TermsPage() {
                 <div
                   key={cat}
                   className={`flex flex-col gap-1 px-4 py-3 ${
-                    i % 2 === 0 ? 'bg-foreground/[0.03]' : ''
-                  } ${i > 0 ? 'border-t border-foreground/[0.04]' : ''}`}
+                    i % 2 === 0 ? 'bg-[var(--bg-card)]' : ''
+                  } ${i > 0 ? 'border-t border-[var(--border-subtle)]' : ''}`}
                 >
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-4">
-                    <span className="w-32 shrink-0 text-[11px] font-bold uppercase tracking-wider text-foreground/40">
+                    <span className="w-32 shrink-0 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
                       {cat}
                     </span>
-                    <span className="text-[12px] text-foreground/60">{desc}</span>
+                    <span className="text-[12px] text-[var(--text-tertiary)]">{desc}</span>
                   </div>
                   <div className="mt-1 sm:ml-36">
-                    <span className="rounded-full border border-foreground/[0.08] bg-foreground/[0.04] px-2 py-0.5 text-[11px] font-medium text-foreground/40">
+                    <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-tertiary)]">
                       Lawful basis: {basis}
                     </span>
                   </div>
@@ -583,7 +578,7 @@ export default function TermsPage() {
               <strong className="text-foreground/90">Third-Party Services (Sub-Processors).</strong> The Service integrates
               with third-party sub-processors that process data under contractual obligations consistent with these Terms:
             </p>
-            <div className="overflow-hidden rounded-xl border border-foreground/[0.06]">
+            <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
               {[
                 ['Vercel', 'Hosting and analytics', 'United States'],
                 ['Sentry', 'Error monitoring', 'United States'],
@@ -600,18 +595,18 @@ export default function TermsPage() {
                 <div
                   key={name}
                   className={`flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:items-center sm:gap-4 ${
-                    i % 2 === 0 ? 'bg-foreground/[0.03]' : ''
-                  } ${i > 0 ? 'border-t border-foreground/[0.04]' : ''}`}
+                    i % 2 === 0 ? 'bg-[var(--bg-card)]' : ''
+                  } ${i > 0 ? 'border-t border-[var(--border-subtle)]' : ''}`}
                 >
-                  <span className="w-24 shrink-0 text-[11px] font-bold text-foreground/50">{name}</span>
-                  <span className="flex-1 text-[11px] text-foreground/50">{purpose}</span>
-                  <span className="text-[11px] text-foreground/30">{location}</span>
+                  <span className="w-24 shrink-0 text-[11px] font-bold text-[var(--text-tertiary)]">{name}</span>
+                  <span className="flex-1 text-[11px] text-[var(--text-tertiary)]">{purpose}</span>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">{location}</span>
                 </div>
               ))}
             </div>
-            <p className="text-[12px] text-foreground/50">
+            <p className="text-[12px] text-[var(--text-tertiary)]">
               We encourage you to review the privacy policies and DPAs of these providers. A current list of sub-processors
-              is available upon request at <strong className="text-foreground/70">lwarts@claimscan.tech</strong>.
+              is available upon request at <strong className="text-[var(--text-secondary)]">lwarts@claimscan.tech</strong>.
             </p>
 
             <p>
@@ -634,7 +629,7 @@ export default function TermsPage() {
               <strong className="text-foreground/90">Your Data Rights.</strong> Depending on your jurisdiction, you may have
               the following rights regarding your personal data:
             </p>
-            <div className="overflow-hidden rounded-xl border border-foreground/[0.06]">
+            <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
               {[
                 ['Right of Access', 'Obtain confirmation of whether we process your data and request a copy (GDPR Art. 15)'],
                 ['Right to Rectification', 'Request correction of inaccurate personal data (GDPR Art. 16)'],
@@ -648,18 +643,18 @@ export default function TermsPage() {
                 <div
                   key={right}
                   className={`flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:items-start sm:gap-4 ${
-                    i % 2 === 0 ? 'bg-foreground/[0.03]' : ''
-                  } ${i > 0 ? 'border-t border-foreground/[0.04]' : ''}`}
+                    i % 2 === 0 ? 'bg-[var(--bg-card)]' : ''
+                  } ${i > 0 ? 'border-t border-[var(--border-subtle)]' : ''}`}
                 >
-                  <span className="w-36 shrink-0 text-[11px] font-bold uppercase tracking-wider text-foreground/40">
+                  <span className="w-36 shrink-0 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
                     {right}
                   </span>
-                  <span className="text-[12px] text-foreground/60">{desc}</span>
+                  <span className="text-[12px] text-[var(--text-tertiary)]">{desc}</span>
                 </div>
               ))}
             </div>
             <p>
-              To exercise any of these rights, contact us at <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
+              To exercise any of these rights, contact us at <strong className="text-[var(--text-secondary)]">lwarts@claimscan.tech</strong>.
               We will respond to all verifiable requests within thirty (30) days. If we need additional time, we will inform
               you of the reason and extension period (up to an additional sixty (60) days).
             </p>
@@ -668,8 +663,8 @@ export default function TermsPage() {
               <strong className="text-foreground/90">CCPA/CPRA Disclosure (California Residents).</strong> If you are a
               California resident, you have the right to: (a) know what personal information we collect and how it is used;
               (b) request deletion of your personal information; (c) opt-out of the sale or sharing of your personal information.
-              ClaimScan does <strong className="text-foreground/80">not sell or share</strong> personal information as defined
-              under the CCPA/CPRA. To submit a request, contact <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
+              ClaimScan does <strong className="text-[var(--text-secondary)]">not sell or share</strong> personal information as defined
+              under the CCPA/CPRA. To submit a request, contact <strong className="text-[var(--text-secondary)]">lwarts@claimscan.tech</strong>.
             </p>
 
             <p>
@@ -678,7 +673,7 @@ export default function TermsPage() {
               from the European Economic Area (EEA), United Kingdom, or Switzerland to jurisdictions without an adequacy decision,
               we rely on Standard Contractual Clauses (SCCs) as approved by the European Commission (June 2021 version) and
               supplementary technical measures (encryption in transit and at rest). You may request a copy of our SCCs at{' '}
-              <strong className="text-foreground/80">lwarts@claimscan.tech</strong>.
+              <strong className="text-[var(--text-secondary)]">lwarts@claimscan.tech</strong>.
             </p>
 
             <p>
@@ -693,15 +688,13 @@ export default function TermsPage() {
               we have collected data from a minor, we will take steps to delete it promptly.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 13 - Cookie Policy */}
-        <LazySection>
+          {/* 13 - Cookie Policy */}
           <SectionBlock id="cookies" number="13" title="Cookie Policy">
             <p>
               ClaimScan uses minimal cookies and local storage mechanisms strictly necessary for the operation of the Service.
             </p>
-            <div className="overflow-hidden rounded-xl border border-foreground/[0.06]">
+            <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]">
               {[
                 ['Strictly Necessary', 'Required for security features (Cloudflare Turnstile verification, CSRF protection). Cannot be disabled. No consent required under ePrivacy Directive Art. 5(3).'],
                 ['Functional Storage', 'Local storage for wallet connection state, user preferences (theme), and UI state. Cleared when you disconnect your wallet. Classified as strictly necessary for service delivery.'],
@@ -709,13 +702,13 @@ export default function TermsPage() {
                 <div
                   key={cat}
                   className={`flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:gap-4 ${
-                    i % 2 === 0 ? 'bg-foreground/[0.03]' : ''
-                  } ${i > 0 ? 'border-t border-foreground/[0.04]' : ''}`}
+                    i % 2 === 0 ? 'bg-[var(--bg-card)]' : ''
+                  } ${i > 0 ? 'border-t border-[var(--border-subtle)]' : ''}`}
                 >
-                  <span className="w-32 shrink-0 text-[11px] font-bold uppercase tracking-wider text-foreground/40">
+                  <span className="w-32 shrink-0 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
                     {cat}
                   </span>
-                  <span className="text-[12px] text-foreground/60">{desc}</span>
+                  <span className="text-[12px] text-[var(--text-tertiary)]">{desc}</span>
                 </div>
               ))}
             </div>
@@ -741,10 +734,8 @@ export default function TermsPage() {
               for US users) before doing so.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 14 - Termination */}
-        <LazySection>
+          {/* 14 - Termination */}
           <SectionBlock id="termination" number="14" title="Termination">
             <p>
               We may terminate or suspend your access to the Service immediately, without prior notice or liability,
@@ -757,10 +748,8 @@ export default function TermsPage() {
               property provisions, disclaimers, limitation of liability, indemnification, and governing law.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 15 - Governing Law */}
-        <LazySection>
+          {/* 15 - Governing Law */}
           <SectionBlock id="governing-law" number="15" title="Governing Law & Disputes">
             <p>
               These Terms shall be governed by and construed in accordance with the laws of the State of Delaware,
@@ -793,10 +782,8 @@ export default function TermsPage() {
               permanently barred. This limitation applies to the fullest extent permitted by applicable law.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 16 - Modifications */}
-        <LazySection>
+          {/* 16 - Modifications */}
           <SectionBlock id="modifications" number="16" title="Modifications">
             <p>
               LW ARTS reserves the right to modify these Terms at any time. Material changes will be communicated by
@@ -812,10 +799,8 @@ export default function TermsPage() {
               posting to this page.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 17 - Severability & Waiver */}
-        <LazySection>
+          {/* 17 - Severability & Waiver */}
           <SectionBlock id="severability" number="17" title="Severability & Waiver">
             <p>
               If any provision of these Terms is held to be invalid, illegal, or unenforceable by a court of competent
@@ -830,16 +815,14 @@ export default function TermsPage() {
               further exercise of that or any other right or remedy.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 18 - Force Majeure */}
-        <LazySection>
+          {/* 18 - Force Majeure */}
           <SectionBlock id="force-majeure" number="18" title="Force Majeure">
             <p>
               LW ARTS shall not be liable for any failure or delay in performing its obligations under these Terms where
               such failure or delay results from circumstances beyond our reasonable control, including but not limited to:
             </p>
-            <div className="rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] p-4">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
               <div className="space-y-2">
                 {[
                   'Blockchain network congestion, forks, consensus failures, or protocol-level changes beyond our control',
@@ -851,7 +834,7 @@ export default function TermsPage() {
                   'Cloud infrastructure outages affecting our hosting, database, or caching providers',
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5 text-[12px]">
-                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
+                    <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-tertiary)]" />
                     <span>{item}</span>
                   </div>
                 ))}
@@ -862,10 +845,8 @@ export default function TermsPage() {
               event. We will use reasonable efforts to mitigate the impact and resume normal operations as soon as practicable.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 19 - Entire Agreement */}
-        <LazySection>
+          {/* 19 - Entire Agreement */}
           <SectionBlock id="entire-agreement" number="19" title="Entire Agreement">
             <p>
               These Terms, together with our Privacy Policy (Section 12), Cookie Policy (Section 13), and any other policies
@@ -884,16 +865,14 @@ export default function TermsPage() {
               of these Terms.
             </p>
           </SectionBlock>
-        </LazySection>
 
-        {/* 20 - Contact */}
-        <LazySection>
+          {/* 20 - Contact */}
           <SectionBlock id="contact" number="20" title="Contact">
             <p>
               For questions, concerns, or requests regarding these Terms, Privacy Policy, or any other legal matter,
               please contact us through the following channels:
             </p>
-            <div className="rounded-xl border border-foreground/[0.06] p-5">
+            <div className="rounded-xl border border-[var(--border-subtle)] p-5">
               <div className="space-y-3">
                 {[
                   { label: 'Email', value: 'lwarts@claimscan.tech' },
@@ -901,35 +880,94 @@ export default function TermsPage() {
                   { label: 'X (Twitter)', value: '@lwartss' },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center gap-4">
-                    <span className="w-20 shrink-0 text-[11px] font-bold uppercase tracking-wider text-foreground/40">
+                    <span className="w-20 shrink-0 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
                       {item.label}
                     </span>
-                    <span className="font-mono text-[12px] text-foreground/70">{item.value}</span>
+                    <span className="font-mono text-[12px] text-[var(--text-secondary)]">{item.value}</span>
                   </div>
                 ))}
               </div>
             </div>
           </SectionBlock>
-        </LazySection>
-      </div>
+        </div>
 
-      {/* ═══ CTA ═══ */}
-      <LazySection>
-        <section className="mt-20 rounded-2xl bg-foreground py-14 text-center">
-          <h2 className="text-xl font-bold tracking-tight text-background sm:text-2xl">
-            Ready to find your money?
-          </h2>
-          <p className="mx-auto mt-3 max-w-sm text-sm text-background/50">
-            Enter your handle. See what you&apos;re owed. 30 seconds. Free to scan.
-          </p>
-          <Link
-            href="/"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-background px-6 py-3 text-sm font-bold text-foreground transition-all duration-200 hover:opacity-90 hover:shadow-[0_4px_20px_-4px_rgba(255,255,255,0.15)]"
-          >
-            Scan Now <span aria-hidden="true">&rarr;</span>
-          </Link>
-        </section>
-      </LazySection>
-    </article>
+        {/* ═══ PRICING SECTION ═══ */}
+        <div className="my-16 h-px bg-[var(--border-subtle)]" />
+
+        <div className="text-center space-y-4">
+          <h2 className="text-[32px] font-bold text-[var(--text-primary)]">API PRICING</h2>
+          <p className="text-[15px] text-[var(--text-secondary)]">Free to scan. Pay per query for API access via x402 protocol.</p>
+        </div>
+
+        <div className="mt-8 grid gap-5 sm:grid-cols-3">
+          {/* Free tier */}
+          <div className="rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6">
+            <span className="text-[11px] font-semibold uppercase tracking-[1.5px] text-[var(--text-tertiary)]">Free</span>
+            <div className="mt-2 text-[28px] font-bold text-[var(--text-primary)]">$0</div>
+            <p className="mt-3 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+              Scanning, leaderboard, and price feeds. No auth required.
+            </p>
+            <div className="mt-5 space-y-2">
+              {['Fee scanning', 'Leaderboard access', 'Price feeds', 'No auth needed'].map((f) => (
+                <div key={f} className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-tertiary)]" />
+                  {f}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Pay-per-query */}
+          <div className="rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6">
+            <span className="text-[11px] font-semibold uppercase tracking-[1.5px] text-[var(--text-tertiary)]">Pay-per-query</span>
+            <div className="mt-2 text-[28px] font-bold text-[var(--text-primary)]">x402</div>
+            <p className="mt-3 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+              V2 endpoints. USDC on Base. No API keys or subscriptions.
+            </p>
+            <div className="mt-5 space-y-2">
+              {[
+                '/v2/fees: $0.01/query',
+                '/v2/export: $0.05/query',
+                '/v2/intelligence: $0.02/query',
+                'USDC on Base',
+              ].map((f) => (
+                <div key={f} className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-tertiary)]" />
+                  {f}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Enterprise */}
+          <div className="rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6">
+            <span className="text-[11px] font-semibold uppercase tracking-[1.5px] text-[var(--text-tertiary)]">Enterprise</span>
+            <div className="mt-2 text-[28px] font-bold text-[var(--text-primary)]">Custom</div>
+            <p className="mt-3 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+              Custom rate limits, volume pricing, and dedicated support.
+            </p>
+            <div className="mt-5 space-y-2">
+              {['Custom rate limits', 'Volume discounts', 'Dedicated support', 'Contact @lwarts on Telegram'].map((f) => (
+                <div key={f} className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-tertiary)]" />
+                  {f}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ═══ CTA ═══ */}
+        <div className="mt-16 rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-card)] py-12 text-center">
+          <h2 className="text-[24px] font-bold text-[var(--text-primary)]">READY TO INTEGRATE?</h2>
+          <p className="mt-3 text-[14px] text-[var(--text-secondary)]">ClaimScan API via x402. Pay per query in USDC on Base.</p>
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <Link href="/docs" className="pressable hover-glow-primary rounded-[10px] bg-white px-6 py-3 text-[13px] font-semibold text-[var(--text-inverse)] hover:bg-white/90">Read the Docs</Link>
+            <a href="https://t.me/lwarts" target="_blank" rel="noopener noreferrer" className="pressable hover-glow rounded-[10px] border border-[var(--border-default)] px-6 py-3 text-[13px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]">Contact us</a>
+          </div>
+        </div>
+        </main>
+      </div>
+    </div>
   );
 }

@@ -65,7 +65,7 @@ export function ScanStatusLog({ fees, resolvedChains }: ScanStatusLogProps) {
       <button
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+        className="pressable flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left hover:bg-muted/30"
       >
         {/* Status dots summary */}
         <div className="flex items-center gap-1" aria-hidden="true">

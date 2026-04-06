@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     template: '%s | ClaimScan',
   },
   description:
-    'Find unclaimed creator fees on Pump.fun, Bags.fm, Clanker, Zora and 9 launchpads. Paste any @handle or wallet to see earnings across Solana, Base, and BNB Chain in seconds.',
+    'Find unclaimed creator fees on Pump.fun, Bags.fm, Clanker, Zora and more. Paste any handle or wallet to see earnings across Solana, Base, and BNB Chain in seconds.',
   keywords: [
     'DeFi fees', 'creator fees', 'Pump.fun fees', 'Bags.fm', 'Clanker',
     'Zora', 'Solana', 'Base', 'BNB Chain', 'BSC', 'cross-chain', 'fee tracker', 'unclaimed fees',
@@ -68,7 +68,7 @@ export const metadata: Metadata = {
         url: '/opengraph-image.png',
         width: 1200,
         height: 630,
-        alt: 'ClaimScan — Cross-chain DeFi fee tracker for Solana, Base, and BNB Chain',
+        alt: 'ClaimScan: Cross-chain DeFi fee tracker for Solana, Base, and BNB Chain',
       },
     ],
   },
@@ -82,7 +82,7 @@ export const metadata: Metadata = {
     images: [
       {
         url: '/opengraph-image.png',
-        alt: 'ClaimScan — Cross-chain DeFi fee tracker for Solana, Base, and BNB Chain',
+        alt: 'ClaimScan: Cross-chain DeFi fee tracker for Solana, Base, and BNB Chain',
       },
     ],
   },
@@ -127,7 +127,7 @@ export default async function RootLayout({
       <head>
         <meta name="base:app_id" content="69b2e7675600c39dcfa4fe7b" />
         <JsonLd />
-        {/* Turnstile with CSP nonce — loaded afterInteractive to not block FCP.
+        {/* Turnstile with CSP nonce: loaded afterInteractive to not block FCP.
             Only needed when user opens ClaimDialog, not on initial page load. */}
         <Script
           src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
@@ -151,14 +151,17 @@ export default async function RootLayout({
             <header className="animate-fade-in-down sticky top-0 z-50 border-b border-[var(--border-subtle)] bg-[#0B0B0E99] backdrop-blur-xl pt-[env(safe-area-inset-top)]">
               <nav aria-label="Main navigation" className="flex items-center justify-between px-5 py-4 sm:px-12 sm:py-4">
                 <div className="flex items-center gap-8">
-                  <Link href="/" className="group flex items-center gap-2.5 py-1" aria-label="ClaimScan home">
-                    <img src="/icon.svg" alt="" aria-hidden="true" className="h-7 w-7 rounded-[6px] invert" />
+                  <Link href="/" className="pressable group flex items-center gap-2.5 py-1" aria-label="ClaimScan home">
+                    <img src="/icon.svg" alt="" aria-hidden="true" className="h-7 w-7 rounded-[6px] invert transition-transform duration-200 group-hover:rotate-[-4deg] group-hover:scale-105" />
                     <span className="text-[20px] font-bold tracking-tight text-[var(--text-primary)]">
                       ClaimScan
                     </span>
                   </Link>
                   <div className="hidden items-center gap-7 sm:flex">
-                    <Link href="/leaderboard" className="text-[15px] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]">Leaderboard</Link>
+                    <Link href="/leaderboard" className="group relative text-[15px] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]">
+                      Leaderboard
+                      <span className="absolute left-0 -bottom-1 h-[1.5px] w-full origin-left scale-x-0 bg-[var(--text-primary)] transition-transform duration-200 ease-out group-hover:scale-x-100" />
+                    </Link>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

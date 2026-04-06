@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: PageProps) {
     description: `See earned, claimed, and unclaimed fees for ${displayName} across Pump.fun, Bags.fm, Clanker, Zora and more. Real-time data on Solana, Base, and BNB Chain.`,
     ...(isWallet ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
-      title: `${displayName} — Earned & Unclaimed Fees | ClaimScan`,
+      title: `${displayName}: Earned & Unclaimed Fees | ClaimScan`,
       description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads on Solana, Base, and BNB Chain.`,
       images: [
         {
@@ -56,7 +56,7 @@ export async function generateMetadata({ params }: PageProps) {
       card: 'summary_large_image' as const,
       site: '@lwartss',
       creator: '@lwartss',
-      title: `${displayName} — Earned & Unclaimed Fees | ClaimScan`,
+      title: `${displayName}: Earned & Unclaimed Fees | ClaimScan`,
       description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads.`,
       images: [
         {

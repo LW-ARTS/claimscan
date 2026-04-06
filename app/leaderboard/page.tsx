@@ -6,33 +6,68 @@ import { fetchLeaderboard } from '@/lib/services/leaderboard';
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Leaderboard — ClaimScan',
+    title: 'Leaderboard | ClaimScan',
     description:
       'Top creator fee earners across Pump.fun, Bags.fm, Clanker, Zora, and 5 more launchpads on Solana and Base.',
     alternates: { canonical: `${APP_URL}/leaderboard` },
     openGraph: {
-      title: 'Leaderboard — Top Creator Fee Earners | ClaimScan',
+      title: 'Leaderboard: Top Creator Fee Earners | ClaimScan',
       description:
         'See who earns the most in creator fees across 9 DeFi launchpads on Solana, Base, and BNB Chain.',
       url: `${APP_URL}/leaderboard`,
       siteName: 'ClaimScan',
       type: 'website',
+      images: [
+        {
+          url: '/leaderboard/opengraph-image',
+          width: 1200,
+          height: 630,
+          alt: 'ClaimScan Leaderboard',
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image' as const,
       site: '@lwartss',
       creator: '@lwartss',
-      title: 'Leaderboard — Top Creator Fee Earners | ClaimScan',
+      title: 'Leaderboard: Top Creator Fee Earners | ClaimScan',
       description:
         'See who earns the most in creator fees across 9 DeFi launchpads on Solana, Base, and BNB Chain.',
+      images: [
+        {
+          url: '/leaderboard/opengraph-image',
+          width: 1200,
+          height: 630,
+          alt: 'ClaimScan Leaderboard',
+        },
+      ],
     },
   };
 }
 
-const TIME_FILTERS = ['All Time', '30D', '7D'] as const;
+
+const LEADERBOARD_BREADCRUMB_LD = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  '@id': 'https://claimscan.tech/leaderboard#breadcrumb',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'ClaimScan',
+      item: 'https://claimscan.tech',
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'Leaderboard',
+      item: 'https://claimscan.tech/leaderboard',
+    },
+  ],
+}).replace(/[<>&\u2028\u2029]/g, (c) => ({ '<': '\\u003c', '>': '\\u003e', '&': '\\u0026', '\u2028': '\\u2028', '\u2029': '\\u2029' })[c]!);
 
 export default async function LeaderboardPage() {
-  // Fetch initial data server-side for SEO — direct DB call, no HTTP self-fetch
+  // Fetch initial data server-side for SEO (direct DB call, no HTTP self-fetch).
   let initialData: { entries: Array<{
     handle: string;
     handle_type: 'twitter' | 'github';
@@ -45,7 +80,7 @@ export default async function LeaderboardPage() {
   try {
     initialData = await fetchLeaderboard({ limit: 15 });
   } catch {
-    // DB fetch failed — client will retry
+    // DB fetch failed. Client will retry.
   }
 
   return (
@@ -58,7 +93,12 @@ export default async function LeaderboardPage() {
         `,
       }}
     >
-      {/* Header — Pencil: padding 48px 40px 32px 40px */}
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger -- static JSON-LD, same pattern used in docs/page.tsx
+        dangerouslySetInnerHTML={{ __html: LEADERBOARD_BREADCRUMB_LD }}
+      />
+      {/* Header. Pencil: padding 48px 40px 32px 40px */}
       <div className="flex items-end justify-between px-5 pt-12 pb-8 sm:px-10 sm:pt-12 sm:pb-8">
         <div className="space-y-3">
           <p className="text-[11px] font-semibold tracking-[3px] text-[var(--text-tertiary)] uppercase">
@@ -71,29 +111,15 @@ export default async function LeaderboardPage() {
             Rankings based on total lifetime fees across all supported platforms
           </p>
         </div>
-        <div className="hidden sm:flex items-center gap-1">
-          {TIME_FILTERS.map((label) => (
-            <button
-              key={label}
-              className={
-                label === 'All Time'
-                  ? 'rounded-[6px] bg-white text-[var(--text-inverse)] px-4 py-2 text-[13px] font-medium'
-                  : 'rounded-[6px] bg-[var(--bg-surface)] text-[var(--text-secondary)] px-4 py-2 text-[13px]'
-              }
-            >
-              {label}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* Search — Pencil: padding 0 40px 16px 40px */}
+      {/* Search. Pencil: padding 0 40px 16px 40px */}
       <div className="px-5 pb-4 sm:px-10">
-        <SearchBar />
+        <SearchBar size="lg" />
       </div>
 
-      {/* Table — Pencil: padding 0 40px */}
-      <div className="px-5 sm:px-10">
+      {/* Table. Pencil: padding 0 40px */}
+      <div className="px-5 pb-16 sm:px-10">
         <LeaderboardTable
           initialEntries={initialData.entries}
           initialTotal={initialData.total}
