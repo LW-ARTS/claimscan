@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LeaderboardTable } from '@/app/components/LeaderboardTable';
+import { SearchBar } from '@/app/components/SearchBar';
 import { APP_URL } from '@/lib/constants';
 import { fetchLeaderboard } from '@/lib/services/leaderboard';
 
@@ -28,6 +29,8 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+const TIME_FILTERS = ['All Time', '30D', '7D'] as const;
+
 export default async function LeaderboardPage() {
   // Fetch initial data server-side for SEO — direct DB call, no HTTP self-fetch
   let initialData: { entries: Array<{
@@ -40,26 +43,62 @@ export default async function LeaderboardPage() {
   }>; total: number } = { entries: [], total: 0 };
 
   try {
-    initialData = await fetchLeaderboard({ limit: 50 });
+    initialData = await fetchLeaderboard({ limit: 15 });
   } catch {
     // DB fetch failed — client will retry
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
-          Leaderboard
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Top creator fee earners across 9 launchpads on Solana and Base.
-        </p>
+    <div
+      style={{
+        background: `
+          radial-gradient(ellipse 50% 35% at 20% 40%, #FFFFFF05 0%, transparent 100%),
+          radial-gradient(ellipse 110% 50% at 50% 12%, #FFFFFF0A 0%, transparent 100%),
+          linear-gradient(180deg, #16161A 0%, #09090B 100%)
+        `,
+      }}
+    >
+      {/* Header — Pencil: padding 48px 40px 32px 40px */}
+      <div className="flex items-end justify-between px-5 pt-12 pb-8 sm:px-10 sm:pt-12 sm:pb-8">
+        <div className="space-y-3">
+          <p className="text-[11px] font-semibold tracking-[3px] text-[var(--text-tertiary)] uppercase">
+            Leaderboard
+          </p>
+          <h1 className="text-[32px] font-bold tracking-tight text-[var(--text-primary)]">
+            TOP CREATOR FEE EARNERS
+          </h1>
+          <p className="text-[15px] text-[var(--text-secondary)]">
+            Rankings based on total lifetime fees across all supported platforms
+          </p>
+        </div>
+        <div className="hidden sm:flex items-center gap-1">
+          {TIME_FILTERS.map((label) => (
+            <button
+              key={label}
+              className={
+                label === 'All Time'
+                  ? 'rounded-[6px] bg-white text-[var(--text-inverse)] px-4 py-2 text-[13px] font-medium'
+                  : 'rounded-[6px] bg-[var(--bg-surface)] text-[var(--text-secondary)] px-4 py-2 text-[13px]'
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <LeaderboardTable
-        initialEntries={initialData.entries}
-        initialTotal={initialData.total}
-      />
-    </main>
+      {/* Search — Pencil: padding 0 40px 16px 40px */}
+      <div className="px-5 pb-4 sm:px-10">
+        <SearchBar />
+      </div>
+
+      {/* Table — Pencil: padding 0 40px */}
+      <div className="px-5 sm:px-10">
+        <LeaderboardTable
+          initialEntries={initialData.entries}
+          initialTotal={initialData.total}
+        />
+      </div>
+    </div>
   );
 }

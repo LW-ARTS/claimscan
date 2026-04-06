@@ -208,7 +208,7 @@ export default function DocsPage() {
 
           <div className="mt-8 grid gap-5 sm:grid-cols-2">
             {/* Solana */}
-            <div className="rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.08)]">
+            <div className="rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(255,255,255,0.06)]">
               <div className="mb-4 flex items-center justify-between">
                 <span className="rounded-md bg-foreground px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-background">Solana</span>
                 <span className="text-[11px] font-medium text-muted-foreground">6 platforms</span>
@@ -231,7 +231,7 @@ export default function DocsPage() {
             </div>
 
             {/* Base */}
-            <div className="rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.08)]">
+            <div className="rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(255,255,255,0.06)]">
               <div className="mb-4 flex items-center justify-between">
                 <span className="rounded-md bg-foreground px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-background">Base</span>
                 <span className="text-[11px] font-medium text-muted-foreground">3 platforms</span>
@@ -408,7 +408,7 @@ export default function DocsPage() {
                 ['Privacy-first', 'No raw PII stored. Searches anonymized before logging.'],
               ]},
             ].map((group) => (
-              <div key={group.area} className="rounded-xl border border-foreground/[0.06] border-l-2 border-l-foreground/20 p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.06)]">
+              <div key={group.area} className="rounded-xl border border-foreground/[0.06] border-l-2 border-l-foreground/20 p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(255,255,255,0.04)]">
                 <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-foreground/40">
                   {group.area}
                 </span>
@@ -565,7 +565,7 @@ export default function DocsPage() {
 
       {/* ═══ WHITEPAPER ═══ */}
       <LazySection>
-        <section className="mt-16 flex items-center justify-between rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(0,0,0,0.06)]">
+        <section className="mt-16 flex items-center justify-between rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(255,255,255,0.04)]">
           <div>
             <Label>Reference</Label>
             <h3 className="mt-1.5 text-sm font-bold">V1.5 Whitepaper</h3>
@@ -602,7 +602,7 @@ export default function DocsPage() {
               { code: '2203', role: 'Backend' },
               { code: '2204', role: 'Motion' },
             ].map((m) => (
-              <div key={m.code} className="flex flex-col items-center rounded-xl border border-foreground/[0.06] py-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)]">
+              <div key={m.code} className="flex flex-col items-center rounded-xl border border-foreground/[0.06] py-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_-4px_rgba(255,255,255,0.06)]">
                 <span className="font-mono text-[11px] font-bold text-muted-foreground">LW-{m.code}</span>
                 <span className="mt-1 text-xs font-bold">{m.role}</span>
               </div>
