@@ -598,7 +598,7 @@ export function ProfileHero({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Total Unclaimed</p>
-            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tabular-nums text-[var(--text-primary)]">
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tracking-tight text-[var(--text-primary)]">
               <span aria-hidden="true">
                 <CountUpLazy value={displayUnclaimedUsd} variant="usd" />
               </span>
@@ -610,19 +610,19 @@ export function ProfileHero({
           </div>
           <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Total Claimed</p>
-            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tabular-nums text-[var(--text-primary)]">
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tracking-tight text-[var(--text-primary)]">
               <CountUpLazy value={displayClaimedUsd} variant="usd" />
             </p>
           </div>
           <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Largest Single Fee</p>
-            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tabular-nums text-[var(--text-primary)]">
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tracking-tight text-[var(--text-primary)]">
               <CountUpLazy value={largestFeeUsd} variant="usd" />
             </p>
           </div>
           <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Platforms with Fees</p>
-            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tabular-nums text-[var(--text-primary)]">
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tracking-tight text-[var(--text-primary)]">
               {platformCount} of {Object.keys(PLATFORM_CONFIG).length}
             </p>
           </div>

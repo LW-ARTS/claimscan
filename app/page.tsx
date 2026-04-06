@@ -346,7 +346,7 @@ export default async function Home() {
                   )}
                   <span className="text-sm font-semibold text-[var(--text-primary)]">@{entry.handle}</span>
                 </span>
-                <span className="w-32 whitespace-nowrap text-right text-sm font-bold text-[var(--text-primary)]">
+                <span className="w-32 whitespace-nowrap text-right text-sm font-bold tracking-tight text-[var(--text-primary)]">
                   {formatUsd(entry.total_earned_usd)}
                 </span>
                 <span className="hidden w-24 text-center text-sm text-[var(--text-secondary)] sm:block">

@@ -143,7 +143,7 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                     {entry.platform_count} platform{entry.platform_count !== 1 ? 's' : ''} &middot; {entry.token_count} tokens
                   </p>
                 </div>
-                <span className="whitespace-nowrap text-sm font-bold tabular-nums text-[var(--text-primary)]">
+                <span className="whitespace-nowrap text-sm font-bold tracking-tight text-[var(--text-primary)]">
                   {formatUsd(entry.total_earned_usd)}
                 </span>
               </Link>
