@@ -140,7 +140,7 @@ export default async function Home() {
             <span className="text-3xl font-black uppercase tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">Track your</span>
             <MoneyFaceEmoji size={64} className="size-7 sm:size-10 md:size-14 lg:size-[72px] brightness-0 invert" />
           </div>
-          <div className="flex items-center justify-center gap-3 text-3xl font-black uppercase tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl sm:gap-4">
+          <div className="flex items-center justify-center gap-1.5 text-3xl font-black uppercase tracking-tighter sm:gap-4 sm:text-5xl md:text-6xl lg:text-7xl">
             <span>CREATOR</span>
             <span>REVENUE</span>
           </div>
@@ -346,13 +346,13 @@ export default async function Home() {
                   )}
                   <span className="text-sm font-semibold text-[var(--text-primary)]">@{entry.handle}</span>
                 </span>
-                <span className="w-32 text-right text-sm font-bold tabular-nums text-[var(--text-primary)]">
+                <span className="w-32 whitespace-nowrap text-right text-sm font-bold text-[var(--text-primary)]">
                   {formatUsd(entry.total_earned_usd)}
                 </span>
-                <span className="hidden w-24 text-center text-sm tabular-nums text-[var(--text-secondary)] sm:block">
+                <span className="hidden w-24 text-center text-sm text-[var(--text-secondary)] sm:block">
                   {entry.platform_count}
                 </span>
-                <span className="hidden w-20 text-center text-sm tabular-nums text-[var(--text-secondary)] sm:block">
+                <span className="hidden w-20 text-center text-sm text-[var(--text-secondary)] sm:block">
                   {entry.token_count}
                 </span>
               </Link>
