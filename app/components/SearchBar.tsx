@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, startTransition } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Search, Loader2, ArrowRight } from 'lucide-react';
-import { ShimmerButton } from '@/components/ui/shimmer-button';
+
 import { track } from '@vercel/analytics';
 
 export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
@@ -97,10 +97,7 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
   return (
     <form onSubmit={handleSearch} className="relative w-full">
       <div
-        className={`relative flex items-center gap-3 rounded-[14px] border bg-[#0E0E12] shadow-[0_4px_60px_#FFFFFF06] transition-[border-color,box-shadow] duration-200 ease-out ${focused
-          ? 'border-[#FFFFFF30] shadow-[0_0_20px_rgba(255,255,255,0.06)]'
-          : 'border-[var(--border-default)] hover-hover:hover:border-[#FFFFFF30]'
-          } ${isLarge ? 'px-5 py-2' : 'p-1'}`}
+        className={`focus-glow relative flex items-center gap-3 rounded-[14px] border-none bg-[#0E0E12] shadow-[0_0_0_1px_#FFFFFF0C,0_4px_60px_#FFFFFF06] ${isLarge ? 'px-5 py-2' : 'p-1'}`}
       >
         <div className="relative flex-1">
           <Search
@@ -115,7 +112,7 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             name="query"
             autoComplete="off"
             spellCheck={false}
-            placeholder="Search by @handle, wallet, or ENS..."
+            placeholder="@handle, wallet address, or X/GitHub URL"
             aria-label="Search by Twitter handle, GitHub username, or wallet address"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -132,27 +129,25 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             </kbd>
           )}
         </div>
-        <ShimmerButton
+        <button
           type="submit"
           disabled={loading || !canSearch}
           aria-label={loading ? 'Searching...' : 'Scan'}
           aria-busy={loading}
-          className={`flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg font-bold uppercase tracking-wide transition-[transform,opacity] duration-200 ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 ${isLarge
-            ? 'h-[44px] min-w-[90px] px-4 text-sm sm:min-w-[100px] sm:px-6 sm:text-base'
-            : 'h-[44px] min-w-[90px] px-4 text-sm'
+          className={`pressable hover-glow flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-[#2A2A2E] font-semibold uppercase tracking-wider text-white/80 duration-200 ease-out hover:bg-[#3A3A3E] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 ${isLarge
+            ? 'h-[42px] px-5 text-[13px]'
+            : 'h-[38px] px-4 text-[12px]'
             }`}
-          shimmerSize="0.1em"
-          background="var(--foreground)"
         >
           {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin text-background" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <>
-              <span className="text-background whitespace-nowrap z-10">Scan</span>
-              {isLarge && <ArrowRight className="h-4 w-4 text-background z-10" />}
+              <span className="whitespace-nowrap">Scan</span>
+              {isLarge && <ArrowRight className="h-4 w-4" />}
             </>
           )}
-        </ShimmerButton>
+        </button>
       </div>
     </form>
   );

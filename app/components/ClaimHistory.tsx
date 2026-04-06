@@ -66,7 +66,7 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
       <button
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        className="flex w-full cursor-pointer items-center justify-between py-3 text-left group sm:py-1"
+        className="pressable flex w-full cursor-pointer items-center justify-between py-3 text-left group sm:py-1"
       >
         <h3 className="text-sm font-semibold tracking-tight">
           Claim History
@@ -94,7 +94,7 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
           return (
             <div
               key={event.id}
-              className="flex items-center gap-3 rounded-lg border border-border/30 bg-card px-3 py-2.5 text-sm"
+              className="card-hover flex items-center gap-3 rounded-lg border border-border/30 bg-card px-3 py-2.5 text-sm"
             >
               <PlatformIcon platform={event.platform} className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden />
               <div className="min-w-0 flex-1">
@@ -126,7 +126,7 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => track('external_link_clicked', { explorer: getExplorerName(event.chain), chain: event.chain })}
-                    className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] text-muted-foreground/60 transition-colors hover:text-foreground"
+                    className="pressable inline-flex items-center justify-center min-h-[44px] min-w-[44px] text-muted-foreground/60 hover:text-foreground"
                     aria-label={`View on ${getExplorerName(event.chain)}`}
                     title={`View on ${getExplorerName(event.chain)}`}
                   >
@@ -144,7 +144,7 @@ export function ClaimHistory({ events }: ClaimHistoryProps) {
       {events.length > 3 && !expanded && (
         <button
           onClick={() => setExpanded(true)}
-          className="w-full cursor-pointer rounded-lg py-3 text-center text-xs font-medium text-muted-foreground/50 transition-colors hover:bg-muted/40 hover:text-muted-foreground sm:py-1.5"
+          className="pressable w-full cursor-pointer rounded-lg py-3 text-center text-xs font-medium text-muted-foreground/50 hover:bg-muted/40 hover:text-muted-foreground sm:py-1.5"
         >
           Show {events.length - 3} more
         </button>

@@ -205,7 +205,7 @@ export function ClaimDialog({
             </div>
             <button
               onClick={handleClose}
-              className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center border border-border text-foreground transition-colors hover:bg-muted active:scale-95"
+              className="pressable flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center border border-border text-foreground transition-colors hover:bg-muted"
               aria-label="Close"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -336,7 +336,7 @@ export function ClaimDialog({
                 <button
                   onClick={handleClaim}
                   disabled={phase !== 'idle' || hasInsufficientSol || !!bagsWalletMismatch}
-                  className="flex h-12 sm:h-14 w-full cursor-pointer items-center justify-center gap-2 sm:gap-2.5 bg-foreground text-background transition-all duration-200 hover:bg-foreground/90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="pressable hover-glow-primary flex h-12 sm:h-14 w-full cursor-pointer items-center justify-center gap-2 sm:gap-2.5 bg-foreground text-background duration-200 hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <svg className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -368,7 +368,7 @@ export function ClaimDialog({
               </p>
               <button
                 onClick={cancel}
-                className="cursor-pointer border border-border px-5 py-3 text-xs text-muted-foreground/60 transition-colors hover:bg-muted hover:text-muted-foreground"
+                className="pressable hover-glow cursor-pointer border border-border px-5 py-3 text-xs text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground"
               >
                 Cancel
               </button>
@@ -398,7 +398,7 @@ export function ClaimDialog({
 
               <button
                 onClick={cancel}
-                className="mt-2 w-full cursor-pointer border border-border py-3 text-xs text-muted-foreground/60 transition-colors hover:bg-muted hover:text-muted-foreground"
+                className="pressable hover-glow mt-2 w-full cursor-pointer border border-border py-3 text-xs text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground"
               >
                 Cancel Remaining
               </button>
@@ -449,7 +449,7 @@ export function ClaimDialog({
                             rel="noopener noreferrer"
                             aria-label="View transaction on Solscan"
                             onClick={() => track('external_link_clicked', { explorer: 'Solscan', chain: 'sol' })}
-                            className="text-muted-foreground/60 transition-colors hover:text-foreground"
+                            className="pressable text-muted-foreground/60 hover:text-foreground"
                           >
                             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
@@ -464,7 +464,7 @@ export function ClaimDialog({
 
               <button
                 onClick={() => onOpenChange(false)}
-                className="flex h-12 sm:h-14 w-full cursor-pointer items-center justify-center bg-foreground text-xs sm:text-[13px] font-medium tracking-[1.5px] sm:tracking-[2px] text-background transition-all hover:bg-foreground/90 active:scale-[0.98]"
+                className="pressable hover-glow-primary flex h-12 sm:h-14 w-full cursor-pointer items-center justify-center bg-foreground text-xs sm:text-[13px] font-medium tracking-[1.5px] sm:tracking-[2px] text-background hover:bg-foreground/90"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 DONE

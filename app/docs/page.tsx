@@ -1,33 +1,34 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { LazySection } from '../components/LazySection';
+import { DocsSidebar } from '../components/DocsSidebar';
+import { RevealMount } from '../components/anim/RevealMount';
 
 export const metadata: Metadata = {
-  title: 'ClaimScan Docs: Architecture & Roadmap',
+  title: 'API Reference & Guides | ClaimScan',
   description:
-    'ClaimScan documentation. Creator fee tracking across 10 launchpads on Solana, Base, Ethereum, and BNB Chain. V2 paid API via x402 for agents and developers.',
+    'Complete API reference for ClaimScan. Track creator fees across 9 launchpads on Solana, Base, Ethereum, and BNB Chain.',
   openGraph: {
-    title: 'ClaimScan Docs',
+    title: 'API Reference & Guides | ClaimScan',
     description:
-      'Architecture, security, and roadmap for the cross-chain DeFi fee tracker powering 10 launchpads.',
+      'Complete API reference for ClaimScan. Track creator fees across 9 launchpads on Solana, Base, Ethereum, and BNB Chain.',
     images: [
       {
         url: 'https://claimscan.tech/og-docs.png',
         width: 1200,
         height: 630,
-        alt: 'ClaimScan Docs: Architecture & Roadmap',
+        alt: 'ClaimScan API Reference & Guides',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image' as const,
-    title: 'ClaimScan Docs',
+    title: 'API Reference & Guides | ClaimScan',
     description:
-      'Architecture, security, and roadmap for the cross-chain DeFi fee tracker.',
+      'Complete API reference for ClaimScan. Track creator fees across 9 launchpads on Solana, Base, Ethereum, and BNB Chain.',
     images: [
       {
         url: 'https://claimscan.tech/og-docs.png',
-        alt: 'ClaimScan Docs: Architecture & Roadmap',
+        alt: 'ClaimScan API Reference & Guides',
       },
     ],
   },
@@ -35,18 +36,6 @@ export const metadata: Metadata = {
     canonical: 'https://claimscan.tech/docs',
   },
 };
-
-/* ── Helpers ── */
-
-function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/50">
-      {children}
-    </span>
-  );
-}
-
-/* ── Page ── */
 
 export default function DocsPage() {
   const faqData = JSON.stringify({
@@ -61,7 +50,7 @@ export default function DocsPage() {
             name: 'How does ClaimScan work?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Enter a social handle (Twitter, Farcaster, GitHub) or wallet address. ClaimScan resolves it to wallet addresses and scans 9 DeFi launchpads across Solana, Base, and BNB Chain in parallel, showing earned, claimed, and unclaimed fees in real time.',
+              text: 'Paste a social handle or wallet address. ClaimScan resolves it to wallets and scans 9 platforms across Solana, Base, Ethereum, and BNB Chain in parallel, showing earned, claimed, and unclaimed fees in real time.',
             },
           },
           {
@@ -69,7 +58,7 @@ export default function DocsPage() {
             name: 'What platforms does ClaimScan support?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'ClaimScan supports 9 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana, plus Clanker, Zora, and Bankr on Base.',
+              text: 'ClaimScan supports 9 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana, plus Clanker, Zora, and Bankr on Base/ETH/BSC.',
             },
           },
           {
@@ -77,7 +66,7 @@ export default function DocsPage() {
             name: 'Is ClaimScan free?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Yes. ClaimScan is completely free to use. There are no fees for scanning or viewing your creator fee data.',
+              text: 'Yes. Scanning, viewing fee data, and the leaderboard are completely free. No API key needed. V2 paid endpoints for developers and agents use pay-per-query pricing via the x402 protocol.',
             },
           },
           {
@@ -85,7 +74,7 @@ export default function DocsPage() {
             name: 'How do I claim fees?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Connect your wallet on a profile page and click Claim on eligible unclaimed fees. ClaimScan builds the transaction server-side, simulates it, and you sign it in your wallet. Currently live for Bags.fm with Clanker and Zora coming soon.',
+              text: 'Connect your wallet on a profile page and click Claim on eligible unclaimed fees. ClaimScan builds the transaction server-side, simulates it, and you sign in your wallet. Currently live for Bags.fm with others coming soon.',
             },
           },
           {
@@ -93,7 +82,7 @@ export default function DocsPage() {
             name: 'Is ClaimScan safe?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Yes. ClaimScan is fully read-only for scanning. No wallet connection required. For claiming, all transactions are built server-side and simulated before signing. ClaimScan never has access to your private keys.',
+              text: 'Yes. Scanning is fully read-only. Claims are zero-custody. Transactions are built server-side with pre-sign simulation. ClaimScan never has access to your private keys.',
             },
           },
         ],
@@ -136,587 +125,699 @@ export default function DocsPage() {
   });
 
   return (
-    <article className="mx-auto w-full max-w-[720px] px-5 pb-24">
+    <div
+      className="min-h-screen w-full"
+      style={{
+        background: `
+          radial-gradient(ellipse at 85% 55%, #FFFFFF05 0%, transparent 100%),
+          radial-gradient(ellipse at 15% 30%, #FFFFFF07 0%, transparent 100%),
+          radial-gradient(ellipse at 45% 6%, #FFFFFF0C 0%, transparent 60%),
+          linear-gradient(180deg, #16161A 0%, #09090B 100%)
+        `,
+      }}
+    >
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: faqData.replace(/[<>&\u2028\u2029]/g, c => ({ '<': '\\u003c', '>': '\\u003e', '&': '\\u0026', '\u2028': '\\u2028', '\u2029': '\\u2029' })[c]!) }}
       />
 
       {/* ═══ HEADER ═══ */}
-      <LazySection>
-        <header className="pb-16 pt-8 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-foreground/[0.03] px-3.5 py-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-foreground/30" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-foreground/60" />
-            </span>
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-foreground/70">
-              V1.5 &middot; Live
-            </span>
-          </div>
-          <h1 className="mt-6 text-[clamp(2rem,5vw,2.75rem)] font-bold leading-[1.1] tracking-tight">
-            How ClaimScan Works
-          </h1>
-          <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground">
-            Architecture, security model, and roadmap for the cross-chain creator fee tracker.
-          </p>
-          <div className="mx-auto mt-8 h-px w-12 bg-foreground/15" />
-        </header>
-      </LazySection>
+      <header className="mx-auto max-w-[1200px] pt-20 pb-12 px-5 sm:px-12 text-center flex flex-col items-center gap-4">
+        <span className="text-[11px] font-semibold tracking-[2px] text-white uppercase">
+          DOCUMENTATION
+        </span>
+        <h1 className="text-[40px] font-bold text-[var(--text-primary)]">
+          API REFERENCE &amp; GUIDES
+        </h1>
+        <p className="max-w-lg text-base text-[var(--text-secondary)]">
+          Integrate ClaimScan into your app. Scan fees, claim tokens, export data.
+        </p>
+      </header>
 
-      {/* ═══ OVERVIEW ═══ */}
-      <LazySection rootMargin="300px 0px">
-        <section className="glass rounded-2xl p-6 sm:p-8">
-          <Label>Overview</Label>
-          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            One search. 10 launchpads. 4 chains.
-          </h2>
-          <p className="mt-4 text-[15px] leading-[1.75] text-foreground/70">
-            You launched tokens. Platforms collected fees for you. But nobody told you where the money is.
-            ClaimScan scans 10 launchpads across Solana, Base, Ethereum, and BNB Chain in real time, showing what you&apos;ve
-            earned, what you&apos;ve claimed, and what&apos;s still sitting uncollected on-chain.
-          </p>
+      {/* ═══ 2-COLUMN LAYOUT ═══ */}
+      <div className="mx-auto flex w-full max-w-[1200px] px-5 sm:px-12 pb-24">
+        {/* ── Sidebar (client component with scroll spy) ── */}
+        <DocsSidebar />
 
-          <div className="mt-8 grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3">
-            {[
-              { v: '9', l: 'Platforms' },
-              { v: '4', l: 'Chains' },
-              { v: '~40%', l: 'Unclaimed' },
-              { v: '<30s', l: 'Scan' },
-              { v: '$0', l: 'Cost' },
-              { v: '24/7', l: 'Uptime' },
-            ].map((s) => (
-              <div key={s.l} className="flex flex-col items-center rounded-xl bg-foreground py-3.5 text-background transition-transform duration-150 ease-out hover-hover:hover:scale-105 active:scale-[0.97]">
-                <span className="text-xl font-bold tracking-tight">{s.v}</span>
-                <span className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-background/50">{s.l}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      </LazySection>
+        {/* ── Main content ── */}
+        <main className="flex-1 lg:pl-12">
+          <RevealMount />
 
-      {/* ═══ PLATFORMS ═══ */}
-      <LazySection rootMargin="250px 0px">
-        <section className="mt-12">
-          <Label>Supported Platforms</Label>
-          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            9 platforms across Solana, Base, and BNB Chain
-          </h2>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Every major creator fee launchpad across Solana and EVM chains.
-          </p>
+          {/* ═══ INTRODUCTION ═══ */}
+          <section id="introduction" data-reveal className="reveal scroll-mt-24">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">
+              Introduction
+            </h2>
+            <p className="mt-4 text-[15px] leading-[1.75] text-[var(--text-secondary)]">
+              ClaimScan scans 9 launchpads across 4 chains and shows what creators earned, claimed, and left uncollected.
+              Paste a handle or wallet. Get a full fee breakdown in seconds.
+            </p>
 
-          <div className="mt-8 grid gap-5 sm:grid-cols-2">
-            {/* Solana */}
-            <div className="rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(255,255,255,0.06)]">
-              <div className="mb-4 flex items-center justify-between">
-                <span className="rounded-md bg-foreground px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-background">Solana</span>
-                <span className="text-[11px] font-medium text-muted-foreground">6 platforms</span>
-              </div>
-              <div className="space-y-0 divide-y divide-foreground/[0.06]">
-                {[
-                  { name: 'Pump.fun', desc: 'Largest memecoin launchpad' },
-                  { name: 'Bags.fm', desc: 'Social token trading' },
-                  { name: 'Believe', desc: 'Community token launches' },
-                  { name: 'RevShare', desc: 'Revenue sharing' },
-                  { name: 'Coinbarrel', desc: 'Fast token launches' },
-                  { name: 'Raydium', desc: 'DEX LP fee tracking' },
-                ].map((p) => (
-                  <div key={p.name} className="flex items-center justify-between py-2.5">
-                    <span className="text-[13px] font-semibold">{p.name}</span>
-                    <span className="text-[11px] text-muted-foreground">{p.desc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Base */}
-            <div className="rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(255,255,255,0.06)]">
-              <div className="mb-4 flex items-center justify-between">
-                <span className="rounded-md bg-foreground px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-background">Base</span>
-                <span className="text-[11px] font-medium text-muted-foreground">3 platforms</span>
-              </div>
-              <div className="space-y-0 divide-y divide-foreground/[0.06]">
-                {[
-                  { name: 'Clanker', desc: 'Farcaster launcher' },
-                  { name: 'Zora', desc: 'Protocol rewards' },
-                  { name: 'Bankr', desc: 'AI trading fee splits' },
-                ].map((p) => (
-                  <div key={p.name} className="flex items-center justify-between py-2.5">
-                    <span className="text-[13px] font-semibold">{p.name}</span>
-                    <span className="text-[11px] text-muted-foreground">{p.desc}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 rounded-lg bg-foreground/[0.03] px-3 py-2 text-[11px] text-muted-foreground">
-                + ETH L1 (Zora live) · Arbitrum coming in V2
-              </div>
-            </div>
-          </div>
-        </section>
-      </LazySection>
-
-      {/* ═══ HOW IT WORKS ═══ */}
-      <LazySection>
-        <section className="mt-16">
-          <Label>How it works</Label>
-          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            How to check unclaimed crypto fees in 30 seconds
-          </h2>
-
-          <ol className="relative mt-8 ml-3.5 border-l border-foreground/10 pl-0">
-            {[
-              { step: 'Enter a handle', desc: 'Twitter, Farcaster, GitHub username, or raw wallet address.' },
-              { step: 'Identity resolution', desc: 'Social handles mapped to wallet addresses across both chains.' },
-              { step: 'Parallel platform scan', desc: 'All 9 platforms queried simultaneously. Results stream in real time as each completes.' },
-              { step: 'Fee aggregation', desc: 'Earned, claimed, partially claimed, and unclaimed fees pulled per token. Duplicates filtered.' },
-              { step: 'USD conversion', desc: 'Live prices from multiple sources. Continuously refreshed.' },
-              { step: 'Live dashboard', desc: 'Platform breakdown, chain breakdown, token-level details. Auto-refreshes in real time.' },
-            ].map((s, i) => (
-              <li key={i} className="relative mb-8 last:mb-0 pl-7">
-                <span className="absolute -left-3.5 top-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-foreground text-[11px] font-bold tabular-nums text-background">
-                  {i + 1}
-                </span>
-                <div className="pt-0.5">
-                  <h3 className="text-[13px] font-bold">{s.step}</h3>
-                  <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{s.desc}</p>
+            <div className="mt-6 space-y-4">
+              <div className="rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-input)] overflow-hidden">
+                <div className="flex justify-between px-4 py-2.5 bg-[#FFFFFF08]">
+                  <span className="font-mono text-[12px] text-[var(--text-tertiary)]">Base URL</span>
                 </div>
-              </li>
-            ))}
-          </ol>
-
-          <div className="mt-6 rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] px-4 py-3 text-[12px] text-foreground/60">
-            All scanning is read-only. No wallet connection required. No signatures. No transaction risk.
-          </div>
-        </section>
-      </LazySection>
-
-      {/* ═══ CLAIMING ═══ */}
-      <LazySection>
-        <section className="mt-16">
-          <Label>Claim Flow</Label>
-          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            How to claim creator fees on Solana and Base
-          </h2>
-          <p className="mt-4 text-[15px] leading-[1.75] text-foreground/70">
-            Connect your wallet and claim uncollected fees without leaving the app. Fully zero-custody:
-            transactions are built server-side, simulated before signing, and submitted to the chain.
-            We never have access to your private keys.
-          </p>
-
-          <div className="relative mt-8 glass rounded-xl p-5">
-            <div className="absolute left-[29px] top-[30px] bottom-[30px] w-px bg-foreground/10 sm:left-[33px]" />
-            <div className="space-y-4">
-              {[
-                'API fetches your claimable positions from the platform',
-                'Transaction built server-side and simulated on-chain',
-                'You sign in your wallet (Phantom, Solflare, Backpack, etc.)',
-                'Transaction submitted and confirmed in real time',
-              ].map((text, i) => (
-                <div key={i} className="relative flex items-start gap-3.5 text-[13px]">
-                  <span className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background">{i + 1}</span>
-                  <span className="pt-[3px] text-foreground/80">{text}</span>
+                <div className="p-4">
+                  <code className="font-mono text-[13px] text-[var(--text-secondary)]">https://claimscan.tech</code>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {['Bags.fm · Live', 'Clanker · Coming', 'Zora · Coming'].map((s) => (
-              <span
-                key={s}
-                className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition-colors duration-150 ${
-                  s.includes('Live')
-                    ? 'border-foreground/20 bg-foreground text-background'
-                    : 'border-foreground/10 text-muted-foreground hover:border-foreground/20'
-                }`}
-              >
-                {s}
-              </span>
-            ))}
-          </div>
-        </section>
-      </LazySection>
-
-      {/* ═══ ARCHITECTURE ═══ */}
-      <LazySection>
-        <section className="mt-16">
-          <Label>Architecture</Label>
-          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            Tech Stack
-          </h2>
-
-          <div className="mt-6 overflow-hidden rounded-xl border border-foreground/[0.06]">
-            {[
-              ['Frontend', 'React + Tailwind CSS'],
-              ['Blockchain', 'Solana + EVM (Base, ETH, BSC)'],
-              ['Database', 'SQL database with access controls'],
-              ['Price Feeds', 'Multi-source price aggregation'],
-              ['Identity', 'Social identity resolution across platforms'],
-              ['Monitoring', 'Error tracking + analytics'],
-              ['Deployment', 'Serverless infrastructure'],
-              ['Typography', 'Exo 2 (headings) + JetBrains Mono'],
-            ].map(([cat, tech], i) => (
-              <div
-                key={cat}
-                className={`flex items-center gap-4 px-4 py-2.5 ${
-                  i % 2 === 0 ? 'bg-foreground/[0.03]' : ''
-                } ${i > 0 ? 'border-t border-foreground/[0.04]' : ''}`}
-              >
-                <span className="w-24 shrink-0 text-[11px] font-bold uppercase tracking-wider text-foreground/40">
-                  {cat}
-                </span>
-                <span className="font-mono text-[12px] text-foreground/80">{tech}</span>
               </div>
-            ))}
-          </div>
+            </div>
 
-          {/* ── Key decisions ── */}
-          <div className="mt-12 flex items-center gap-3">
-            <h3 className="text-sm font-bold">Key Architecture Decisions</h3>
-            <div className="h-px flex-1 bg-foreground/[0.06]" />
-          </div>
+            <h3 className="mt-8 text-[14px] font-semibold text-[var(--text-primary)]">Supported Chains</h3>
+            <div className="mt-3 overflow-hidden rounded-[10px] border border-[var(--border-default)]">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-[#FFFFFF08]">
+                    <th className="px-4 py-3 text-[12px] font-semibold uppercase tracking-[1px] text-[var(--text-tertiary)]">Chain</th>
+                    <th className="px-4 py-3 text-[12px] font-semibold uppercase tracking-[1px] text-[var(--text-tertiary)]">Chain ID</th>
+                    <th className="px-4 py-3 text-[12px] font-semibold uppercase tracking-[1px] text-[var(--text-tertiary)]">Decimals</th>
+                    <th className="px-4 py-3 text-[12px] font-semibold uppercase tracking-[1px] text-[var(--text-tertiary)]">Platforms</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { chain: 'Solana', id: 'N/A', decimals: '9', platforms: 'Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, Raydium' },
+                    { chain: 'Base', id: '8453', decimals: '18', platforms: 'Clanker, Zora, Bankr' },
+                    { chain: 'Ethereum', id: '1', decimals: '18', platforms: 'Zora' },
+                    { chain: 'BSC', id: '56', decimals: '18', platforms: 'Clanker' },
+                  ].map((row, i) => (
+                    <tr key={row.chain} className={i % 2 === 0 ? 'bg-[var(--bg-input)]' : 'bg-[#FFFFFF04]'}>
+                      <td className="px-4 py-3 font-mono text-[13px] font-semibold text-white">{row.chain}</td>
+                      <td className="px-4 py-3 font-mono text-[13px] text-[var(--text-secondary)]">{row.id}</td>
+                      <td className="px-4 py-3 font-mono text-[13px] text-[var(--text-secondary)]">{row.decimals}</td>
+                      <td className="px-4 py-3 text-[13px] text-[var(--text-secondary)]">{row.platforms}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          <div className="mt-6 space-y-4">
-            {[
-              { area: 'Streaming', items: [
-                ['Real-time updates', 'Platform results delivered as they complete. No waiting for all 9 to finish.'],
-                ['Clean cancellation', 'Navigate away mid-scan and all in-flight requests cancel instantly.'],
-              ]},
-              { area: 'Performance', items: [
-                ['Optimized routing', 'All routes tuned for fast execution with parallel fetching.'],
-                ['Smart timeouts', 'Partial results returned instead of timeouts on slow platforms.'],
-              ]},
-              { area: 'Caching', items: [
-                ['Multi-layer cache', 'Fee data cached across multiple layers. Fresh scans only trigger after expiry.'],
-                ['Background indexing', 'Creator tokens pre-indexed so live scans resolve faster.'],
-              ]},
-              { area: 'Data', items: [
-                ['Dynamic dust filter', 'Low-value positions filtered using live token prices.'],
-                ['Large portfolios', 'Handles creators with hundreds of tokens without result limits.'],
-              ]},
-              { area: 'Claim System', items: [
-                ['Zero-custody flow', 'Server builds unsigned transactions. You sign in your wallet. No private keys leave the browser.'],
-                ['Pre-sign simulation', 'Every transaction simulated before wallet prompt. Catches errors before you sign.'],
-                ['Verified requests', 'All claim requests cryptographically verified end-to-end.'],
-                ['Wallet auto-discovery', 'Detects all Wallet Standard compatible wallets automatically.'],
-                ['Real-time confirmation', 'Transaction status confirmed on-chain. No manual refresh needed.'],
-              ]},
-              { area: 'Infrastructure', items: [
-                ['Rate limiting', 'Multiple layers of abuse prevention across all endpoints.'],
-                ['Signal Lock animation', 'Custom loading UX with radar-style scan sequence. Responsive and reduced-motion friendly.'],
-                ['Privacy-first', 'No raw PII stored. Searches anonymized before logging.'],
-              ]},
-            ].map((group) => (
-              <div key={group.area} className="rounded-xl border border-foreground/[0.06] border-l-2 border-l-foreground/20 p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(255,255,255,0.04)]">
-                <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-foreground/40">
-                  {group.area}
-                </span>
-                <div className="mt-3 space-y-2.5">
-                  {group.items.map(([title, desc]) => (
-                    <div key={title} className="text-[13px] leading-relaxed">
-                      <strong className="font-semibold">{title}</strong>
-                      <span className="text-muted-foreground"> · {desc}</span>
+            <p className="mt-4 text-[13px] leading-[1.75] text-[var(--text-tertiary)]">
+              Token amounts are BigInt strings. Do not convert to <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">Number</code>. Precision loss will corrupt balances.
+            </p>
+          </section>
+
+          {/* ═══ SUPPORTED PLATFORMS ═══ */}
+          <section id="platforms" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">Supported Platforms</h2>
+            <p className="mt-3 text-[15px] text-[var(--text-secondary)]">9 platforms across Solana, Base, and BNB Chain.</p>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-[10px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="rounded-[6px] bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-inverse)]">Solana</span>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">6 platforms</span>
+                </div>
+                <div className="space-y-0 divide-y divide-[var(--border-subtle)]">
+                  {[['Pump.fun','Largest memecoin launchpad'],['Bags.fm','Social token trading'],['Believe','Community token launches'],['RevShare','Revenue sharing'],['Coinbarrel','Fast token launches'],['Raydium','DEX LP fee tracking']].map(([n,d])=>(
+                    <div key={n} className="flex items-center justify-between py-2.5">
+                      <span className="text-[13px] font-semibold text-[var(--text-primary)]">{n}</span>
+                      <span className="text-[11px] text-[var(--text-tertiary)]">{d}</span>
                     </div>
                   ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
-      </LazySection>
+              <div className="rounded-[10px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="rounded-[6px] bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-inverse)]">Base / ETH / BSC</span>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">3 platforms</span>
+                </div>
+                <div className="space-y-0 divide-y divide-[var(--border-subtle)]">
+                  {[['Clanker','Farcaster launcher (Base + BSC)'],['Zora','Protocol rewards (Base + ETH)'],['Bankr','AI trading fee splits (Base)']].map(([n,d])=>(
+                    <div key={n} className="flex items-center justify-between py-2.5">
+                      <span className="text-[13px] font-semibold text-[var(--text-primary)]">{n}</span>
+                      <span className="text-[11px] text-[var(--text-tertiary)]">{d}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
 
-      {/* ═══ SECURITY ═══ */}
-      <LazySection>
-        <section className="mt-16">
-          <div className="rounded-2xl bg-foreground p-6 sm:p-8">
-            <Label><span className="text-background/40">Security &amp; Privacy</span></Label>
-            <h2 className="mt-3 text-xl font-bold tracking-tight text-background sm:text-2xl">
-              Is ClaimScan safe to use?
-            </h2>
-            <p className="mt-4 text-[15px] leading-[1.75] text-background/55">
-              We don&apos;t touch your wallet. We don&apos;t store your data.
-              That&apos;s not a promise. It&apos;s the architecture.
+          {/* ═══ HOW IT WORKS ═══ */}
+          <section id="how-it-works" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">How It Works</h2>
+            <p className="mt-3 text-[15px] text-[var(--text-secondary)]">Scan any creator in under 30 seconds. No wallet connection required.</p>
+            <ol className="mt-6 space-y-4">
+              {[['Enter a handle','Twitter, Farcaster, GitHub username, or raw wallet address.'],['Identity resolution','Social handles resolved to wallet addresses across all supported chains.'],['Parallel platform scan','All 9 platforms queried simultaneously. Results stream in real time.'],['Fee aggregation','Earned, claimed, and unclaimed fees pulled per token. Duplicates filtered.'],['USD conversion','Live prices via DexScreener, Jupiter, and CoinGecko. Auto-refreshed.'],['Live dashboard','Platform breakdown, chain breakdown, token-level details. Auto-refreshes.']].map(([title,desc],i)=>(
+                <li key={i} className="flex gap-4">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-[var(--text-inverse)]">{i+1}</span>
+                  <div>
+                    <h3 className="text-[13px] font-bold text-[var(--text-primary)]">{title}</h3>
+                    <p className="mt-0.5 text-[13px] text-[var(--text-secondary)]">{desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <div className="mt-6 rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-3 text-[12px] text-[var(--text-tertiary)]">
+              All scanning is read-only. No wallet connection required. No signatures. No transaction risk.
+            </div>
+          </section>
+
+          {/* ═══ CLAIM FLOW ═══ */}
+          <section id="claim-flow" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">Claim Flow</h2>
+            <p className="mt-3 text-[15px] text-[var(--text-secondary)]">
+              Claim uncollected fees without leaving ClaimScan. Zero-custody flow: transactions built server-side, simulated before you sign, submitted on-chain. Your private keys never leave your wallet.
             </p>
-
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              {[
-                { t: 'Private searches', d: 'Your search queries are never stored in readable form. Nobody can see who you looked up.' },
-                { t: 'Server-side only', d: 'All sensitive operations run server-side. Nothing secret touches the browser.' },
-                { t: 'Zero-custody claims', d: 'Transactions built server-side, simulated before signing, submitted by your wallet.' },
-                { t: 'Signed requests', d: 'Every claim request is cryptographically verified end-to-end.' },
-                { t: 'Tamper-proof claims', d: 'Claim states are immutable once finalized. No rollbacks, no overwrites.' },
-                { t: 'On-chain verifiable', d: 'Every fee record and claim transaction independently verifiable on-chain.' },
-              ].map((item) => (
-                <div key={item.t} className="rounded-lg border border-background/10 bg-background/[0.05] p-4 transition-colors duration-200 hover:bg-background/[0.08]">
-                  <h3 className="text-[13px] font-bold text-background">{item.t}</h3>
-                  <p className="mt-1.5 text-[12px] leading-relaxed text-background/45">{item.d}</p>
+            <div className="mt-6 rounded-[10px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 space-y-3">
+              {['Claimable positions fetched from the platform','Transaction built and simulated server-side','You sign in your wallet (Phantom, Solflare, Backpack, etc.)','Transaction submitted and confirmed on-chain'].map((text,i)=>(
+                <div key={i} className="flex items-start gap-3 text-[13px]">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-[var(--text-inverse)]">{i+1}</span>
+                  <span className="pt-[3px] text-[var(--text-secondary)]">{text}</span>
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-      </LazySection>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {['Bags.fm · Live','Clanker · Coming','Zora · Coming'].map((s)=>(
+                <span key={s} className={`rounded-[6px] border px-2.5 py-1 text-[11px] font-semibold ${s.includes('Live') ? 'border-[var(--border-accent)] bg-white text-[var(--text-inverse)]' : 'border-[var(--border-subtle)] text-[var(--text-tertiary)]'}`}>{s}</span>
+              ))}
+            </div>
+          </section>
 
-      {/* ═══ ROADMAP ═══ */}
-      <LazySection>
-        <section className="mt-16">
-          <Label>Roadmap</Label>
-          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            What&apos;s shipped &amp; what&apos;s next
-          </h2>
+          {/* ═══ AUTHENTICATION ═══ */}
+          <section id="authentication" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">
+              Authentication
+            </h2>
+            <p className="mt-4 text-[15px] leading-[1.75] text-[var(--text-secondary)]">
+              Free endpoints (search, leaderboard, prices) need no authentication.
+              Cloudflare Turnstile is required for <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">/api/search</code> and <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">/api/resolve</code>.
+            </p>
 
-          <div className="relative mt-8">
-            {/* Timeline spine */}
-            <div className="absolute left-[17px] top-0 bottom-0 w-px bg-foreground/10" />
+            <h3 className="mt-6 text-[14px] font-semibold text-[var(--text-primary)]">Request Signing</h3>
+            <p className="mt-2 text-[14px] leading-[1.75] text-[var(--text-secondary)]">
+              HMAC-SHA256 via <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">X-Request-Sig</code> header. 30-second validity window. Recommended for server-to-server calls.
+            </p>
 
-            <div className="space-y-10">
-              {/* V1 */}
-              <div className="relative pl-12">
-                <div className="absolute left-[9px] top-1 h-[18px] w-[18px] rounded-full border-2 border-background bg-foreground" />
-                <div className="rounded-xl border border-foreground/[0.06] p-5">
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-md bg-foreground px-2.5 py-1 text-[11px] font-bold text-background">V1.5</span>
-                    <span className="text-[11px] font-medium text-muted-foreground">Current &middot; March 2026</span>
-                  </div>
-                  <div className="ml-1 mt-5 columns-1 gap-x-6 space-y-1.5 sm:columns-2">
-                    {[
-                      '9 platform support (Solana + Base + BSC)',
-                      'Multi-identity search (Twitter, GitHub, Farcaster, Wallet)',
-                      'Real-time streaming scan results',
-                      'Signal Lock loading animation',
-                      'Optimized serverless architecture',
-                      'Smart caching with background indexing',
-                      'Large portfolio support (no result limits)',
-                      'Real-time fee polling with live updates',
-                      'Multi-source USD price aggregation',
-                      'Dynamic dust filtering',
-                      'Bags.fm direct claim (zero-custody)',
-                      'Pre-sign transaction simulation',
-                      'Cryptographic claim verification',
-                      'Wallet Standard auto-discovery',
-                      'Real-time claim confirmation',
-                      'Full claim audit trail',
-                      'Rate limiting and abuse prevention',
-                      'Privacy-preserving analytics',
-                    ].map((item) => (
-                      <div key={item} className="flex items-start gap-2.5 break-inside-avoid text-[12px] text-foreground/70">
-                        <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
-                        {item}
-                      </div>
-                    ))}
-                  </div>
+            <h3 className="mt-6 text-[14px] font-semibold text-[var(--text-primary)]">V2 Paid Endpoints</h3>
+            <p className="mt-2 text-[14px] leading-[1.75] text-[var(--text-secondary)]">
+              V2 endpoints use the{' '}
+              <a href="https://x402.org" target="_blank" rel="noopener noreferrer" className="text-link hover:text-[var(--text-primary)]">
+                x402 protocol
+              </a>
+              . Pay per query in USDC on Base. No API keys, no subscriptions.
+            </p>
+
+            <div className="rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-input)] overflow-hidden mt-4">
+              <div className="flex justify-between items-center px-4 py-2 bg-[#FFFFFF08] border-b border-[var(--border-subtle)]">
+                <span className="font-mono text-[12px] text-[var(--text-tertiary)]">bash</span>
+              </div>
+              <div className="p-4 overflow-x-auto">
+                <pre className="font-mono text-[13px] text-[var(--text-secondary)] whitespace-pre">{`# Free endpoint
+curl -X POST https://claimscan.tech/api/search \\
+  -H "Content-Type: application/json" \\
+  -d '{"query": "finnbags"}'
+
+# V2 paid endpoint (x402)
+curl https://claimscan.tech/api/v2/fees?wallet=0x... \\
+  -H "Authorization: Bearer {x402_token}"`}</pre>
+              </div>
+            </div>
+          </section>
+
+          {/* ═══ RATE LIMITS ═══ */}
+          <section id="rate-limits" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">
+              Rate Limits
+            </h2>
+            <p className="mt-4 text-[15px] leading-[1.75] text-[var(--text-secondary)]">
+              All limits are per IP. Exceeding them returns <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">429 Too Many Requests</code>.
+            </p>
+
+            <div className="mt-6 overflow-hidden rounded-[10px] border border-[var(--border-default)]">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-[#FFFFFF08]">
+                    <th className="px-4 py-3 text-[12px] font-semibold uppercase tracking-[1px] text-[var(--text-tertiary)]">Endpoint</th>
+                    <th className="px-4 py-3 text-[12px] font-semibold uppercase tracking-[1px] text-[var(--text-tertiary)]">Limit</th>
+                    <th className="px-4 py-3 text-[12px] font-semibold uppercase tracking-[1px] text-[var(--text-tertiary)]">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { endpoint: '/api/search', limit: '10 req/min', notes: 'Turnstile required' },
+                    { endpoint: '/api/resolve', limit: '10 req/min', notes: 'Turnstile required' },
+                    { endpoint: '/api/fees/live', limit: '5 req/min', notes: 'Onchain reads' },
+                    { endpoint: 'Other /api/*', limit: '30 req/min', notes: 'General' },
+                    { endpoint: 'Handle enum', limit: '20 handles/5min', notes: 'Anti-enumeration' },
+                  ].map((row, i) => (
+                    <tr key={row.endpoint} className={i % 2 === 0 ? 'bg-[var(--bg-input)]' : 'bg-[#FFFFFF04]'}>
+                      <td className="px-4 py-3 font-mono text-[13px] font-semibold text-white">{row.endpoint}</td>
+                      <td className="px-4 py-3 font-mono text-[13px] text-[var(--text-secondary)]">{row.limit}</td>
+                      <td className="px-4 py-3 text-[13px] text-[var(--text-secondary)]">{row.notes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="mt-4 text-[13px] leading-[1.75] text-[var(--text-tertiary)]">
+              Max POST body: 4KB. <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">User-Agent</code> header required on all requests. Known scraper agents are blocked.
+            </p>
+          </section>
+
+          {/* ═══ SEARCH BY HANDLE ═══ */}
+          <section id="search" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">
+              Search by Handle
+            </h2>
+
+            <div className="flex items-center gap-3 mt-6 mb-3">
+              <span className="font-mono text-[12px] font-bold text-white bg-[#FFFFFF14] px-2.5 py-1 rounded-[6px]">POST</span>
+              <code className="font-mono text-[16px] font-semibold text-[var(--text-primary)]">/api/search</code>
+            </div>
+            <p className="text-[15px] leading-[1.75] text-[var(--text-secondary)]">
+              Resolves a social handle (Twitter, GitHub, Farcaster) or wallet address to a creator identity. Returns the creator profile, all linked wallets, and aggregated fee records across all 9 platforms and 4 chains.
+            </p>
+
+            <h3 className="mt-6 text-[14px] font-semibold text-[var(--text-primary)]">Parameters</h3>
+            <div className="mt-3 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[8px] px-4 py-3 mt-2">
+                <div className="flex items-center gap-2 sm:w-40 shrink-0">
+                  <code className="font-mono text-[13px] text-white">query</code>
+                  <span className="text-[11px] bg-[#FBBF2418] text-[var(--warning)] px-2 py-0.5 rounded-[4px]">required</span>
+                </div>
+                <span className="text-[13px] text-[var(--text-secondary)]">Social handle or wallet address. 2-256 characters.</span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[8px] px-4 py-3 mt-2">
+                <div className="flex items-center gap-2 sm:w-40 shrink-0">
+                  <code className="font-mono text-[13px] text-white">cfTurnstileToken</code>
+                  <span className="text-[11px] bg-[#FFFFFF10] text-[var(--text-tertiary)] px-2 py-0.5 rounded-[4px]">optional</span>
+                </div>
+                <span className="text-[13px] text-[var(--text-secondary)]">Cloudflare Turnstile verification token. Required from browsers.</span>
+              </div>
+            </div>
+
+            <h3 className="mt-6 text-[14px] font-semibold text-[var(--text-primary)]">Response</h3>
+            <div className="rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-input)] overflow-hidden mt-4">
+              <div className="flex justify-between items-center px-4 py-2 bg-[#FFFFFF08] border-b border-[var(--border-subtle)]">
+                <span className="font-mono text-[12px] text-[var(--text-tertiary)]">json</span>
+              </div>
+              <div className="p-4 overflow-x-auto">
+                <pre className="font-mono text-[13px] text-[var(--text-secondary)] whitespace-pre">{`{
+  "creator": {
+    "handle": "finnbags",
+    "platform": "twitter",
+    "avatar": "https://pbs.twimg.com/..."
+  },
+  "wallets": [
+    "So1anaWa11etAddress...",
+    "0xEvmWalletAddress..."
+  ],
+  "fees": [
+    {
+      "platform": "bags",
+      "chain": "sol",
+      "token_mint": "TokenMintAddress...",
+      "token_name": "BAGS",
+      "total_earned": "1500000000",
+      "claimed": "500000000",
+      "unclaimed": "1000000000",
+      "usd_value": 142.50
+    }
+  ],
+  "cached": true,
+  "refreshing": false
+}`}</pre>
+              </div>
+            </div>
+          </section>
+
+          {/* ═══ GET FEES V2 ═══ */}
+          <section id="fees" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">
+              Get Fees (V2)
+            </h2>
+
+            <div className="flex items-center gap-3 mt-6 mb-3">
+              <span className="font-mono text-[12px] font-bold text-white bg-[#FFFFFF14] px-2.5 py-1 rounded-[6px]">GET</span>
+              <code className="font-mono text-[16px] font-semibold text-[var(--text-primary)]">/api/v2/fees</code>
+            </div>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-[6px] bg-[#FFFFFF08] px-3 py-1.5">
+              <span className="text-[12px] font-semibold text-[var(--text-tertiary)]">Price:</span>
+              <span className="font-mono text-[13px] font-bold text-white">$0.01/query</span>
+              <span className="text-[11px] text-[var(--text-tertiary)]">via x402</span>
+            </div>
+            <p className="text-[15px] leading-[1.75] text-[var(--text-secondary)]">
+              Returns every fee record for a wallet across all 9 platforms and 4 chains. Each record includes earned, claimed, unclaimed amounts (BigInt) and current USD value.
+            </p>
+
+            <h3 className="mt-6 text-[14px] font-semibold text-[var(--text-primary)]">Parameters</h3>
+            <div className="mt-3 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[8px] px-4 py-3 mt-2">
+                <div className="flex items-center gap-2 sm:w-40 shrink-0">
+                  <code className="font-mono text-[13px] text-white">wallet</code>
+                  <span className="text-[11px] bg-[#FBBF2418] text-[var(--warning)] px-2 py-0.5 rounded-[4px]">required</span>
+                </div>
+                <span className="text-[13px] text-[var(--text-secondary)]">Solana base58 or EVM 0x address</span>
+              </div>
+            </div>
+
+            <h3 className="mt-6 text-[14px] font-semibold text-[var(--text-primary)]">Response</h3>
+            <div className="rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-input)] overflow-hidden mt-4">
+              <div className="flex justify-between items-center px-4 py-2 bg-[#FFFFFF08] border-b border-[var(--border-subtle)]">
+                <span className="font-mono text-[12px] text-[var(--text-tertiary)]">json</span>
+              </div>
+              <div className="p-4 overflow-x-auto">
+                <pre className="font-mono text-[13px] text-[var(--text-secondary)] whitespace-pre">{`{
+  "wallet": "So1anaWa11etAddress...",
+  "fees": [
+    {
+      "platform": "pump",
+      "chain": "sol",
+      "token_mint": "TokenMintAddress...",
+      "token_name": "PUMP",
+      "total_earned": "2500000000",
+      "claimed": "1000000000",
+      "unclaimed": "1500000000",
+      "usd_value": 312.75
+    }
+  ],
+  "summary": {
+    "totalEarnedUsd": 4820.50,
+    "totalUnclaimedUsd": 1930.25,
+    "totalRecords": 24,
+    "platforms": 5,
+    "chains": 2
+  },
+  "paidVia": "x402"
+}`}</pre>
+              </div>
+            </div>
+
+            <div className="rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-input)] overflow-hidden mt-4">
+              <div className="flex justify-between items-center px-4 py-2 bg-[#FFFFFF08] border-b border-[var(--border-subtle)]">
+                <span className="font-mono text-[12px] text-[var(--text-tertiary)]">bash</span>
+              </div>
+              <div className="p-4 overflow-x-auto">
+                <pre className="font-mono text-[13px] text-[var(--text-secondary)] whitespace-pre">{`curl https://claimscan.tech/api/v2/fees?wallet=So1anaWa11etAddress...`}</pre>
+              </div>
+            </div>
+          </section>
+
+          {/* ═══ EXPORT DATA ═══ */}
+          <section id="export" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">
+              Export Data
+            </h2>
+
+            <div className="flex items-center gap-3 mt-6 mb-3">
+              <span className="font-mono text-[12px] font-bold text-white bg-[#FFFFFF14] px-2.5 py-1 rounded-[6px]">GET</span>
+              <code className="font-mono text-[16px] font-semibold text-[var(--text-primary)]">/api/v2/export</code>
+            </div>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-[6px] bg-[#FFFFFF08] px-3 py-1.5">
+              <span className="text-[12px] font-semibold text-[var(--text-tertiary)]">Price:</span>
+              <span className="font-mono text-[13px] font-bold text-white">$0.05/query</span>
+              <span className="text-[11px] text-[var(--text-tertiary)]">via x402</span>
+            </div>
+            <p className="text-[15px] leading-[1.75] text-[var(--text-secondary)]">
+              Download fee data as CSV or JSON. CSV response includes a <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">Content-Disposition</code> header for direct file save. Limit: 1,000 records per request.
+            </p>
+
+            <h3 className="mt-6 text-[14px] font-semibold text-[var(--text-primary)]">Parameters</h3>
+            <div className="mt-3 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[8px] px-4 py-3 mt-2">
+                <div className="flex items-center gap-2 sm:w-40 shrink-0">
+                  <code className="font-mono text-[13px] text-white">wallet</code>
+                  <span className="text-[11px] bg-[#FBBF2418] text-[var(--warning)] px-2 py-0.5 rounded-[4px]">required</span>
+                </div>
+                <span className="text-[13px] text-[var(--text-secondary)]">Solana base58 or EVM 0x address</span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[8px] px-4 py-3 mt-2">
+                <div className="flex items-center gap-2 sm:w-40 shrink-0">
+                  <code className="font-mono text-[13px] text-white">format</code>
+                  <span className="text-[11px] bg-[#FFFFFF10] text-[var(--text-tertiary)] px-2 py-0.5 rounded-[4px]">optional</span>
+                </div>
+                <span className="text-[13px] text-[var(--text-secondary)]"><code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">csv</code> or <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">json</code>. Defaults to <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">csv</code>.</span>
+              </div>
+            </div>
+
+            <div className="rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-input)] overflow-hidden mt-4">
+              <div className="flex justify-between items-center px-4 py-2 bg-[#FFFFFF08] border-b border-[var(--border-subtle)]">
+                <span className="font-mono text-[12px] text-[var(--text-tertiary)]">bash</span>
+              </div>
+              <div className="p-4 overflow-x-auto">
+                <pre className="font-mono text-[13px] text-[var(--text-secondary)] whitespace-pre">{`# Export as CSV (default)
+curl https://claimscan.tech/api/v2/export?wallet=0xEvmAddress... \\
+  -o fees.csv
+
+# Export as JSON
+curl https://claimscan.tech/api/v2/export?wallet=0xEvmAddress...&format=json`}</pre>
+              </div>
+            </div>
+          </section>
+
+          {/* ═══ LEADERBOARD ═══ */}
+          <section id="leaderboard-api" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">
+              Leaderboard
+            </h2>
+
+            <div className="flex items-center gap-3 mt-6 mb-3">
+              <span className="font-mono text-[12px] font-bold text-white bg-[#FFFFFF14] px-2.5 py-1 rounded-[6px]">GET</span>
+              <code className="font-mono text-[16px] font-semibold text-[var(--text-primary)]">/api/leaderboard</code>
+            </div>
+            <p className="text-[15px] leading-[1.75] text-[var(--text-secondary)]">
+              Top creators ranked by total fees earned (USD). Free endpoint, no auth. Filter by platform or chain. Paginated, max 100 results per page.
+            </p>
+
+            <h3 className="mt-6 text-[14px] font-semibold text-[var(--text-primary)]">Parameters</h3>
+            <div className="mt-3 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[8px] px-4 py-3 mt-2">
+                <div className="flex items-center gap-2 sm:w-40 shrink-0">
+                  <code className="font-mono text-[13px] text-white">limit</code>
+                  <span className="text-[11px] bg-[#FFFFFF10] text-[var(--text-tertiary)] px-2 py-0.5 rounded-[4px]">optional</span>
+                </div>
+                <span className="text-[13px] text-[var(--text-secondary)]">Results per page. Default 50, max 100.</span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[8px] px-4 py-3 mt-2">
+                <div className="flex items-center gap-2 sm:w-40 shrink-0">
+                  <code className="font-mono text-[13px] text-white">offset</code>
+                  <span className="text-[11px] bg-[#FFFFFF10] text-[var(--text-tertiary)] px-2 py-0.5 rounded-[4px]">optional</span>
+                </div>
+                <span className="text-[13px] text-[var(--text-secondary)]">Number of results to skip for pagination. Default 0.</span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[8px] px-4 py-3 mt-2">
+                <div className="flex items-center gap-2 sm:w-40 shrink-0">
+                  <code className="font-mono text-[13px] text-white">platform</code>
+                  <span className="text-[11px] bg-[#FFFFFF10] text-[var(--text-tertiary)] px-2 py-0.5 rounded-[4px]">optional</span>
+                </div>
+                <span className="text-[13px] text-[var(--text-secondary)]">Filter by platform (e.g. <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">bags</code>, <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">pump</code>, <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">clanker</code>)</span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-[8px] px-4 py-3 mt-2">
+                <div className="flex items-center gap-2 sm:w-40 shrink-0">
+                  <code className="font-mono text-[13px] text-white">chain</code>
+                  <span className="text-[11px] bg-[#FFFFFF10] text-[var(--text-tertiary)] px-2 py-0.5 rounded-[4px]">optional</span>
+                </div>
+                <span className="text-[13px] text-[var(--text-secondary)]">Filter by chain (<code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">sol</code>, <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">base</code>, <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">eth</code>, <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">bsc</code>)</span>
+              </div>
+            </div>
+
+            <div className="rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-input)] overflow-hidden mt-4">
+              <div className="flex justify-between items-center px-4 py-2 bg-[#FFFFFF08] border-b border-[var(--border-subtle)]">
+                <span className="font-mono text-[12px] text-[var(--text-tertiary)]">bash</span>
+              </div>
+              <div className="p-4 overflow-x-auto">
+                <pre className="font-mono text-[13px] text-[var(--text-secondary)] whitespace-pre">{`curl "https://claimscan.tech/api/leaderboard?limit=50&offset=0&platform=bags&chain=sol"`}</pre>
+              </div>
+            </div>
+
+            <h3 className="mt-6 text-[14px] font-semibold text-[var(--text-primary)]">Response</h3>
+            <div className="rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-input)] overflow-hidden mt-4">
+              <div className="flex justify-between items-center px-4 py-2 bg-[#FFFFFF08] border-b border-[var(--border-subtle)]">
+                <span className="font-mono text-[12px] text-[var(--text-tertiary)]">json</span>
+              </div>
+              <div className="p-4 overflow-x-auto">
+                <pre className="font-mono text-[13px] text-[var(--text-secondary)] whitespace-pre">{`{
+  "creators": [
+    {
+      "handle": "finnbags",
+      "total_earned_usd": 52340.12,
+      "unclaimed_usd": 12500.00,
+      "platforms": 5,
+      "tokens": 38
+    }
+  ],
+  "total": 1240,
+  "limit": 50,
+  "offset": 0
+}`}</pre>
+              </div>
+            </div>
+          </section>
+
+          {/* ═══ SECURITY & PRIVACY ═══ */}
+          <section id="security" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">Security &amp; Privacy</h2>
+            <p className="mt-3 text-[15px] text-[var(--text-secondary)]">
+              ClaimScan never touches your wallet or stores your data. That&apos;s the architecture, not a promise.
+            </p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {[{t:'Private searches',d:'Search queries are never stored in readable form.'},{t:'Server-side only',d:'All sensitive operations run server-side. No secrets reach the browser.'},{t:'Zero-custody claims',d:'Transactions built and simulated server-side. You sign and submit from your wallet.'},{t:'Signed requests',d:'Every claim request is cryptographically verified end-to-end.'},{t:'Tamper-proof claims',d:'Claim states are immutable once finalized. Cannot be rolled back.'},{t:'On-chain verifiable',d:'Every fee record and claim transaction is independently verifiable on-chain.'}].map((item)=>(
+                <div key={item.t} className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
+                  <h3 className="text-[13px] font-bold text-[var(--text-primary)]">{item.t}</h3>
+                  <p className="mt-1.5 text-[12px] text-[var(--text-tertiary)]">{item.d}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ═══ ARCHITECTURE ═══ */}
+          <section id="architecture" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">Architecture</h2>
+            <div className="mt-6 rounded-[10px] border border-[var(--border-subtle)] overflow-hidden">
+              {[['Frontend','Next.js, React, Tailwind CSS'],['Blockchain','Solana + EVM (Base, Ethereum, BSC)'],['Database','Supabase (PostgreSQL + RLS)'],['Cache','Upstash Redis + in-memory fallback'],['Price Feeds','DexScreener, Jupiter, CoinGecko'],['Identity','Twitter, GitHub, Farcaster, OWS wallet resolution'],['Payments','x402 protocol (USDC on Base)'],['Security','Sentry, Cloudflare Turnstile, request signing'],['Deployment','Vercel (serverless)']].map(([cat,tech],i)=>(
+                <div key={cat} className={`flex items-center gap-4 px-4 py-2.5 ${i%2===0?'bg-[#FFFFFF04]':''} ${i>0?'border-t border-[var(--border-subtle)]':''}`}>
+                  <span className="w-28 shrink-0 text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">{cat}</span>
+                  <span className="font-mono text-[12px] text-[var(--text-secondary)]">{tech}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ═══ FAQ ═══ */}
+          <section id="faq" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">
+              Frequently Asked Questions
+            </h2>
+
+            <div className="mt-6 space-y-6">
+              {[
+                {
+                  q: 'How does ClaimScan work?',
+                  a: 'Paste a social handle or wallet address. ClaimScan resolves it to wallets and scans 9 platforms across Solana, Base, Ethereum, and BNB Chain in parallel, showing earned, claimed, and unclaimed fees in real time.',
+                },
+                {
+                  q: 'What platforms are supported?',
+                  a: '9 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana, plus Clanker, Zora, and Bankr on Base/ETH/BSC.',
+                },
+                {
+                  q: 'Is ClaimScan free?',
+                  a: 'Yes. Scanning, viewing fee data, and the leaderboard are completely free. No API key needed. V2 paid endpoints for developers and agents use pay-per-query pricing via the x402 protocol.',
+                },
+                {
+                  q: 'How do I claim fees?',
+                  a: 'Connect your wallet on a profile page and click Claim on eligible unclaimed fees. ClaimScan builds the transaction server-side, simulates it, and you sign in your wallet. Currently live for Bags.fm with others coming soon.',
+                },
+                {
+                  q: 'Is ClaimScan safe?',
+                  a: 'Yes. Scanning is fully read-only. Claims are zero-custody. Transactions are built server-side with pre-sign simulation. ClaimScan never has access to your private keys.',
+                },
+              ].map((item) => (
+                <div key={item.q}>
+                  <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">{item.q}</h3>
+                  <p className="mt-2 text-[14px] leading-[1.75] text-[var(--text-secondary)]">{item.a}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ═══ PRICING ═══ */}
+          <section id="pricing" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">
+              API Pricing
+            </h2>
+            <p className="mt-4 text-[15px] leading-[1.75] text-[var(--text-secondary)]">
+              Free for scanning. Pay-per-query for programmatic access via x402.
+            </p>
+
+            <div className="mt-8 grid gap-5 sm:grid-cols-3">
+              {/* Free tier */}
+              <div className="rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6">
+                <span className="text-[11px] font-semibold uppercase tracking-[1.5px] text-[var(--text-tertiary)]">Free</span>
+                <div className="mt-2 text-[28px] font-bold text-[var(--text-primary)]">$0</div>
+                <p className="mt-3 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+                  Scanning, leaderboard, and price feeds. No auth required.
+                </p>
+                <div className="mt-5 space-y-2">
+                  {['Fee scanning', 'Leaderboard access', 'Price feeds', 'No auth needed'].map((f) => (
+                    <div key={f} className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-tertiary)]" />
+                      {f}
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* V2 */}
-              <div className="relative pl-12">
-                <div className="absolute left-[9px] top-1 h-[18px] w-[18px] rounded-full border-2 border-foreground/20 bg-background" />
-                <div className="rounded-xl border border-dashed border-foreground/10 p-5">
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-md border border-foreground/20 px-2.5 py-1 text-[11px] font-bold">V2</span>
-                    <span className="text-[11px] font-medium text-muted-foreground">Coming Soon</span>
-                  </div>
-                  <div className="ml-1 mt-5 space-y-1.5">
-                    {[
-                      'Token Fee Scanner (paste any contract address)',
-                      'Fee recipient discovery (who gets paid)',
-                      'Earnings breakdown (earned, claimed, unclaimed in USD)',
-                      'Tri-state claim status (claimed, partial, unclaimed)',
-                      'One-click claim expansion (Bags.fm live, Clanker & Zora next)',
-                      'Additional chain support (full Ethereum L1, Arbitrum)',
-                    ].map((item) => (
-                      <div key={item} className="flex items-start gap-2.5 text-[12px] text-muted-foreground">
-                        <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/15" />
-                        {item}
-                      </div>
-                    ))}
-                  </div>
+              {/* Pay-per-query */}
+              <div className="rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6">
+                <span className="text-[11px] font-semibold uppercase tracking-[1.5px] text-[var(--text-tertiary)]">Pay-per-query</span>
+                <div className="mt-2 text-[28px] font-bold text-[var(--text-primary)]">x402</div>
+                <p className="mt-3 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+                  V2 endpoints. USDC on Base. No API keys or subscriptions.
+                </p>
+                <div className="mt-5 space-y-2">
+                  {[
+                    '/v2/fees: $0.01/query',
+                    '/v2/export: $0.05/query',
+                    '/v2/intelligence: $0.02/query',
+                    'USDC on Base',
+                  ].map((f) => (
+                    <div key={f} className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-tertiary)]" />
+                      {f}
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* V3 */}
-              <div className="relative pl-12">
-                <div className="absolute left-[9px] top-1 h-[18px] w-[18px] rounded-full border-2 border-foreground/10 bg-background" />
-                <div className="rounded-xl border border-dashed border-foreground/[0.06] p-5">
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-md border border-foreground/10 px-2.5 py-1 text-[11px] font-bold text-muted-foreground">V3</span>
-                    <span className="text-[11px] text-foreground/25">2026+</span>
-                  </div>
-                  <div className="ml-1 mt-5 space-y-1.5">
-                    {[
-                      'Automated claim scheduling',
-                      'Creator analytics & insights dashboard',
-                      'Portfolio dashboard for multi-creator agencies',
-                      'SDK for platform integrations',
-                    ].map((item) => (
-                      <div key={item} className="flex items-start gap-2.5 text-[12px] text-foreground/30">
-                        <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/10" />
-                        {item}
-                      </div>
-                    ))}
-                  </div>
+              {/* Enterprise */}
+              <div className="rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6">
+                <span className="text-[11px] font-semibold uppercase tracking-[1.5px] text-[var(--text-tertiary)]">Enterprise</span>
+                <div className="mt-2 text-[28px] font-bold text-[var(--text-primary)]">Custom</div>
+                <p className="mt-3 text-[13px] text-[var(--text-secondary)] leading-relaxed">
+                  Custom rate limits, volume pricing, and dedicated support.
+                </p>
+                <div className="mt-5 space-y-2">
+                  {['Custom rate limits', 'Volume discounts', 'Dedicated support', 'Contact @lwarts on Telegram'].map((f) => (
+                    <div key={f} className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-tertiary)]" />
+                      {f}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
-          </div>
-        </section>
-      </LazySection>
+          </section>
 
-      {/* ═══ WHITEPAPER ═══ */}
-      <LazySection>
-        <section className="mt-16 flex items-center justify-between rounded-xl border border-foreground/[0.06] p-5 transition-shadow duration-200 hover:shadow-[0_2px_20px_-6px_rgba(255,255,255,0.04)]">
-          <div>
-            <Label>Reference</Label>
-            <h3 className="mt-1.5 text-sm font-bold">V1.5 Whitepaper</h3>
-          </div>
-          <a
-            href="/ClaimScan-Whitepaper-V1.pdf"
-            download
-            className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-xs font-bold text-background transition-opacity hover:opacity-80"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-            </svg>
-            Download PDF
-          </a>
-        </section>
-      </LazySection>
-
-      {/* ═══ TEAM ═══ */}
-      <LazySection>
-        <section className="mt-16">
-          <Label>Team</Label>
-          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            Built by LW
-          </h2>
-          <p className="mt-4 text-[15px] leading-[1.75] text-foreground/70">
-            4-person Web3 studio. 408+ projects shipped. $1.6B+ market cap generated.
-            Every build handled by the same team you talk to on Telegram.
-          </p>
-
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              { code: '2201', role: 'Brand' },
-              { code: '2202', role: 'Frontend' },
-              { code: '2203', role: 'Backend' },
-              { code: '2204', role: 'Motion' },
-            ].map((m) => (
-              <div key={m.code} className="flex flex-col items-center rounded-xl border border-foreground/[0.06] py-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_-4px_rgba(255,255,255,0.06)]">
-                <span className="font-mono text-[11px] font-bold text-muted-foreground">LW-{m.code}</span>
-                <span className="mt-1 text-xs font-bold">{m.role}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 flex items-center justify-center gap-8">
-            {[
-              { label: 'X', href: 'https://x.com/lwartss', text: '@lwartss' },
-              { label: 'Telegram', href: 'https://t.me/lwarts', text: 't.me/lwarts' },
-              { label: 'Website', href: 'https://lwdesigns.art', text: 'lwdesigns.art' },
-            ].map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center transition-opacity hover:opacity-70"
-              >
-                <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{link.label}</span>
-                <span className="mt-0.5 text-xs font-bold">{link.text}</span>
-              </a>
-            ))}
-          </div>
-        </section>
-      </LazySection>
-
-      {/* ═══ API V2 PAID ENDPOINTS ═══ */}
-      <LazySection rootMargin="300px 0px">
-        <section className="glass mt-16 rounded-2xl p-6 sm:p-8">
-          <Label>API V2: Paid Endpoints</Label>
-          <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
-            Pay-per-query via x402
-          </h2>
-          <p className="mt-4 text-[15px] leading-[1.75] text-foreground/70">
-            ClaimScan V2 API endpoints are protected by the{' '}
-            <a href="https://x402.org" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
-              x402 protocol
-            </a>
-            . Pay in USDC per query. No API keys, no subscriptions. Compatible with{' '}
-            <a href="https://openwallet.sh" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
-              OWS
-            </a>
-            {' '}wallets and AI agents.
-          </p>
-
-          <div className="mt-6 space-y-4">
-            {[
-              {
-                method: 'GET',
-                path: '/api/v2/fees?wallet=<address>',
-                price: '$0.01',
-                desc: 'Fee report across all platforms and chains',
-              },
-              {
-                method: 'GET',
-                path: '/api/v2/export?wallet=<address>',
-                price: '$0.05',
-                desc: 'CSV/JSON export of all fees',
-              },
-              {
-                method: 'GET',
-                path: '/api/v2/intelligence?wallet=<address>',
-                price: '$0.02',
-                desc: 'Intelligence report with fees + Allium enrichment',
-              },
-              {
-                method: 'GET',
-                path: '/api/v2/resolve?ows_wallet=<name>',
-                price: 'Free',
-                desc: 'Resolve OWS wallet to multi-chain addresses',
-              },
-            ].map((ep) => (
-              <div key={ep.path} className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-                <div className="flex items-center gap-2">
-                  <span className="rounded bg-foreground/10 px-1.5 py-0.5 font-mono text-[11px] font-bold">{ep.method}</span>
-                  <code className="text-[13px] text-foreground/80">{ep.path}</code>
-                  <span className="ml-auto text-[12px] font-bold text-foreground/50">{ep.price}</span>
+          {/* ═══ ROADMAP ═══ */}
+          <section id="roadmap" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
+            <h2 className="text-[24px] font-bold text-[var(--text-primary)]">Roadmap</h2>
+            <div className="mt-6 space-y-6">
+              <div className="rounded-[10px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="rounded-[6px] bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--text-inverse)]">V1.5</span>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">Current · Live</span>
                 </div>
-                <p className="mt-1.5 text-[13px] text-foreground/50">{ep.desc}</p>
+                <div className="columns-1 sm:columns-2 gap-x-6 space-y-1.5">
+                  {['9 platform support (Solana + Base + BSC)','Multi-identity search (Twitter, GitHub, Farcaster, Wallet)','Real-time streaming scan results','Bags.fm direct claim (zero-custody)','Pre-sign transaction simulation','Smart caching with background indexing','Multi-source USD price aggregation','V2 paid API via x402 protocol','Rate limiting and abuse prevention','Privacy-preserving analytics'].map((item)=>(
+                    <div key={item} className="flex items-start gap-2 break-inside-avoid text-[12px] text-[var(--text-secondary)]">
+                      <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
+                      {item}
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
+              <div className="rounded-[10px] border border-dashed border-[var(--border-subtle)] p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="rounded-[6px] border border-[var(--border-subtle)] px-2.5 py-1 text-[11px] font-bold text-[var(--text-secondary)]">V2</span>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">Coming Soon</span>
+                </div>
+                <div className="space-y-1.5">
+                  {['Token Fee Scanner (paste any contract address)','Fee recipient discovery','One-click claim expansion (Clanker & Zora)','Additional chain support (Arbitrum)','SDK for platform integrations'].map((item)=>(
+                    <div key={item} className="flex items-start gap-2 text-[12px] text-[var(--text-tertiary)]">
+                      <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-tertiary)]" />
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
 
-          <div className="mt-6 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-            <p className="text-[13px] font-bold text-foreground/70">Agent access via OWS CLI</p>
-            <code className="mt-2 block whitespace-pre-wrap text-[12px] text-foreground/50">
-              ows pay request &quot;https://claimscan.tech/api/v2/fees?wallet=0x...&quot; --wallet my-agent
-            </code>
-          </div>
-
-          <p className="mt-4 text-[13px] text-foreground/40">
-            Data sources: ClaimScan (9 launchpads) + Allium (cross-chain transactions &amp; PnL). Settlement on Base via USDC.
-          </p>
-        </section>
-      </LazySection>
-
-      {/* ═══ CTA ═══ */}
-      <LazySection>
-        <section className="mt-20 rounded-2xl bg-foreground py-14 text-center">
-          <h2 className="text-xl font-bold tracking-tight text-background sm:text-2xl">
-            Ready to find your money?
-          </h2>
-          <p className="mx-auto mt-3 max-w-sm text-sm text-background/50">
-            Enter your handle. See what you&apos;re owed. 30 seconds. Free forever.
-          </p>
-          <Link
-            href="/"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-background px-6 py-3 text-sm font-bold text-foreground transition-all duration-200 hover:opacity-90 hover:shadow-[0_4px_20px_-4px_rgba(255,255,255,0.15)]"
-          >
-            Scan Now <span aria-hidden="true">&rarr;</span>
-          </Link>
-        </section>
-      </LazySection>
-    </article>
+        </main>
+      </div>
+    </div>
   );
 }

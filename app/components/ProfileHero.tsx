@@ -7,6 +7,7 @@ import { PlatformIcon } from './PlatformIcon';
 import { PLATFORM_CONFIG, CHAIN_CONFIG, LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
 import { safeBigInt, formatUsd, toUsdValue, copyToClipboard, computeFeeUsd } from '@/lib/utils';
 import { signedFetch } from '@/lib/signed-fetch';
+import { CountUpLazy } from './anim/CountUpLazy';
 import type { Database, Chain, Platform } from '@/lib/supabase/types';
 
 type Creator = Database['public']['Tables']['creators']['Row'];
@@ -104,7 +105,7 @@ function WalletPill({ address, chain }: { address: string; chain: string }) {
     <button
       onClick={handleCopy}
       title={copied ? 'Copied!' : `Copy ${address}`}
-      className="cursor-pointer rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1.5 flex items-center gap-2 shrink-0 text-[11px] transition-colors hover:bg-[var(--bg-surface-hover)] active:scale-[0.97]"
+      className="pressable hover-glow cursor-pointer rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1.5 flex items-center gap-2 shrink-0 text-[11px] hover:bg-[var(--bg-surface-hover)]"
     >
       <span className={`h-2 w-2 rounded-full ${copied ? 'bg-[var(--success)]' : 'bg-[var(--text-secondary)]'}`} aria-hidden="true" />
       <span className="font-mono text-[var(--text-secondary)]">
@@ -137,7 +138,7 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
   }, [wallet.address]);
 
   return (
-    <div className="group flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50">
+    <div className="row-hover group flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 hover:bg-muted/50">
       <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${meta.bg} ${meta.color}`}>
         {wallet.chain}
       </span>
@@ -150,7 +151,7 @@ function WalletRow({ wallet }: { wallet: Wallet }) {
         onClick={handleCopy}
         aria-label={copyState === 'copied' ? 'Copied!' : copyState === 'failed' ? 'Copy failed' : 'Copy address'}
         title={copyState === 'copied' ? 'Copied!' : copyState === 'failed' ? 'Failed to copy' : 'Copy address'}
-        className={`inline-flex shrink-0 items-center justify-center rounded-md p-3 -m-2 transition-all ${
+        className={`pressable inline-flex shrink-0 items-center justify-center rounded-md p-3 -m-2 ${
           copyState === 'copied'
             ? 'text-emerald-400'
             : copyState === 'failed'
@@ -503,12 +504,12 @@ export function ProfileHero({
                   width={64}
                   height={64}
                   priority
-                  className="h-12 w-12 rounded-full object-cover sm:h-16 sm:w-16"
+                  className="hover-ring h-12 w-12 rounded-full object-cover sm:h-16 sm:w-16"
                   onError={() => setAvatarError(true)}
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--text-primary)] text-lg font-black text-[var(--text-inverse)] sm:h-16 sm:w-16 sm:text-xl">
+                <div className="hover-ring flex h-12 w-12 items-center justify-center rounded-full bg-[var(--text-primary)] text-lg font-black text-[var(--text-inverse)] sm:h-16 sm:w-16 sm:text-xl">
                   {displayName[0]?.toUpperCase()}
                 </div>
               )}
@@ -519,14 +520,14 @@ export function ProfileHero({
                 {displayName}
               </h1>
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex items-center gap-1.5 rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--text-secondary)]">
+                <span className="hover-glow inline-flex items-center gap-1.5 rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--text-secondary)]">
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 9m18 0V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3" />
                   </svg>
                   {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
                 </span>
                 {(solWallets > 0 || evmWallets > 0) && (
-                  <span className="inline-flex items-center gap-1.5 rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--text-secondary)]">
+                  <span className="hover-glow inline-flex items-center gap-1.5 rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--text-secondary)]">
                     {evmWallets > 0 && <>{evmWallets} EVM</>}
                     {evmWallets > 0 && solWallets > 0 && <> &middot; </>}
                     {solWallets > 0 && <>{solWallets} SOL</>}
@@ -541,7 +542,7 @@ export function ProfileHero({
             <button
               onClick={handleSaveImage}
               disabled={saving}
-              className="rounded-[8px] bg-white text-[var(--text-inverse)] px-[18px] py-[10px] text-[13px] font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 active:scale-[0.97] disabled:opacity-60"
+              className="pressable hover-glow-primary rounded-[8px] bg-white text-[var(--text-inverse)] px-[18px] py-[10px] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-60"
             >
               {saved ? (
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
@@ -552,7 +553,7 @@ export function ProfileHero({
             </button>
             <button
               onClick={handleCopyLink}
-              className="rounded-[8px] border border-[var(--border-accent)] text-[var(--text-primary)] px-[18px] py-[10px] text-[13px] font-medium flex items-center gap-2 transition-colors hover:bg-[var(--bg-surface-hover)] active:scale-[0.97]"
+              className="pressable hover-glow rounded-[8px] border border-[var(--border-accent)] text-[var(--text-primary)] px-[18px] py-[10px] text-[13px] font-medium flex items-center gap-2 hover:bg-[var(--bg-surface-hover)]"
             >
               {linkCopied ? (
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
@@ -566,7 +567,7 @@ export function ProfileHero({
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => track('share_x_clicked', { handle })}
-              className="rounded-[8px] border border-[var(--border-accent)] text-[var(--text-primary)] px-[18px] py-[10px] text-[13px] font-medium flex items-center gap-2 transition-colors hover:bg-[var(--bg-surface-hover)] active:scale-[0.97]"
+              className="pressable hover-glow rounded-[8px] border border-[var(--border-accent)] text-[var(--text-primary)] px-[18px] py-[10px] text-[13px] font-medium flex items-center gap-2 hover:bg-[var(--bg-surface-hover)]"
             >
               <XIcon className="h-4 w-4" />
               Share on X
@@ -584,7 +585,7 @@ export function ProfileHero({
           {remainingWallets > 0 && (
             <button
               onClick={() => setShowAllWallets(true)}
-              className="cursor-pointer rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1.5 shrink-0 text-[11px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)]"
+              className="pressable hover-glow cursor-pointer rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1.5 shrink-0 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
             >
               +{remainingWallets} more
             </button>
@@ -595,26 +596,31 @@ export function ProfileHero({
       {/* Section 3 — Aggregate Stats */}
       <div className="px-5 py-6 sm:px-12 sm:py-8">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className="rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
+          <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Total Unclaimed</p>
-            <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]" aria-live="polite" aria-atomic="true">
-              {formatUsd(displayUnclaimedUsd)}
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]">
+              <span aria-hidden="true">
+                <CountUpLazy value={displayUnclaimedUsd} variant="usd" />
+              </span>
               {loading && <PulsingDot className="ml-1.5 inline-flex h-1.5 w-1.5 text-[var(--text-primary)]" />}
+              <span className="sr-only" aria-live="polite" aria-atomic="true">
+                Total unclaimed: {formatUsd(displayUnclaimedUsd)}
+              </span>
             </p>
           </div>
-          <div className="rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
+          <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Total Claimed</p>
             <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]">
-              {formatUsd(displayClaimedUsd)}
+              <CountUpLazy value={displayClaimedUsd} variant="usd" />
             </p>
           </div>
-          <div className="rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
+          <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Largest Single Fee</p>
             <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]">
-              {formatUsd(largestFeeUsd)}
+              <CountUpLazy value={largestFeeUsd} variant="usd" />
             </p>
           </div>
-          <div className="rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
+          <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Platforms with Fees</p>
             <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]">
               {platformCount} of {Object.keys(PLATFORM_CONFIG).length}

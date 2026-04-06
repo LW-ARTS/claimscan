@@ -255,9 +255,13 @@ const PERMISSIONS_POLICY = [
  * 'self' and URL allowlists are kept for CSP2 browser fallback.
  */
 function buildCspHeader(nonce: string): string {
+  // React dev mode needs 'unsafe-eval' for hot reload and error reconstruction.
+  // Never emit this in production.
+  const isDev = process.env.NODE_ENV === 'development';
+  const devEval = isDev ? " 'unsafe-eval'" : '';
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval' https://challenges.cloudflare.com`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${devEval} https://challenges.cloudflare.com`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://pbs.twimg.com https://abs.twimg.com https://avatars.githubusercontent.com https://imagedelivery.net https://ipfs.io https://unavatar.io",
     "font-src 'self' https://fonts.gstatic.com",

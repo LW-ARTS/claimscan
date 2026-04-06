@@ -26,13 +26,13 @@ export default function RootError({
         <div className="mt-6 flex gap-4">
           <button
             onClick={reset}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-5 py-3 text-sm font-bold uppercase tracking-wide text-background transition-all hover:bg-foreground/90"
+            className="pressable hover-glow-primary inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-5 py-3 text-sm font-bold uppercase tracking-wide text-background hover:bg-foreground/90"
           >
             Try again
           </button>
           <Link
             href="/"
-            className="inline-flex items-center rounded-lg px-5 py-2.5 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors"
+            className="pressable inline-flex items-center rounded-lg px-5 py-2.5 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors"
           >
             Go home
           </Link>

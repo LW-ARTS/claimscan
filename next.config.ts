@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     viewTransition: true,
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: ['lucide-react', 'motion'],
   },
   serverExternalPackages: ['@solana/web3.js', 'viem', '@meteora-ag/dynamic-bonding-curve-sdk'],
   images: {

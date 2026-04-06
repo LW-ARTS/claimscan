@@ -47,7 +47,7 @@ export function MobileNav() {
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label={open ? 'Close menu' : 'Open menu'}
-        className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+        className="pressable flex h-9 w-9 items-center justify-center rounded-md text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
       >
         {open ? (
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -71,9 +71,9 @@ export function MobileNav() {
             <Link
               key={link.href}
               href={link.href}
-              className={`rounded-lg px-3 py-3 text-[15px] font-medium transition-colors ${
+              className={`nav-item rounded-lg px-3 py-3 text-[15px] font-medium ${
                 pathname === link.href
-                  ? 'bg-[var(--bg-surface)] text-[var(--text-primary)]'
+                  ? 'is-active bg-[var(--bg-surface)] text-[var(--text-primary)]'
                   : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]'
               }`}
             >
