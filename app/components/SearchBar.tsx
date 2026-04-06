@@ -10,10 +10,20 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Use a shorter placeholder on narrow screens so it doesn't get truncated mid-word
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    const update = () => setIsNarrow(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   // Clear loading when the route actually changes
   useEffect(() => {
@@ -112,7 +122,7 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             name="query"
             autoComplete="off"
             spellCheck={false}
-            placeholder="@handle, wallet address, or X/GitHub URL"
+            placeholder={isNarrow ? '@handle or wallet' : '@handle, wallet address, or X/GitHub URL'}
             aria-label="Search by Twitter handle, GitHub username, or wallet address"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

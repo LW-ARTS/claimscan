@@ -37,6 +37,21 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const tableTopRef = useRef<HTMLDivElement>(null);
+
+  /** Scroll to the first row when paginating (so users see the new content). */
+  const goToPage = useCallback((updater: (p: number) => number) => {
+    setCurrentPage((p) => {
+      const next = updater(p);
+      if (next !== p) {
+        // Defer to next frame so the new rows render before we scroll.
+        requestAnimationFrame(() => {
+          tableTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+      return next;
+    });
+  }, []);
 
   const handleCopy = useCallback(async (id: string, address: string) => {
     try {
@@ -89,6 +104,8 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
 
   return (
     <>
+    {/* Anchor for pagination scroll-to-top */}
+    <div ref={tableTopRef} aria-hidden="true" className="scroll-mt-20" />
     {/* Mobile: stacked card layout */}
     <div className="space-y-3 md:hidden">
       {displayedFees.map(({ fee, usd, display: { label, badge } }, idx) => {
@@ -308,27 +325,29 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
 
     {/* Pagination */}
     {totalPages > 1 && (
-      <div className="mt-6 flex items-center justify-between border-t border-[var(--border-subtle)] px-4 pt-4">
-        <p className="text-[13px] text-[var(--text-tertiary)]">
+      <div className="mt-6 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] px-4 pt-4">
+        <p className="whitespace-nowrap text-[12px] text-[var(--text-tertiary)] sm:text-[13px]">
           {(currentPage - 1) * PER_PAGE + 1}&ndash;{Math.min(currentPage * PER_PAGE, sortedFees.length)} of {sortedFees.length}
         </p>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onClick={() => goToPage((p) => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="pressable hover-glow cursor-pointer rounded-[8px] border border-[var(--border-default)] px-3 py-1.5 text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Previous page"
+            className="pressable hover-glow shrink-0 cursor-pointer whitespace-nowrap rounded-[8px] border border-[var(--border-default)] px-2.5 py-1.5 text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-30 sm:px-3 sm:text-[13px]"
           >
-            &larr; Prev
+            &larr;<span className="hidden sm:inline"> Prev</span>
           </button>
-          <span className="px-3 py-1 text-[13px] font-mono text-[var(--text-primary)]">
+          <span className="shrink-0 whitespace-nowrap px-2 py-1 font-mono text-[12px] text-[var(--text-primary)] sm:px-3 sm:text-[13px]">
             {currentPage} / {totalPages}
           </span>
           <button
-            onClick={() => { setCurrentPage((p) => Math.min(totalPages, p + 1)); track('fee_page_changed', { page: currentPage + 1 }); }}
+            onClick={() => { goToPage((p) => Math.min(totalPages, p + 1)); track('fee_page_changed', { page: currentPage + 1 }); }}
             disabled={currentPage === totalPages}
-            className="pressable hover-glow cursor-pointer rounded-[8px] border border-[var(--border-default)] px-3 py-1.5 text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Next page"
+            className="pressable hover-glow shrink-0 cursor-pointer whitespace-nowrap rounded-[8px] border border-[var(--border-default)] px-2.5 py-1.5 text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-30 sm:px-3 sm:text-[13px]"
           >
-            Next &rarr;
+            <span className="hidden sm:inline">Next </span>&rarr;
           </button>
         </div>
       </div>

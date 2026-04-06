@@ -56,7 +56,7 @@ export const CHAIN_CONFIG = {
     chainId: 1,
   },
   bsc: {
-    name: 'BNB Chain',
+    name: 'BNB',
     nativeToken: 'BNB',
     nativeDecimals: 18,
     coingeckoId: 'binancecoin',
