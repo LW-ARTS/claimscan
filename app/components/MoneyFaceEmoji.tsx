@@ -32,12 +32,18 @@ export default function MoneyFaceEmoji({ className = '', size = 64 }: MoneyFaceE
     };
   }, []);
 
+  // Only apply inline width/height when the caller hasn't sized this via
+  // className (size-*, w-*, h-*) — inline styles otherwise win and break
+  // the responsive Tailwind classes (e.g. mobile size-7).
+  const hasSizeClass = /(?:^|\s)(?:size-|w-|h-)/.test(className);
+  const inlineSize = hasSizeClass ? undefined : { width: size, height: size };
+
   if (!animationData) {
-    return <div className={className} style={{ width: size, height: size }} />;
+    return <div className={className} style={inlineSize} />;
   }
 
   return (
-    <div className={className} style={{ width: size, height: size }}>
+    <div className={className} style={inlineSize}>
       <Lottie
         animationData={animationData}
         loop
