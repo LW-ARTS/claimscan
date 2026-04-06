@@ -52,7 +52,7 @@ const chainMeta: Record<string, { label: string; color: string; bg: string }> = 
   sol: { label: 'Solana', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
   base: { label: 'Base', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
   eth: { label: 'Ethereum', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
-  bsc: { label: 'BNB Chain', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
+  bsc: { label: 'BNB', color: 'text-muted-foreground', bg: 'bg-muted border-border' },
 };
 
 function CopyIcon({ className }: { className?: string }) {
@@ -538,39 +538,39 @@ export function ProfileHero({
           </div>
 
           {/* Right: 3 action buttons */}
-          <div className="animate-fade-in-up delay-200 flex items-center gap-2 shrink-0">
+          <div className="animate-fade-in-up delay-200 flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
             <button
               onClick={handleSaveImage}
               disabled={saving}
-              className="pressable hover-glow-primary rounded-[8px] bg-white text-[var(--text-inverse)] px-[18px] py-[10px] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-60"
+              className="pressable hover-glow-primary flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-[8px] bg-white px-3 py-[10px] text-[12px] font-semibold text-[var(--text-inverse)] hover:opacity-90 disabled:opacity-60 sm:flex-initial sm:px-[18px] sm:text-[13px]"
             >
               {saved ? (
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
               ) : (
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
               )}
-              {saved ? 'Saved!' : saving ? 'Saving...' : 'Save OG Card'}
+              {saved ? 'Saved!' : saving ? 'Saving...' : (<><span className="sm:hidden">Save</span><span className="hidden sm:inline">Save OG Card</span></>)}
             </button>
             <button
               onClick={handleCopyLink}
-              className="pressable hover-glow rounded-[8px] border border-[var(--border-accent)] text-[var(--text-primary)] px-[18px] py-[10px] text-[13px] font-medium flex items-center gap-2 hover:bg-[var(--bg-surface-hover)]"
+              className="pressable hover-glow flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-[8px] border border-[var(--border-accent)] px-3 py-[10px] text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] sm:flex-initial sm:px-[18px] sm:text-[13px]"
             >
               {linkCopied ? (
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
               ) : (
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
               )}
-              {linkCopied ? 'Copied!' : 'Copy Link'}
+              {linkCopied ? 'Copied!' : (<><span className="sm:hidden">Copy</span><span className="hidden sm:inline">Copy Link</span></>)}
             </button>
             <a
               href={tweetIntentUrl}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => track('share_x_clicked', { handle })}
-              className="pressable hover-glow rounded-[8px] border border-[var(--border-accent)] text-[var(--text-primary)] px-[18px] py-[10px] text-[13px] font-medium flex items-center gap-2 hover:bg-[var(--bg-surface-hover)]"
+              className="pressable hover-glow flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-[8px] border border-[var(--border-accent)] px-3 py-[10px] text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] sm:flex-initial sm:px-[18px] sm:text-[13px]"
             >
               <XIcon className="h-4 w-4" />
-              Share on X
+              <span className="sm:hidden">Share</span><span className="hidden sm:inline">Share on X</span>
             </a>
           </div>
         </div>
@@ -598,7 +598,7 @@ export function ProfileHero({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Total Unclaimed</p>
-            <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]">
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tabular-nums text-[var(--text-primary)]">
               <span aria-hidden="true">
                 <CountUpLazy value={displayUnclaimedUsd} variant="usd" />
               </span>
@@ -610,19 +610,19 @@ export function ProfileHero({
           </div>
           <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Total Claimed</p>
-            <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]">
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tabular-nums text-[var(--text-primary)]">
               <CountUpLazy value={displayClaimedUsd} variant="usd" />
             </p>
           </div>
           <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Largest Single Fee</p>
-            <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]">
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tabular-nums text-[var(--text-primary)]">
               <CountUpLazy value={largestFeeUsd} variant="usd" />
             </p>
           </div>
           <div className="card-hover rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
             <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Platforms with Fees</p>
-            <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]">
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold tabular-nums text-[var(--text-primary)]">
               {platformCount} of {Object.keys(PLATFORM_CONFIG).length}
             </p>
           </div>

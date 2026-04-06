@@ -164,19 +164,19 @@ export default async function Home() {
       <div className="animate-fade-in-up delay-500 mt-8 w-full px-5 sm:mt-16 sm:px-12">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
           <div className="card-hover rounded-2xl border border-[#FFFFFF10] bg-[#FFFFFF06] px-5 py-6 text-center shadow-[0_2px_48px_#FFFFFF05] sm:px-7 sm:py-8">
-            <p className="font-mono text-2xl font-bold tabular-nums text-[var(--text-primary)] sm:text-[38px]">
+            <p className="text-2xl font-bold tabular-nums text-[var(--text-primary)] sm:text-[38px]">
               <CountUpLazy value={stats.totalFeesUsd} variant="compact" />
             </p>
             <p className="mt-2 text-[13px] tracking-wide text-[var(--text-secondary)]">Fees Tracked</p>
           </div>
           <div className="card-hover rounded-2xl border border-[#FFFFFF10] bg-[#FFFFFF06] px-5 py-6 text-center shadow-[0_2px_48px_#FFFFFF05] sm:px-7 sm:py-8">
-            <p className="font-mono text-2xl font-bold tabular-nums text-[var(--text-primary)] sm:text-[38px]">
+            <p className="text-2xl font-bold tabular-nums text-[var(--text-primary)] sm:text-[38px]">
               <CountUpLazy value={stats.walletsScanned} variant="walletsCompact" />
             </p>
             <p className="mt-2 text-[13px] tracking-wide text-[var(--text-secondary)]">Wallets Scanned</p>
           </div>
           <div className="card-hover rounded-2xl border border-[#FFFFFF10] bg-[#FFFFFF06] px-5 py-6 text-center shadow-[0_2px_48px_#FFFFFF05] sm:px-7 sm:py-8">
-            <p className="font-mono text-2xl font-bold tabular-nums text-[var(--text-primary)] sm:text-[38px]">~40%</p>
+            <p className="text-2xl font-bold tabular-nums text-[var(--text-primary)] sm:text-[38px]">~40%</p>
             <p className="mt-2 text-[13px] tracking-wide text-[var(--text-secondary)]">Left Unclaimed</p>
           </div>
         </div>
@@ -346,13 +346,13 @@ export default async function Home() {
                   )}
                   <span className="text-sm font-semibold text-[var(--text-primary)]">@{entry.handle}</span>
                 </span>
-                <span className="w-32 text-right font-mono text-sm font-bold tabular-nums text-[var(--text-primary)]">
+                <span className="w-32 text-right text-sm font-bold tabular-nums text-[var(--text-primary)]">
                   {formatUsd(entry.total_earned_usd)}
                 </span>
-                <span className="hidden w-24 text-center font-mono text-sm tabular-nums text-[var(--text-secondary)] sm:block">
+                <span className="hidden w-24 text-center text-sm tabular-nums text-[var(--text-secondary)] sm:block">
                   {entry.platform_count}
                 </span>
-                <span className="hidden w-20 text-center font-mono text-sm tabular-nums text-[var(--text-secondary)] sm:block">
+                <span className="hidden w-20 text-center text-sm tabular-nums text-[var(--text-secondary)] sm:block">
                   {entry.token_count}
                 </span>
               </Link>

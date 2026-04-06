@@ -267,12 +267,12 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
       {/* Top Bar Section — 3-row filter system */}
       <div className="space-y-3 px-4 pt-6 sm:px-8">
         {/* Row 1 — Chain Tabs */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
           {(['all', 'sol', 'base', 'eth', 'bsc'] as const).map(ch => (
             <button
               key={ch}
               onClick={() => setChainFilter(ch)}
-              className={`pressable rounded-[6px] px-3 py-1.5 text-[13px] font-medium ${
+              className={`pressable shrink-0 rounded-[6px] px-3 py-1.5 text-[13px] font-medium ${
                 chainFilter === ch
                   ? 'hover-glow-primary bg-white text-[var(--text-inverse)]'
                   : 'hover-glow bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
@@ -287,7 +287,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
         <div
           role="radiogroup"
           aria-label="Filter by claim status"
-          className="flex items-center gap-1.5"
+          className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0"
           onKeyDown={(e) => {
             if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
             e.preventDefault();
@@ -309,14 +309,14 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
                 aria-checked={isActive}
                 tabIndex={isActive ? 0 : -1}
                 onClick={() => setStatusFilter(status as typeof statusFilter)}
-                className={`pressable hover-glow inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`pressable hover-glow inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive
                     ? 'bg-[var(--bg-surface-hover)] border border-[var(--border-accent)] text-[var(--text-primary)]'
                     : 'bg-[var(--bg-surface)] text-[var(--text-secondary)]'
                 }`}
               >
                 {status}
-                <span className={`font-mono text-xs tabular-nums ${isActive ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'}`}>
+                <span className={`text-xs tabular-nums ${isActive ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'}`}>
                   {count}
                 </span>
               </button>

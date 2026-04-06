@@ -13,7 +13,7 @@ import { copyToClipboard } from '@/lib/utils';
 export function WalletButton() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  if (!mounted) return <div className="h-10 w-[140px] rounded-[10px] bg-[var(--bg-surface)] animate-pulse" />;
+  if (!mounted) return <div className="h-10 w-[100px] sm:w-[140px] rounded-[10px] bg-[var(--bg-surface)] animate-pulse" />;
   return <WalletButtonInner />;
 }
 
@@ -36,9 +36,14 @@ function WalletButtonInner() {
       <button
         onClick={() => setVisible(true)}
         disabled={connecting}
-        className="pressable hover-glow-primary inline-flex cursor-pointer items-center gap-1.5 rounded-[10px] bg-white px-4 py-2 sm:px-5 sm:py-2.5 text-[13px] font-semibold text-[var(--text-inverse)] hover:bg-white/90 disabled:cursor-wait disabled:opacity-50"
+        className="pressable hover-glow-primary inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[10px] bg-white px-3 py-2 sm:px-5 sm:py-2.5 text-[13px] font-semibold text-[var(--text-inverse)] hover:bg-white/90 disabled:cursor-wait disabled:opacity-50"
       >
-        {connecting ? 'Connecting...' : 'Connect Wallet'}
+        {connecting ? 'Connecting...' : (
+          <>
+            <span className="sm:hidden">Connect</span>
+            <span className="hidden sm:inline">Connect Wallet</span>
+          </>
+        )}
       </button>
     );
   }
