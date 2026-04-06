@@ -90,6 +90,7 @@ interface ChainSummary {
 export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, wallets = [] }: PlatformBreakdownProps) {
   const [activeTab, setActiveTab] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unclaimed' | 'claimed' | 'partial'>('all');
+  const [chainFilter, setChainFilter] = useState<'all' | Chain>('all');
   const tabsId = useId();
   const { publicKey } = useWallet();
   const [mounted, setMounted] = useState(false);
@@ -208,10 +209,16 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
     return Array.from(byChain.values());
   }, [displayFees, solPrice, ethPrice, bnbPrice]);
 
+  // Chain filter applied before platform grouping
+  const chainFiltered = useMemo(() => {
+    if (chainFilter === 'all') return displayFees;
+    return displayFees.filter(f => f.chain === chainFilter);
+  }, [displayFees, chainFilter]);
+
   // Group fees by platform (memoized — fees can contain hundreds of records)
   const { byPlatform, platformsWithData, platformsEmpty } = useMemo(() => {
     const byPlatform = new Map<Platform, FeeRecord[]>();
-    for (const fee of displayFees) {
+    for (const fee of chainFiltered) {
       const existing = byPlatform.get(fee.platform) ?? [];
       existing.push(fee);
       byPlatform.set(fee.platform, existing);
@@ -219,11 +226,11 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
     const platformsWithData = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) > 0);
     const platformsEmpty = ALL_PLATFORMS.filter((p) => (byPlatform.get(p)?.length ?? 0) === 0);
     return { byPlatform, platformsWithData, platformsEmpty };
-  }, [displayFees]);
+  }, [chainFiltered]);
 
   const platformFiltered = useMemo(
-    () => activeTab === 'all' ? displayFees : (byPlatform.get(activeTab as Platform) ?? []),
-    [activeTab, displayFees, byPlatform],
+    () => activeTab === 'all' ? chainFiltered : (byPlatform.get(activeTab as Platform) ?? []),
+    [activeTab, chainFiltered, byPlatform],
   );
   const filteredFees = statusFilter === 'all'
     ? platformFiltered
@@ -257,57 +264,116 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
 
   return (
     <div className="rounded-2xl bg-card">
-      {/* Top Bar Section — 1:1 Pencil design */}
-      <div className="space-y-4 px-4 pt-6 sm:px-8">
-        {/* Chain summary + unclaimed/partial badges */}
-        {chainSummaries.length > 0 && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-y-2">
-            <div className="flex items-center gap-4">
-              {chainSummaries.map((chain) => (
-                <div key={chain.chain} className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-foreground" aria-hidden="true" />
-                  <span className="text-sm font-medium text-foreground">{chain.name}</span>
-                  <span className="text-sm font-bold tabular-nums text-foreground">{formatUsd(chain.totalUsd)}</span>
-                </div>
-              ))}
-            </div>
-            {(totalUnclaimed > 0 || totalPartial > 0) && (
-              <div className="flex items-center gap-3">
-                {totalUnclaimed > 0 && (
-                  <span className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 font-mono text-xs font-medium text-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                    {totalUnclaimed} unclaimed
-                  </span>
-                )}
-                {totalPartial > 0 && (
-                  <span className="inline-flex items-center gap-1.5 bg-muted px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
-                    {totalPartial} partial
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+      {/* Top Bar Section — 3-row filter system */}
+      <div className="space-y-3 px-4 pt-6 sm:px-8">
+        {/* Row 1 — Chain Tabs */}
+        <div className="flex items-center gap-2">
+          {(['all', 'sol', 'base', 'eth', 'bsc'] as const).map(ch => (
+            <button
+              key={ch}
+              onClick={() => setChainFilter(ch)}
+              className={`rounded-[6px] px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                chainFilter === ch
+                  ? 'bg-white text-[var(--text-inverse)]'
+                  : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
+              }`}
+            >
+              {ch === 'all' ? 'All' : CHAIN_CONFIG[ch]?.name ?? ch}
+            </button>
+          ))}
+        </div>
 
-        {/* Platform tabs */}
+        {/* Row 2 — Status Filters */}
+        <div
+          role="radiogroup"
+          aria-label="Filter by claim status"
+          className="flex items-center gap-1.5"
+          onKeyDown={(e) => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            e.preventDefault();
+            const items = e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+            const idx = Array.from(items).indexOf(e.target as HTMLButtonElement);
+            if (idx === -1) return;
+            const next = e.key === 'ArrowRight' ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
+            items[next].focus();
+            items[next].click();
+          }}
+        >
+          {(['all', 'unclaimed', 'claimed', ...(totalPartial > 0 ? ['partial'] as const : [])] as const).map((status) => {
+            const count = statusCounts[status as keyof typeof statusCounts] ?? 0;
+            const isActive = statusFilter === status;
+            return (
+              <button
+                key={status}
+                role="radio"
+                aria-checked={isActive}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => setStatusFilter(status as typeof statusFilter)}
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  isActive
+                    ? 'bg-[var(--bg-surface-hover)] border border-[var(--border-accent)] text-[var(--text-primary)]'
+                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] active:scale-[0.97]'
+                }`}
+              >
+                {status}
+                <span className={`font-mono text-xs tabular-nums ${isActive ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Row 3 — Launchpad/Platform Tabs */}
         <div
           role="tablist"
           aria-label="Filter by platform"
-          className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 sm:flex-wrap sm:gap-3 sm:overflow-visible sm:pb-0"
+          className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0"
           onKeyDown={(e) => handleTabKeyDown(e, tabKeys)}
         >
-          <TabButton active={activeTab === 'all'} tabsId={tabsId} tabKey="all" onClick={() => setActiveTab('all')} count={displayFees.length}>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'all'}
+            aria-controls={`${tabsId}-panel`}
+            id={`${tabsId}-tab-all`}
+            tabIndex={activeTab === 'all' ? 0 : -1}
+            onClick={() => setActiveTab('all')}
+            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium transition-colors ${
+              activeTab === 'all'
+                ? 'bg-[var(--bg-surface-hover)] border border-[var(--border-accent)] text-[var(--text-primary)]'
+                : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] active:scale-[0.97]'
+            }`}
+          >
             All
-          </TabButton>
+            <span className={`font-mono text-xs tabular-nums ${activeTab === 'all' ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'}`}>
+              {chainFiltered.length}
+            </span>
+          </button>
           {platformsWithData.map((platform) => {
             const config = PLATFORM_CONFIG[platform];
             const count = byPlatform.get(platform)?.length ?? 0;
+            const isActive = activeTab === platform;
             return (
-              <TabButton key={platform} active={activeTab === platform} tabsId={tabsId} tabKey={platform} onClick={() => setActiveTab(platform)} count={count}>
+              <button
+                key={platform}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`${tabsId}-panel`}
+                id={`${tabsId}-tab-${platform}`}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => setActiveTab(platform)}
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                  isActive
+                    ? 'bg-[var(--bg-surface-hover)] border border-[var(--border-accent)] text-[var(--text-primary)]'
+                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] active:scale-[0.97]'
+                }`}
+              >
                 <PlatformIcon platform={platform} className="h-3.5 w-3.5" aria-hidden />
                 <span>{config?.name ?? platform}</span>
-              </TabButton>
+                <span className={`font-mono text-xs tabular-nums ${isActive ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'}`}>
+                  {count}
+                </span>
+              </button>
             );
           })}
         </div>
@@ -328,47 +394,6 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
           {PLATFORM_CONFIG[platform]?.name ?? platform} (0)
         </button>
       ))}
-
-      {/* Status filter — 1:1 Pencil design */}
-      <div
-        role="radiogroup"
-        aria-label="Filter by claim status"
-        className="flex items-center gap-1"
-        onKeyDown={(e) => {
-          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-          e.preventDefault();
-          const items = e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]');
-          const idx = Array.from(items).indexOf(e.target as HTMLButtonElement);
-          if (idx === -1) return;
-          const next = e.key === 'ArrowRight' ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
-          items[next].focus();
-          items[next].click();
-        }}
-      >
-        {(['all', 'unclaimed', 'claimed', ...(totalPartial > 0 ? ['partial'] as const : [])] as const).map((status) => {
-          const count = statusCounts[status as keyof typeof statusCounts] ?? 0;
-          const isActive = statusFilter === status;
-          return (
-            <button
-              key={status}
-              role="radio"
-              aria-checked={isActive}
-              tabIndex={isActive ? 0 : -1}
-              onClick={() => setStatusFilter(status as typeof statusFilter)}
-              className={`inline-flex cursor-pointer items-center gap-1.5 px-4 py-3 text-[13px] font-medium capitalize transition-colors sm:py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                isActive
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:text-foreground active:scale-[0.97]'
-              }`}
-            >
-              {status}
-              <span className={`font-mono text-xs tabular-nums ${isActive ? 'text-background/60' : 'text-muted-foreground/60'}`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
       </div>
 
       {/* CTA — Claim All — 1:1 Pencil design */}
@@ -406,7 +431,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
               className={`flex h-12 w-full cursor-pointer items-center justify-center text-sm font-semibold uppercase tracking-[1px] transition-all duration-200 active:scale-[0.97] ${
                 confirmingClaimAll
                   ? 'bg-foreground/90 text-background ring-2 ring-foreground/20'
-                  : 'bg-foreground text-background hover:bg-foreground/85 hover:shadow-[0_4px_20px_rgba(0,0,0,0.15)]'
+                  : 'bg-foreground text-background hover:bg-foreground/85 hover:shadow-[0_4px_20px_rgba(255,255,255,0.1)]'
               }`}
             >
               {confirmingClaimAll

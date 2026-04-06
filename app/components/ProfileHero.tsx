@@ -4,9 +4,8 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { track } from '@vercel/analytics';
 import { PlatformIcon } from './PlatformIcon';
-import { ShareButton } from './ShareButton';
 import { PLATFORM_CONFIG, CHAIN_CONFIG, LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
-import { safeBigInt, formatUsd, toUsdValue, copyToClipboard } from '@/lib/utils';
+import { safeBigInt, formatUsd, toUsdValue, copyToClipboard, computeFeeUsd } from '@/lib/utils';
 import { signedFetch } from '@/lib/signed-fetch';
 import type { Database, Chain, Platform } from '@/lib/supabase/types';
 
@@ -85,6 +84,38 @@ function CheckIcon({ className }: { className?: string }) {
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
     </svg>
+  );
+}
+
+function WalletPill({ address, chain }: { address: string; chain: string }) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const handleCopy = useCallback(async () => {
+    const ok = await copyToClipboard(address);
+    if (ok) {
+      setCopied(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 1500);
+    }
+  }, [address]);
+
+  return (
+    <button
+      onClick={handleCopy}
+      title={copied ? 'Copied!' : `Copy ${address}`}
+      className="cursor-pointer rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1.5 flex items-center gap-2 shrink-0 text-[11px] transition-colors hover:bg-[var(--bg-surface-hover)] active:scale-[0.97]"
+    >
+      <span className={`h-2 w-2 rounded-full ${copied ? 'bg-[var(--success)]' : 'bg-[var(--text-secondary)]'}`} aria-hidden="true" />
+      <span className="font-mono text-[var(--text-secondary)]">
+        {copied ? 'Copied!' : `${address.slice(0, 6)}...${address.slice(-4)}`}
+      </span>
+      {copied ? (
+        <svg className="h-3 w-3 text-[var(--success)]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+      ) : (
+        <svg className="h-3 w-3 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
+      )}
+    </button>
   );
 }
 
@@ -401,171 +432,196 @@ export function ProfileHero({
   const cacheBuster = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const avatarUrl = isValidHandle ? `https://unavatar.io/x/${avatarHandle}?_cb=${cacheBuster}` : null;
 
+  // ── Computed values for new layout ──
+  const solWallets = wallets.filter(w => w.chain === 'sol').length;
+  const evmWallets = wallets.length - solWallets;
+  const largestFeeUsd = Math.max(0, ...initialFees.map(f => computeFeeUsd(f, solPrice, ethPrice, bnbPrice)));
+
+  const profileUrl = `https://claimscan.tech/${encodeURIComponent(handle)}`;
+  const ogUrl = `/${encodeURIComponent(handle)}/opengraph-image`;
+
+  const tweetText = [
+    `I earned ${formatUsd(totalEarnedUsd)} in creator fees across ${platformCount} platform${platformCount !== 1 ? 's' : ''}`,
+    '',
+    `How much are you leaving on the table?`,
+    '',
+    'via claimscan.tech | @lwartss',
+  ].join('\n');
+
+  const tweetIntentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(profileUrl)}`;
+
+  const [linkCopied, setLinkCopied] = useState(false);
+  const linkTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleCopyLink = useCallback(async () => {
+    if (linkTimerRef.current) clearTimeout(linkTimerRef.current);
+    track('share_copy_link', { handle });
+    const ok = await copyToClipboard(profileUrl);
+    if (ok) {
+      setLinkCopied(true);
+      linkTimerRef.current = setTimeout(() => setLinkCopied(false), 2000);
+    }
+  }, [profileUrl, handle]);
+
+  const handleSaveImage = useCallback(async () => {
+    if (saving) return;
+    track('share_save_image', { handle });
+    setSaving(true);
+    try {
+      // Use dedicated download API route with Content-Disposition: attachment
+      // (blob: URLs are blocked by CSP default-src 'self')
+      const a = document.createElement('a');
+      a.href = `/api/og-download/${encodeURIComponent(handle)}`;
+      a.click();
+      setSaved(true);
+      if (linkTimerRef.current) clearTimeout(linkTimerRef.current);
+      linkTimerRef.current = setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.warn('[ProfileHero] Image save failed:', err instanceof Error ? err.message : err);
+    } finally {
+      setSaving(false);
+    }
+  }, [handle, saving, ogUrl]);
+
+  const displayWallets = wallets.slice(0, 6);
+  const remainingWallets = wallets.length - displayWallets.length;
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card">
-      <div className="px-5 py-6 sm:px-14 sm:py-12">
-        {/* Hero: side-by-side on desktop, stacked on mobile */}
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          {/* Left: avatar + name + badges */}
-          <div className="flex items-center gap-4 sm:gap-6">
+    <div>
+      {/* Section 1 — Profile Info Bar */}
+      <div className="border-b border-[var(--border-subtle)] px-5 py-6 sm:px-12 sm:py-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          {/* Left: avatar + name + pills */}
+          <div className="flex items-center gap-4">
             <div className="animate-scale-in relative shrink-0">
               {avatarUrl && !avatarError ? (
                 <Image
                   src={avatarUrl}
                   alt={displayName}
-                  width={100}
-                  height={100}
+                  width={64}
+                  height={64}
                   priority
-                  className="h-14 w-14 rounded-full object-cover sm:h-[100px] sm:w-[100px]"
+                  className="h-12 w-12 rounded-full object-cover sm:h-16 sm:w-16"
                   onError={() => setAvatarError(true)}
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-xl font-black text-background sm:h-[100px] sm:w-[100px] sm:text-4xl">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--text-primary)] text-lg font-black text-[var(--text-inverse)] sm:h-16 sm:w-16 sm:text-xl">
                   {displayName[0]?.toUpperCase()}
                 </div>
               )}
             </div>
 
-            <div className="animate-fade-in-up delay-100 min-w-0 space-y-2 sm:space-y-3">
-              <h1 className="truncate text-xl font-bold tracking-tight text-foreground sm:text-[32px]">
+            <div className="animate-fade-in-up delay-100 min-w-0">
+              <h1 className="truncate text-[24px] font-bold tracking-tight text-[var(--text-primary)]">
                 {displayName}
               </h1>
-              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                {creator.twitter_handle && (
-                  <span className="inline-flex items-center gap-1.5 border border-border px-2 py-1 text-xs text-foreground sm:px-3 sm:py-1.5 sm:text-[13px]">
-                    <XIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    @{creator.twitter_handle}
-                  </span>
-                )}
-                {creator.github_handle && (
-                  <span className="inline-flex items-center gap-1.5 border border-border px-2 py-1 text-xs text-muted-foreground sm:px-3 sm:py-1.5 sm:text-[13px]">
-                    {creator.github_handle}
-                  </span>
-                )}
-                {chains.map((chain) => {
-                  const meta = chainMeta[chain] ?? { label: chain, color: '', bg: '' };
-                  return (
-                    <span
-                      key={chain}
-                      className="inline-flex items-center gap-1.5 border border-border px-2 py-1.5 text-xs text-muted-foreground sm:px-3 sm:py-1.5"
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-foreground" aria-hidden="true" />
-                      {meta.label}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Right: TOTAL EARNED */}
-          <div className="animate-fade-in-up delay-200 shrink-0 text-center sm:text-right">
-            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-              Total Earned
-            </p>
-            <p className="mt-1 text-4xl font-black tabular-nums tracking-tighter text-foreground sm:text-6xl">
-              {formatUsd(totalEarnedUsd)}
-            </p>
-            {totalEarnedUsd > 0 && (
-              <div className="mt-2 inline-flex items-center border border-border px-3 py-1.5 sm:mt-3 sm:px-4 sm:py-2">
-                <span className="font-mono text-xs text-muted-foreground sm:text-[13px]">
-                  {formatUsd(displayClaimedUsd)} claimed
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Stats row */}
-        <div className="animate-fade-in-up delay-300 mt-6 flex flex-wrap gap-2 sm:mt-8 sm:gap-3 *:min-w-0 *:flex-1">
-          <div className="border border-border px-4 py-4 sm:px-6 sm:py-5">
-            <p className="font-mono text-[11px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-xs">Unclaimed</p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-foreground sm:mt-1.5 sm:text-[26px]" aria-live="polite" aria-atomic="true">
-              {formatUsd(displayUnclaimedUsd)}
-              {loading && <PulsingDot className="ml-1.5 inline-flex h-1.5 w-1.5 text-foreground" />}
-              {pollError && !loading && (
-                <span className="ml-1.5 inline-flex text-destructive" title="Live data may be outdated. Showing cached values." aria-label="Live fee polling error">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--text-secondary)]">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 9m18 0V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3" />
                   </svg>
+                  {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
                 </span>
-              )}
-            </p>
-          </div>
-          <div className="border border-border px-4 py-4 sm:px-6 sm:py-5">
-            <p className="font-mono text-[11px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-xs">Platforms</p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-foreground sm:mt-1.5 sm:text-[26px]">
-              {platformCount > 0 ? platformCount : '\u2014'}
-            </p>
-          </div>
-          {resolveMs > 0 && (
-            <div className="border border-border px-4 py-4 sm:px-6 sm:py-5">
-              <p className="font-mono text-[11px] font-normal uppercase tracking-[1px] text-muted-foreground sm:text-xs">Scanned In</p>
-              <p className="mt-1 text-lg font-bold tabular-nums text-foreground sm:mt-1.5 sm:text-[26px]">
-                {(resolveMs / 1000).toFixed(1)}s
-              </p>
+                {(solWallets > 0 || evmWallets > 0) && (
+                  <span className="inline-flex items-center gap-1.5 rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1 text-[11px] text-[var(--text-secondary)]">
+                    {evmWallets > 0 && <>{evmWallets} EVM</>}
+                    {evmWallets > 0 && solWallets > 0 && <> &middot; </>}
+                    {solWallets > 0 && <>{solWallets} SOL</>}
+                  </span>
+                )}
+              </div>
             </div>
-          )}
-        </div>
-
-        {/* Divider + Action buttons */}
-        {totalEarnedUsd > 0 && (
-          <div className="animate-fade-in-up delay-400 mt-8 space-y-4 sm:mt-10">
-            <div className="h-px bg-border" />
-            <ShareButton
-              handle={handle}
-              totalEarnedUsd={totalEarnedUsd}
-              platformCount={platformCount}
-            />
           </div>
-        )}
+
+          {/* Right: 3 action buttons */}
+          <div className="animate-fade-in-up delay-200 flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleSaveImage}
+              disabled={saving}
+              className="rounded-[8px] bg-white text-[var(--text-inverse)] px-[18px] py-[10px] text-[13px] font-semibold flex items-center gap-2 transition-opacity hover:opacity-90 active:scale-[0.97] disabled:opacity-60"
+            >
+              {saved ? (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+              ) : (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+              )}
+              {saved ? 'Saved!' : saving ? 'Saving...' : 'Save OG Card'}
+            </button>
+            <button
+              onClick={handleCopyLink}
+              className="rounded-[8px] border border-[var(--border-accent)] text-[var(--text-primary)] px-[18px] py-[10px] text-[13px] font-medium flex items-center gap-2 transition-colors hover:bg-[var(--bg-surface-hover)] active:scale-[0.97]"
+            >
+              {linkCopied ? (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+              ) : (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+              )}
+              {linkCopied ? 'Copied!' : 'Copy Link'}
+            </button>
+            <a
+              href={tweetIntentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => track('share_x_clicked', { handle })}
+              className="rounded-[8px] border border-[var(--border-accent)] text-[var(--text-primary)] px-[18px] py-[10px] text-[13px] font-medium flex items-center gap-2 transition-colors hover:bg-[var(--bg-surface-hover)] active:scale-[0.97]"
+            >
+              <XIcon className="h-4 w-4" />
+              Share on X
+            </a>
+          </div>
+        </div>
       </div>
 
-      {/* Wallets section */}
+      {/* Section 2 — Wallet Pills Bar (click to copy) */}
       {wallets.length > 0 && (
-        <div className="animate-fade-in-up delay-500 px-5 pb-5 sm:px-14 sm:pb-6">
-          {!showAllWallets ? (
+        <div className="px-5 py-3 sm:px-12 sm:py-4 border-b border-[var(--border-subtle)] flex items-center gap-2 overflow-x-auto scrollbar-hide">
+          {displayWallets.map((w) => (
+            <WalletPill key={w.id} address={w.address} chain={w.chain} />
+          ))}
+          {remainingWallets > 0 && (
             <button
               onClick={() => setShowAllWallets(true)}
-              aria-expanded={false}
-              className="group flex w-full cursor-pointer items-center justify-between py-2 transition-colors"
+              className="cursor-pointer rounded-[20px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-1.5 shrink-0 text-[11px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)]"
             >
-              <span className="font-mono text-[11px] font-medium uppercase tracking-[2px] text-muted-foreground/60 sm:text-xs">
-                Resolved Wallets
-              </span>
-              <span className="flex items-center gap-2 font-mono text-xs text-muted-foreground/60 sm:text-[13px]">
-                {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                </svg>
-              </span>
+              +{remainingWallets} more
             </button>
-          ) : (
-            <>
-              <div className="mb-3 flex items-center justify-between">
-                <p className="font-mono text-[11px] font-medium uppercase tracking-[2px] text-muted-foreground/60 sm:text-xs">
-                  Resolved Wallets
-                </p>
-                <p className="font-mono text-xs tabular-nums text-muted-foreground/60 sm:text-[13px]">
-                  {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                {wallets.map((w) => (
-                  <WalletRow key={w.id} wallet={w} />
-                ))}
-              </div>
-              <button
-                onClick={() => setShowAllWallets(false)}
-                className="mt-3 w-full cursor-pointer py-3 text-center font-mono text-xs font-medium text-muted-foreground/60 transition-colors hover:text-foreground"
-              >
-                Hide wallets
-              </button>
-            </>
           )}
         </div>
       )}
+
+      {/* Section 3 — Aggregate Stats */}
+      <div className="px-5 py-6 sm:px-12 sm:py-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <div className="rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
+            <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Total Unclaimed</p>
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]" aria-live="polite" aria-atomic="true">
+              {formatUsd(displayUnclaimedUsd)}
+              {loading && <PulsingDot className="ml-1.5 inline-flex h-1.5 w-1.5 text-[var(--text-primary)]" />}
+            </p>
+          </div>
+          <div className="rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
+            <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Total Claimed</p>
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]">
+              {formatUsd(displayClaimedUsd)}
+            </p>
+          </div>
+          <div className="rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
+            <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Largest Single Fee</p>
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]">
+              {formatUsd(largestFeeUsd)}
+            </p>
+          </div>
+          <div className="rounded-[14px] bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 sm:p-6">
+            <p className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] uppercase tracking-wide">Platforms with Fees</p>
+            <p className="mt-1.5 text-xl sm:text-[32px] font-bold font-mono tabular-nums text-[var(--text-primary)]">
+              {platformCount} of {Object.keys(PLATFORM_CONFIG).length}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

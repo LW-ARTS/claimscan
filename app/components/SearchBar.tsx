@@ -97,14 +97,14 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
   return (
     <form onSubmit={handleSearch} className="relative w-full">
       <div
-        className={`relative flex items-center gap-2 rounded-xl border glass-strong transition-[border-color,box-shadow] duration-200 ease-out ${focused
-          ? 'border-white/20 shadow-[0_0_20px_oklch(0.5_0.1_250/0.1)]'
-          : 'border-white/10 hover-hover:hover:border-white/20'
-          } ${isLarge ? 'p-2' : 'p-1'}`}
+        className={`relative flex items-center gap-3 rounded-[14px] border bg-[#0E0E12] shadow-[0_4px_60px_#FFFFFF06] transition-[border-color,box-shadow] duration-200 ease-out ${focused
+          ? 'border-[#FFFFFF30] shadow-[0_0_20px_rgba(255,255,255,0.06)]'
+          : 'border-[var(--border-default)] hover-hover:hover:border-[#FFFFFF30]'
+          } ${isLarge ? 'px-5 py-2' : 'p-1'}`}
       >
         <div className="relative flex-1">
           <Search
-            className={`absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 ${isLarge ? 'h-5 w-5' : 'h-4 w-4'
+            className={`absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] ${isLarge ? 'h-[22px] w-[22px]' : 'h-4 w-4'
               }`}
           />
           <label htmlFor="claimscan-search" className="sr-only">Search by handle, username, or wallet</label>
@@ -115,19 +115,19 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             name="query"
             autoComplete="off"
             spellCheck={false}
-            placeholder="@handle, wallet address, or X/GitHub URL"
+            placeholder="Search by @handle, wallet, or ENS..."
             aria-label="Search by Twitter handle, GitHub username, or wallet address"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             disabled={loading}
-            className={`w-full select-text bg-transparent outline-none placeholder:text-muted-foreground/40 ${isLarge ? 'h-12 pl-11 pr-2 text-base sm:text-lg' : 'h-11 pl-9 text-sm'
+            className={`w-full select-text bg-transparent outline-none placeholder:text-[var(--text-tertiary)] ${isLarge ? 'h-12 pl-11 pr-2 text-[15px]' : 'h-11 pl-9 text-sm'
               }`}
           />
           {/* Keyboard shortcut hint — visible only on large variant when not focused */}
           {isLarge && !focused && !query && (
-            <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground sm:inline-flex">
+            <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden items-center gap-0.5 rounded-[6px] border border-[var(--border-default)] bg-[#FFFFFF0A] px-3 py-[5px] font-mono text-[12px] font-medium text-[var(--text-secondary)] sm:inline-flex">
               /
             </kbd>
           )}

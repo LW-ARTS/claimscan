@@ -10,9 +10,7 @@ import type { Database } from '@/lib/supabase/types';
 
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 
-/** How many tokens to show initially and per "Show More" click */
-const INITIAL_COUNT = 15;
-const LOAD_MORE_COUNT = 15;
+const PER_PAGE = 15;
 
 interface TokenFeeTableProps {
   fees: FeeRecord[];
@@ -35,7 +33,7 @@ function tokenDisplay(fee: FeeRecord): { label: string; badge: string } {
 }
 
 export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, connectedWallet, onClaimToken }: TokenFeeTableProps) {
-  const [visibleCount, setVisibleCount] = useState(INITIAL_COUNT);
+  const [currentPage, setCurrentPage] = useState(1);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [failedId, setFailedId] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -69,8 +67,8 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
     return withUsd;
   }, [fees, solPrice, ethPrice, bnbPrice]);
 
-  const displayedFees = sortedFees.slice(0, visibleCount);
-  const hasMore = visibleCount < sortedFees.length;
+  const totalPages = Math.max(1, Math.ceil(sortedFees.length / PER_PAGE));
+  const displayedFees = sortedFees.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   /** Currency label based on chain — shown after formatted amounts */
   const currencyLabel = (chain: string) => {
@@ -166,7 +164,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
               <button
                 onClick={() => onClaimToken(fee.token_address)}
                 aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
-                className="mt-3 w-full cursor-pointer rounded-xl bg-foreground py-2.5 text-xs font-bold uppercase tracking-wider text-background transition-all duration-200 hover:shadow-[0_0_16px_rgba(0,0,0,0.12)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]"
+                className="mt-3 w-full cursor-pointer rounded-xl bg-foreground py-2.5 text-xs font-bold uppercase tracking-wider text-background transition-all duration-200 hover:shadow-[0_0_16px_rgba(255,255,255,0.08)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]"
               >
                 <span className="flex items-center justify-center gap-1.5">
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
@@ -186,16 +184,16 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
       <table className="w-full font-mono" aria-label="Creator fee records by token">
         <caption className="sr-only">Fee records showing earned, claimed, and unclaimed amounts per token</caption>
         <thead>
-          <tr className="bg-muted">
-            <th scope="col" className="py-3 pl-2 pr-0 text-left text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Token</th>
-            <th scope="col" className="py-3 text-left text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Platform</th>
-            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Earned</th>
-            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Claimed</th>
-            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Unclaimed</th>
-            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">USD</th>
-            <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Status</th>
+          <tr className="border-b border-[var(--border-subtle)]">
+            <th scope="col" className="py-3 pl-2 pr-0 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Token</th>
+            <th scope="col" className="py-3 text-left text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Platform</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Earned</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Claimed</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Unclaimed</th>
+            <th scope="col" className="py-3 text-right text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">USD</th>
+            <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Status</th>
             {connectedWallet && onClaimToken && (
-              <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-[1px] text-muted-foreground">Action</th>
+              <th scope="col" className="py-3 text-center text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Action</th>
             )}
           </tr>
         </thead>
@@ -208,7 +206,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
             return (
               <tr
                 key={fee.id}
-                className="border-b border-border transition-colors hover:bg-muted/50"
+                className={`border-b border-[var(--border-subtle)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-hover)] ${idx % 2 === 0 ? 'bg-[#FFFFFF06]' : ''}`}
                 style={idx < 10 ? { animation: `fadeInUp 0.4s ease-out ${idx * 40}ms both` } : undefined}
               >
                 <td className="py-3.5 pl-2 pr-0">
@@ -268,22 +266,20 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                 </td>
                 <td className="py-3.5 text-center">
                   {fee.claim_status === 'auto_distributed' ? (
-                    <span className="inline-block border border-purple-200 bg-purple-50 px-3 py-1 text-[11px] font-medium uppercase tracking-[1px] text-purple-700">
+                    <span className="inline-block bg-[#A1A1AA18] text-[var(--text-secondary)] rounded px-2.5 py-0.5 text-[11px] font-medium uppercase">
                       AUTO
                     </span>
                   ) : fee.claim_status === 'claimed' ? (
-                    <span className="inline-block border border-border px-3 py-1 text-[11px] font-medium uppercase tracking-[1px] text-foreground">
+                    <span className="inline-block bg-[#A1A1AA18] text-[var(--text-secondary)] rounded px-2.5 py-0.5 text-[11px] font-medium uppercase">
                       CLAIMED
                     </span>
                   ) : fee.claim_status === 'partially_claimed' ? (
-                    <span className="inline-flex items-center justify-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                      <span className="text-[11px] font-medium uppercase tracking-[1px] text-foreground">PARTIAL</span>
+                    <span className="inline-block bg-[#FB923C18] text-[var(--partial)] rounded px-2.5 py-0.5 text-[11px] font-medium uppercase">
+                      PARTIAL
                     </span>
                   ) : (
-                    <span className="inline-flex items-center justify-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                      <span className="text-[11px] font-medium uppercase tracking-[1px] text-foreground">UNCLAIMED</span>
+                    <span className="inline-block bg-[#FFFFFF10] text-[var(--text-primary)] rounded px-2.5 py-0.5 text-[11px] font-medium uppercase">
+                      UNCLAIMED
                     </span>
                   )}
                 </td>
@@ -310,18 +306,31 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
       </table>
     </div>
 
-    {/* Show More */}
-    {hasMore && (
-      <div className="mt-4 flex flex-col items-center gap-1">
-        <button
-          onClick={() => {
-            track('show_more_clicked', { remaining: sortedFees.length - displayedFees.length });
-            setVisibleCount((c) => c + LOAD_MORE_COUNT);
-          }}
-          className="cursor-pointer rounded-lg border border-border/60 bg-card/80 px-5 py-2 text-sm font-medium text-foreground/80 transition-all hover:bg-foreground hover:text-background active:scale-95"
-        >
-          Show more ({sortedFees.length - displayedFees.length} remaining)
-        </button>
+    {/* Pagination */}
+    {totalPages > 1 && (
+      <div className="mt-6 flex items-center justify-between border-t border-[var(--border-subtle)] px-4 pt-4">
+        <p className="text-[13px] text-[var(--text-tertiary)]">
+          {(currentPage - 1) * PER_PAGE + 1}&ndash;{Math.min(currentPage * PER_PAGE, sortedFees.length)} of {sortedFees.length}
+        </p>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="cursor-pointer rounded-[8px] border border-[var(--border-default)] px-3 py-1.5 text-[13px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            &larr; Prev
+          </button>
+          <span className="px-3 py-1 text-[13px] font-mono text-[var(--text-primary)]">
+            {currentPage} / {totalPages}
+          </span>
+          <button
+            onClick={() => { setCurrentPage((p) => Math.min(totalPages, p + 1)); track('fee_page_changed', { page: currentPage + 1 }); }}
+            disabled={currentPage === totalPages}
+            className="cursor-pointer rounded-[8px] border border-[var(--border-default)] px-3 py-1.5 text-[13px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Next &rarr;
+          </button>
+        </div>
       </div>
     )}
     </>

@@ -137,8 +137,18 @@ export default async function ProfilePage({ params }: PageProps) {
   const displayName = isWallet ? decoded : `@${decoded}`;
 
   return (
-    <div className="space-y-8 sm:space-y-10">
-      <SearchBar />
+    <div
+      className="space-y-0"
+      style={{
+        background: `
+          radial-gradient(ellipse 50% 35% at 75% 30%, #FFFFFF06 0%, transparent 100%),
+          radial-gradient(ellipse 90% 50% at 30% 8%, #FFFFFF0C 0%, transparent 70%),
+          linear-gradient(180deg, #16161A 0%, #09090B 100%)
+        `,
+      }}>
+      <div className="px-5 py-4 sm:px-12">
+        <SearchBar />
+      </div>
       {!isWallet && (
         <ProfileJsonLd
           handle={decoded}
@@ -178,7 +188,7 @@ export default async function ProfilePage({ params }: PageProps) {
 
       {/* Identity disclaimer for notable/celebrity handles */}
       {identityDisclaimer && (
-        <div className="animate-fade-in-up delay-100 flex items-start gap-4 rounded-xl border border-border/40 bg-card/80 px-5 py-4">
+        <div className="animate-fade-in-up delay-100 mx-5 flex items-start gap-4 rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-5 py-4 sm:mx-12">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06]">
             <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
@@ -208,7 +218,7 @@ export default async function ProfilePage({ params }: PageProps) {
         {/* ZONE 2: Breakdown (chain pills + platform tabs + table) */}
         <h2 className="sr-only">Fee Breakdown by Platform</h2>
         <LazySection minHeight={200}>
-          <div className="animate-fade-in-up delay-150">
+          <div className="animate-fade-in-up delay-150 px-[2%]">
             <PlatformBreakdown fees={feeRecords} solPrice={priceResult.sol} ethPrice={priceResult.eth} bnbPrice={priceResult.bnb} wallets={wallets} key={creator.id} />
           </div>
         </LazySection>
@@ -226,7 +236,7 @@ export default async function ProfilePage({ params }: PageProps) {
         {/* ZONE 4: Scan Status (minimal footnote) */}
         <h2 className="sr-only">Scan Status</h2>
         <LazySection minHeight={80}>
-          <div className="animate-fade-in-up delay-300">
+          <div className="animate-fade-in-up delay-300 px-[2%] py-4 mb-12">
             <ScanStatusLog fees={feeRecords} resolvedChains={resolvedChains} />
           </div>
         </LazySection>
