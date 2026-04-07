@@ -8,7 +8,8 @@ import { TokenFeeTable } from './TokenFeeTable';
 import { PlatformIcon } from './PlatformIcon';
 import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
 import { computeFeeUsd, formatUsd, safeBigInt } from '@/lib/utils';
-import type { Database, Platform, Chain } from '@/lib/supabase/types';
+import { useLiveFees, liveFeeKey } from './LiveFeesProvider';
+import type { ClaimStatus, Database, Platform, Chain } from '@/lib/supabase/types';
 
 const ClaimDialog = dynamic(
   () => import('./ClaimDialog').then((m) => ({ default: m.ClaimDialog })),
@@ -93,6 +94,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
   const [chainFilter, setChainFilter] = useState<'all' | Chain>('all');
   const tabsId = useId();
   const { publicKey } = useWallet();
+  const { liveRecords } = useLiveFees();
   const [mounted, setMounted] = useState(false);
   const tabPanelRef = useRef<HTMLDivElement>(null);
   useEffect(() => setMounted(true), []);
@@ -123,16 +125,82 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
   // Local optimistic updates for claimed tokens
   const [claimedMints, setClaimedMints] = useState<Set<string>>(new Set());
 
-  // Apply optimistic updates to fees
-  const displayFees = useMemo(() => {
-    if (claimedMints.size === 0) return fees;
-    return fees.map((fee) => {
+  // Layered merge: live fees first, then claimedMints optimistic overlay.
+  // Order matters — a user who just clicked Claim should see the token
+  // disappear instantly even if the live stream still reports it as
+  // unclaimed for the next 5-30s.
+  const displayFees = useMemo<FeeRecord[]>(() => {
+    const seenKeys = new Set<string>();
+
+    // Step 1: walk cached fees, overlay live data when present
+    const merged: FeeRecord[] = fees.map((fee) => {
+      const key = liveFeeKey(fee.platform, fee.chain, fee.token_address);
+      const live = liveRecords.get(key);
+      if (!live) return fee;
+      seenKeys.add(key);
+
+      const claimed = safeBigInt(live.totalClaimed);
+      const unclaimed = safeBigInt(live.totalUnclaimed);
+
+      // Derive claim_status from the fresh amounts rather than trusting the
+      // cached status. This is the one place live data overrides cache status.
+      let status: ClaimStatus = fee.claim_status;
+      if (unclaimed === 0n && claimed > 0n) status = 'claimed';
+      else if (unclaimed > 0n && claimed > 0n) status = 'partially_claimed';
+      else if (unclaimed > 0n && claimed === 0n) status = 'unclaimed';
+      // else keep whatever the cache had (e.g. auto_distributed)
+
+      return {
+        ...fee,
+        total_earned: live.totalEarned,
+        total_claimed: live.totalClaimed,
+        total_unclaimed: live.totalUnclaimed,
+        total_earned_usd: live.totalEarnedUsd ?? fee.total_earned_usd,
+        claim_status: status,
+        fee_type: live.feeType ?? fee.fee_type,
+        fee_locked: live.feeLocked ?? fee.fee_locked,
+        token_symbol: live.tokenSymbol ?? fee.token_symbol,
+      };
+    });
+
+    // Step 2: append virtual rows for live-only tokens (no cached counterpart)
+    for (const [key, live] of liveRecords) {
+      if (seenKeys.has(key)) continue;
+      const unclaimed = safeBigInt(live.totalUnclaimed);
+      if (unclaimed === 0n) continue; // nothing to show for empty live rows
+      const claimed = safeBigInt(live.totalClaimed);
+      const status: ClaimStatus = claimed > 0n ? 'partially_claimed' : 'unclaimed';
+
+      merged.push({
+        id: `live:${key}`,
+        creator_id: '',
+        creator_token_id: null,
+        platform: live.platform as Platform,
+        chain: live.chain as Chain,
+        token_address: live.tokenAddress,
+        token_symbol: live.tokenSymbol,
+        total_earned: live.totalEarned,
+        total_claimed: live.totalClaimed,
+        total_unclaimed: live.totalUnclaimed,
+        total_earned_usd: live.totalEarnedUsd,
+        claim_status: status,
+        royalty_bps: null,
+        fee_type: live.feeType ?? null,
+        fee_locked: live.feeLocked ?? null,
+        last_synced_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      } as FeeRecord);
+    }
+
+    // Step 3: optimistic claimedMints overlay — just-claimed tokens zero out
+    if (claimedMints.size === 0) return merged;
+    return merged.map((fee) => {
       if (claimedMints.has(fee.token_address) && fee.platform === 'bags') {
         return { ...fee, total_unclaimed: '0', claim_status: 'claimed' as const };
       }
       return fee;
     });
-  }, [fees, claimedMints]);
+  }, [fees, claimedMints, liveRecords]);
 
   const handleClaimToken = useCallback((tokenMint: string) => {
     setSelectedForClaim([tokenMint]);
