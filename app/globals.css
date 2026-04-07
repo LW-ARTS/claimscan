@@ -167,6 +167,12 @@
   button, [role="button"], a, summary {
     cursor: pointer;
   }
+  /* Disable the default iOS tap highlight (bluish overlay) on interactive
+     elements so custom :active micro-interactions (glow, lift, scale)
+     render cleanly without a stacked system overlay on top. */
+  button, [role="button"], a, summary, .pressable, label {
+    -webkit-tap-highlight-color: transparent;
+  }
   /* Allow selection on interactive elements */
   input, textarea, [contenteditable="true"] {
     -webkit-user-select: text;
@@ -208,6 +214,12 @@
   }
   @media (hover: hover) and (pointer: fine) {
     .hover-lift:hover {
+      transform: translateY(-2px);
+    }
+  }
+  /* Touch equivalent — fires on tap so mobile users get the same lift feedback */
+  @media (hover: none) {
+    .hover-lift:active {
       transform: translateY(-2px);
     }
   }
@@ -310,6 +322,13 @@
         0 0 32px rgba(255, 255, 255, 0.14);
     }
   }
+  @media (hover: none) {
+    .hover-glow:active {
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.25),
+        0 0 32px rgba(255, 255, 255, 0.14);
+    }
+  }
 
   /* ───── Primary CTA glow — stronger version for solid white buttons ───── */
   .hover-glow-primary {
@@ -318,6 +337,12 @@
   }
   @media (hover: hover) and (pointer: fine) {
     .hover-glow-primary:hover {
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4),
+                  0 0 40px rgba(255, 255, 255, 0.25);
+    }
+  }
+  @media (hover: none) {
+    .hover-glow-primary:active {
       box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4),
                   0 0 40px rgba(255, 255, 255, 0.25);
     }
@@ -336,6 +361,13 @@
       box-shadow: 0 0 48px rgba(255, 255, 255, 0.08);
     }
   }
+  @media (hover: none) {
+    .card-hover:active {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.22) !important;
+      box-shadow: 0 0 48px rgba(255, 255, 255, 0.08);
+    }
+  }
 
   /* ───── Row hover — horizontal slide + background intensify for list rows ───── */
   .row-hover {
@@ -345,6 +377,11 @@
   @media (hover: hover) and (pointer: fine) {
     .row-hover:hover {
       transform: translateX(3px);
+    }
+  }
+  @media (hover: none) {
+    .row-hover:active {
+      background-color: var(--bg-surface-hover);
     }
   }
 
@@ -357,6 +394,11 @@
       box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.22);
     }
   }
+  @media (hover: none) {
+    .row-hover:active .avatar-ring {
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.22);
+    }
+  }
 
   /* ───── Hover ring — self-triggered variant (e.g. profile hero avatar) ───── */
   .hover-ring {
@@ -364,6 +406,12 @@
   }
   @media (hover: hover) and (pointer: fine) {
     .hover-ring:hover {
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22),
+                  0 0 32px rgba(255, 255, 255, 0.1);
+    }
+  }
+  @media (hover: none) {
+    .hover-ring:active {
       box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22),
                   0 0 32px rgba(255, 255, 255, 0.1);
     }
