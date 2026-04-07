@@ -68,10 +68,26 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 - **4 chains**: Solana, Base, Ethereum, and BNB Chain in a single scan
 - **Identity resolution**: Twitter, GitHub, Farcaster handles, ENS, and raw wallet addresses
 - **Real-time streaming**: Scan progress updates as each platform completes via SSE
-- **Live polling**: Unclaimed balances auto-update in real time
+- **True real time fees**: The unclaimed total, the status filter, and the token list all read from the same live data stream. What you see and what you can act on are always in sync. Tokens appear within seconds of being detected on chain instead of waiting for the next sync.
 - **Dynamic dust filter**: Filters noise using live token prices
 - **Shareable receipts**: OG image cards for social sharing
 - **Privacy-first**: Searches anonymized before logging
+
+### Leaderboard
+- **Public creator ranking** at [claimscan.tech/leaderboard](https://claimscan.tech/leaderboard) ordered by total fees earned across all 9 platforms
+- **Filter chips** for platform and chain that scroll horizontally on mobile and wrap on desktop
+- **Deep linkable filter state**, share a filtered view by URL
+- **Mobile cards** with creator avatars, rank trophy for the top 3, and proper responsive sizing down to 360px wide
+- **Pagination scrolls back to the top** automatically on page change
+- **Dynamic Open Graph image** for the leaderboard route, share the live ranking on socials
+
+### UI and UX
+- **Visual redesign v2** with consistent spacing, typography, color tokens, and motion across every page
+- **Per route skeleton loading states** for home, docs, terms, leaderboard, and creator profiles. No more blank flashes during navigation.
+- **Mobile first** down to 360px wide. Hover utilities have tap mirrors so phones get the same visual feedback as desktop hover.
+- **Animation system** with shared duration tokens, easing curves, and full `prefers-reduced-motion` support so users who opt out of animation still get a great experience.
+- **Dynamic Open Graph images** per creator profile and per leaderboard route. Share any handle, see a beautiful preview card.
+- **Tight currency typography** with proper digit alignment so values render correctly at every size.
 
 ### Claiming (V1.5) ✦ Bags.fm Live
 V1.5 is the update where ClaimScan went from read-only scanner to full claimer. Bags.fm is the first platform with direct on-chain claiming built in. No third-party custody, no approvals, no token permissions. Connect your wallet, review the simulation, sign, done.
@@ -182,13 +198,13 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 
 | Version | Status | Highlights |
 |---------|--------|------------|
-| V1.0 | Live | 9 platforms, cross-chain scanning, identity resolution |
+| V1.0 | Live | First launchpads, cross-chain scanning, identity resolution |
 | **V1.5** | **Live** | First on-chain claim flow (Bags.fm), Turnstile + priority fees, defense-in-depth security, Helius DAS indexing |
-| **V2.0** | **Live** | 9th platform added (Raydium LaunchLab), 4 chains (added ETH + BSC), **paid API via x402 on Base Mainnet**, Allium intelligence, OWS wallet support, Pump.fun V2 |
+| **V2.0** | **Live** | Raydium LaunchLab support, 4 chains (added ETH + BSC), **paid API via x402 on Base Mainnet**, Allium intelligence, OWS wallet support, Pump.fun V2 |
 | **V2.1** | **Live** | x402 hardening: bazaar extension for agent discovery, payment-identifier for idempotency, lifecycle hooks, CSV injection protection, mainnet facilitator |
-| **V2.2** | **Live** | Audit hardening pass — anti-enumeration enforcement on profile routes, x402 wrapper consistency across all V2 endpoints (`/v2/resolve` now paid), Helius restricted frontend RPC key with domain-locked allowlist, framework + dependency upgrades |
-| V2.5 | Next | Token Fee Scanner (paste any CA), multi-platform claim |
-| V3 | Planned | Automated claim scheduling, creator analytics, portfolio dashboard |
+| **V2.5** | **Live** | Visual redesign v2, real time live fees architecture, leaderboard polish, mobile first pass, skeleton loading states, animation system, hardening pass. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v2.5.0). |
+| V3 | Next | Token Fee Scanner (paste any contract address), multi platform direct claim (Clanker + Zora), EVM wallet integration (MetaMask alongside Phantom in a unified flow) |
+| V3.5 | Planned | Automated claim scheduling, creator analytics, portfolio dashboard |
 
 ## Built By
 
