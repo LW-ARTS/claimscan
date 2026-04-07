@@ -296,10 +296,10 @@ export default async function Home() {
         {leaderboardPreview.length > 0 && (
           <div className="overflow-hidden rounded-[14px] border border-[#FFFFFF10] bg-[var(--bg-card)]">
             {/* Header */}
-            <div className="flex items-center gap-8 border-b border-[var(--border-subtle)] px-4 py-3 text-[11px] font-medium uppercase tracking-[1px] text-[var(--text-tertiary)]">
-              <span className="w-12">#</span>
-              <span className="flex-1 text-left">Creator</span>
-              <span className="w-32 text-right">Total Fees</span>
+            <div className="flex items-center gap-3 border-b border-[var(--border-subtle)] px-3 py-3 text-[11px] font-medium uppercase tracking-[1px] text-[var(--text-tertiary)] sm:gap-8 sm:px-4">
+              <span className="w-8 shrink-0 text-center sm:w-12 sm:text-left">#</span>
+              <span className="min-w-0 flex-1 text-left">Creator</span>
+              <span className="shrink-0 text-right sm:w-32">Total Fees</span>
               <span className="hidden w-24 text-center sm:block">Platforms</span>
               <span className="hidden w-20 text-center sm:block">Tokens</span>
             </div>
@@ -310,7 +310,7 @@ export default async function Home() {
                 key={entry.handle}
                 href={`/${entry.handle}`}
                 style={{ ['--stagger-index' as string]: idx }}
-                className={`row-hover flex items-center gap-8 px-4 py-3.5 hover:bg-[var(--bg-surface-hover)] ${
+                className={`row-hover flex items-center gap-3 px-3 py-3.5 sm:gap-8 sm:px-4 hover:bg-[var(--bg-surface-hover)] ${
                   idx === 0
                     ? 'pulse-glow border-l-2 border-l-white bg-[#FFFFFF0A]'
                     : idx % 2 === 1
@@ -318,15 +318,15 @@ export default async function Home() {
                       : ''
                 } ${idx < leaderboardPreview.length - 1 ? 'border-b border-[var(--border-subtle)]' : ''}`}
               >
-                <span className={`flex w-12 shrink-0 items-center justify-center gap-1 tabular-nums text-sm font-bold ${idx === 0 ? 'text-white' : 'text-[var(--text-tertiary)]'}`}>
+                <span className={`flex w-8 shrink-0 items-center justify-center gap-1 tabular-nums text-sm font-bold sm:w-12 ${idx === 0 ? 'text-white' : 'text-[var(--text-tertiary)]'}`}>
                   {idx === 0 && (
-                    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="hidden h-3.5 w-3.5 shrink-0 sm:inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                       <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
                     </svg>
                   )}
                   {idx + 1}
                 </span>
-                <span className="flex flex-1 items-center gap-2.5 text-left">
+                <span className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
                   {entry.handle_type === 'twitter' ? (
                     <img
                       src={`https://unavatar.io/x/${entry.handle}`}
@@ -340,9 +340,9 @@ export default async function Home() {
                       {entry.handle[0]?.toUpperCase()}
                     </span>
                   )}
-                  <span className="text-sm font-semibold text-[var(--text-primary)]">@{entry.handle}</span>
+                  <span className="truncate text-sm font-semibold text-[var(--text-primary)]">@{entry.handle}</span>
                 </span>
-                <span className="w-32 whitespace-nowrap text-right text-sm font-bold text-[var(--text-primary)]">
+                <span className="w-auto shrink-0 whitespace-nowrap text-right text-sm font-bold text-[var(--text-primary)] sm:w-32">
                   {formatUsd(entry.total_earned_usd).replace(/\.\d+K$/, 'K')}
                 </span>
                 <span className="hidden w-24 text-center text-sm text-[var(--text-secondary)] sm:block">
