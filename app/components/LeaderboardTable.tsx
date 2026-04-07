@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 import { formatUsd } from '@/lib/utils';
 
@@ -52,6 +52,7 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
   // Keep filter state for future use but hide selects
   const [platform] = useState('all');
   const [chain] = useState('all');
+  const topRef = useRef<HTMLDivElement>(null);
 
   const fetchPage = useCallback(async (page: number, plat: string, ch: string) => {
     setLoading(true);
@@ -69,6 +70,11 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
       setEntries(data.entries);
       setTotal(data.total);
       setCurrentPage(page);
+      // Scroll back to the first row so the user sees rank #1 of the new page
+      // instead of landing somewhere in the middle of a scrolled list.
+      requestAnimationFrame(() => {
+        topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     } catch {
       // Silently fail — user can retry
     } finally {
@@ -116,6 +122,9 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
 
   return (
     <div>
+      {/* Scroll anchor — pagination jumps here so rank #1 of the new page
+          is visible instead of wherever the user was in the previous page. */}
+      <div ref={topRef} aria-hidden="true" className="scroll-mt-24" />
       {/* Table */}
       {entries.length === 0 && !loading ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] py-16 text-center">
