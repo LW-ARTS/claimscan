@@ -20,6 +20,8 @@ interface FeeInput {
   total_unclaimed: string | null;
   chain: Chain;
   platform: Platform;
+  token_address: string;
+  claim_status: 'claimed' | 'unclaimed' | 'partially_claimed' | 'auto_distributed';
 }
 
 interface WalletInput {
