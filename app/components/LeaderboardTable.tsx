@@ -132,9 +132,10 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                 style={idx < 6 ? { ['--stagger-index' as string]: idx } : undefined}
                 className={`pressable row-hover flex items-center gap-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-3 hover:bg-[var(--bg-surface-hover)] ${pageOffset + idx === 0 ? 'pulse-glow' : ''}`}
               >
-                <span className="avatar-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[var(--text-inverse)] text-xs font-bold">
+                <span className="w-5 shrink-0 text-center text-xs font-bold tabular-nums text-[var(--text-tertiary)]">
                   {pageOffset + idx + 1}
                 </span>
+                <CreatorAvatar handle={entry.handle} handleType={entry.handle_type} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                     {formatHandle(entry)}
@@ -143,8 +144,8 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                     {entry.platform_count} platform{entry.platform_count !== 1 ? 's' : ''} &middot; {entry.token_count} tokens
                   </p>
                 </div>
-                <span className="whitespace-nowrap text-sm font-bold tracking-tight text-[var(--text-primary)]">
-                  {formatUsd(entry.total_earned_usd)}
+                <span className="whitespace-nowrap text-sm font-bold text-[var(--text-primary)]">
+                  {formatUsd(entry.total_earned_usd).replace(/\.\d+K$/, 'K')}
                 </span>
               </Link>
             ))}
