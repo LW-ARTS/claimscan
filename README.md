@@ -107,7 +107,7 @@ ClaimScan V2 introduces a paid API powered by the [x402 protocol](https://x402.o
 | `GET /api/v2/fees?wallet=<address>` | $0.01 | Full fee report across all 10 platforms and 4 chains |
 | `GET /api/v2/export?wallet=<address>` | $0.05 | CSV or JSON export of all fee records |
 | `GET /api/v2/intelligence?wallet=<address>` | $0.02 | Intelligence report: ClaimScan fees + Allium cross-chain enrichment |
-| `GET /api/v2/resolve?ows_wallet=<name>` | Free | Resolve an OWS wallet name into multi-chain addresses |
+| `GET /api/v2/resolve?ows_wallet=<name>` | $0.01 | Resolve an OWS wallet name into multi-chain addresses |
 
 **How it works:**
 
@@ -186,6 +186,7 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 | **V1.5** | **Live** | First on-chain claim flow (Bags.fm), Turnstile + priority fees, defense-in-depth security, Helius DAS indexing |
 | **V2.0** | **Live** | 10th platform (Raydium LaunchLab), 4 chains (added ETH + BSC), **paid API via x402 on Base Mainnet**, Allium intelligence, OWS wallet support, Pump.fun V2 |
 | **V2.1** | **Live** | x402 hardening: bazaar extension for agent discovery, payment-identifier for idempotency, lifecycle hooks, CSV injection protection, mainnet facilitator |
+| **V2.2** | **Live** | Audit hardening pass — anti-enumeration enforcement on profile routes, x402 wrapper consistency across all V2 endpoints (`/v2/resolve` now paid), Helius restricted frontend RPC key with domain-locked allowlist, framework + dependency upgrades |
 | V2.5 | Next | Token Fee Scanner (paste any CA), multi-platform claim |
 | V3 | Planned | Automated claim scheduling, creator analytics, portfolio dashboard |
 
