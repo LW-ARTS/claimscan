@@ -55,10 +55,16 @@ app/
     honeypot/[...path]/       # Trap pra scrapers (retorna dados fake)
   [handle]/opengraph-image.tsx     # OG dinamico por creator
   leaderboard/opengraph-image.tsx  # OG dinamico do leaderboard
+  loading.tsx                      # Skeleton fallback global (skeleton blocks pulse)
+  docs/loading.tsx                 # Skeleton: header + sidebar lg+ + 3 sections
+  terms/loading.tsx                # Skeleton: legal doc com numbered sections
+  leaderboard/loading.tsx          # Skeleton: header + filter chips + 10 ranking rows
+  [handle]/loading.tsx             # Skeleton: signal radar (scanning animation)
   components/
     anim/                     # CountUp, RevealOnScroll, RevealMount + tokens.ts (DURATION/EASE)
     DocsSidebar.tsx           # Sidebar nav /docs
     TermsSidebar.tsx          # Sidebar nav /terms
+    LiveFeesProvider.tsx      # React Context — owns SSE polling, exposes useLiveFees() hook
 lib/
   platforms/                  # 9 adapters (bags, pump, clanker, zora, bankr, believe, revshare, coinbarrel, raydium)
   chains/                     # solana.ts, base.ts, eth.ts, bsc.ts, clanker-reads.ts
@@ -99,10 +105,14 @@ design-reference/             # PNGs @2x do design (referencia visual)
 - Cache TTL: 40min normal, 2h pra creators com 500+ records
 - Price waterfall: DexScreener → Jupiter (Solana only). CoinGecko somente para precos nativos (SOL/ETH)
 - Rate limiting: 30 req/min geral, 10 req/min search, 20 handles/5min anti-enumeration
-- proxy.ts (~528 linhas): security headers, tarpit, honeypot, CORS, request signing, x402 routing — nao existe middleware.ts
+- proxy.ts (~528 linhas): security headers, tarpit, honeypot, CORS, request signing, x402 routing — nao existe middleware.ts. CSP em `buildCspHeader()`. `style-src` allowlista `fonts.googleapis.com` (DM Sans do `@solana/wallet-adapter-react-ui`)
 - Cron endpoints protegidos com CRON_SECRET bearer token
 - Animacoes: usar componentes em `app/components/anim/` + tokens.ts (DURATION/EASE). Sempre respeitar `useReducedMotion`
 - Design tokens: editar SOMENTE em `Claimscan.pen` via Pencil MCP, depois sincronizar `DESIGN-SPEC.md` e `app/globals.css`
+- **Live fees no perfil (`/[handle]`)**: SSE polling vive em `LiveFeesProvider` (Context). Tanto `ProfileHero` quanto `PlatformBreakdown` consomem via `useLiveFees()` hook. O Map é chaveado por `${platform}:${chain}:${tokenAddress}` (composite key). NUNCA dar polling separado — sempre via provider
+- **Merge de displayFees em PlatformBreakdown** (ordem importa): 1) cached fees → 2) live overlay (re-derivar `claim_status` dos amounts frescos) → 3) `claimedMints` optimistic overlay (claim acabou de rolar, ganha de tudo). Tokens que aparecem só em live (não indexados ainda pelo cron) viram virtual rows com `id="live:<key>"`, `creator_id: ''`
+- **Currency display rules**: NÃO usar `font-mono` em valores bold de moeda (`$X.YK`). O Inter bold em sizes pequenos renderiza period com side-bearings visíveis ("$844 . 27K"). Use `tabular-nums` solo, ou `tracking-tight`, ou — pra valores K em contexto compacto — strip os decimais via `formatUsd(v).replace(/\.\d+K$/, 'K')`
+- **Mobile micro-interactions**: todas as utility classes `.hover-glow / .hover-lift / .card-hover / .row-hover / .hover-ring` têm `:active` mirror em `@media (hover: none)` no globals.css. Quando criar nova hover utility, adicionar o mirror também
 
 ## Env (principais)
 - .env.example existe na raiz — usar como base pra setup local
@@ -146,3 +156,6 @@ npm run test:e2e:ui      # Playwright UI mode
 - `Claimscan.pen` e arquivo encriptado — NUNCA ler com Read/Grep, usar `pencil` MCP (`batch_get`/`batch_design`)
 - OG images dinamicas (`opengraph-image.tsx`) sao server components — nao usar hooks nem Wallet context
 - `app/api/stats` usa ISR 24h — invalidacao automatica, nao precisa cron
+- **Pump.fun synthetic token IDs**: o adapter retorna `tokenAddress: 'SOL:pump'` (`tokenSymbol: 'SOL'`) e `tokenAddress: 'SOL:pumpswap'` (`tokenSymbol: 'SOL (PumpSwap)'`) — vault aggregates, nao mints reais. Cache e live stream usam os mesmos IDs sinteticos. O `(PumpSwap)` é stripado pelo `tokenDisplay()` em TokenFeeTable que pega só o primeiro whitespace token
+- **Stat card vs filter invariant** no perfil: o que `Total Unclaimed` mostrar TEM que ser igual à soma USD das rows visíveis no filtro Unclaimed. Se quebrar, é porque alguém reintroduziu um data source diferente entre `displayUnclaimedUsd` (ProfileHero) e `displayFees` (PlatformBreakdown). Ambos lêem do mesmo `useLiveFees().liveRecords` Map
+- **Turbopack file watcher dies on long sessions** (Next.js 16 dev server). Sintoma: source file modificado mas dev server serve código velho. Antes de "re-fixar" qualquer bug que parece não pegar, fazer `curl -s http://localhost:3001/<route> | grep <className-novo>`. Se vier vazio → kill PID e restart com `rm -rf .next/ && npm run dev -- -p 3001`
