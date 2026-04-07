@@ -4,10 +4,10 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { track } from '@vercel/analytics';
 import { PlatformIcon } from './PlatformIcon';
-import { PLATFORM_CONFIG, CHAIN_CONFIG, LIVE_POLL_INTERVAL_MS } from '@/lib/constants';
+import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
 import { safeBigInt, formatUsd, toUsdValue, copyToClipboard, computeFeeUsd } from '@/lib/utils';
-import { signedFetch } from '@/lib/signed-fetch';
 import { CountUpLazy } from './anim/CountUpLazy';
+import { useLiveFees, liveFeeKey, type LiveFeeKey } from './LiveFeesProvider';
 import type { Database, Chain, Platform } from '@/lib/supabase/types';
 
 type Creator = Database['public']['Tables']['creators']['Row'];
@@ -28,12 +28,6 @@ interface WalletInput {
   address: string;
   chain: string;
   sourcePlatform: string;
-}
-
-interface LiveFee {
-  totalUnclaimed: string;
-  chain: string;
-  platform: string;
 }
 
 interface ProfileHeroProps {
@@ -188,12 +182,9 @@ export function ProfileHero({
   const [showAllWallets, setShowAllWallets] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
 
-  // ── Live polling (migrated from FeeSummaryCard) ──
-  const [liveFees, setLiveFees] = useState<LiveFee[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [pollError, setPollError] = useState(false);
-
-  const walletsKey = useMemo(() => JSON.stringify(walletsForLive), [walletsForLive]);
+  // Live SSE state is now owned by LiveFeesProvider; this component just
+  // consumes the merged Map and the loading flag for the pulsing dot.
+  const { liveRecords, loading } = useLiveFees();
 
   // Track profile load once on mount
   useEffect(() => {
@@ -208,177 +199,6 @@ export function ProfileHero({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    let timeoutId: ReturnType<typeof setTimeout>;
-    let webhookSSE: EventSource | null = null;
-
-    // Accumulated fees from streaming partial results.
-    // Each adapter's results replace previous results for that platform.
-    const streamedFees = new Map<string, LiveFee[]>();
-
-    function flushStreamedFees() {
-      const all: LiveFee[] = [];
-      for (const fees of streamedFees.values()) all.push(...fees);
-      setLiveFees(all);
-    }
-
-    /**
-     * Primary: Stream live fees via SSE — each adapter pushes results
-     * as it completes, so fast adapters appear instantly.
-     */
-    async function streamLiveFees() {
-      try {
-        const res = await signedFetch('/api/fees/live-stream', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wallets: JSON.parse(walletsKey) }),
-          signal: controller.signal,
-        });
-
-        if (!res.ok || !res.body) {
-          console.warn(`[ProfileHero] live-stream returned HTTP ${res.status}`);
-          // Fallback to JSON endpoint
-          return pollLiveFees();
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-
-          let currentEvent = '';
-          for (const line of lines) {
-            if (line.startsWith('event: ')) {
-              currentEvent = line.slice(7).trim();
-            } else if (line.startsWith('data: ') && currentEvent) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (currentEvent === 'partial-result' && data.fees && data.platform in PLATFORM_CONFIG) {
-                  streamedFees.set(data.platform, data.fees);
-                  flushStreamedFees();
-                  setLoading(false);
-                  setPollError(false);
-                }
-              } catch {
-                // Ignore parse errors in stream
-              }
-              currentEvent = '';
-            }
-          }
-        }
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') return;
-        console.warn('[ProfileHero] live-stream failed, falling back to JSON:', err instanceof Error ? err.message : err);
-        return pollLiveFees();
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    /** Fallback: traditional JSON fetch (subject to 10s Vercel limit). */
-    async function pollLiveFees() {
-      try {
-        const res = await signedFetch('/api/fees/live', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wallets: JSON.parse(walletsKey) }),
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-        if (!res.ok) {
-          console.warn(`[ProfileHero] live fees returned HTTP ${res.status}`);
-          return;
-        }
-        const data = await res.json();
-        setLiveFees(data.fees ?? []);
-        setPollError(false);
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') return;
-        console.warn('[ProfileHero] live fee poll failed:', err instanceof Error ? err.message : err);
-        setPollError(true);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    function connectWebhookSSE() {
-      try {
-        const walletData = JSON.parse(walletsKey);
-        const url = `/api/fees/stream?wallets=${encodeURIComponent(JSON.stringify(walletData))}`;
-        webhookSSE = new EventSource(url);
-
-        webhookSSE.onmessage = () => {
-          // Webhook triggered — re-stream live fees
-          streamLiveFees();
-        };
-
-        webhookSSE.onerror = () => {
-          webhookSSE?.close();
-          webhookSSE = null;
-          // Fall back to periodic polling for updates
-          if (!controller.signal.aborted) {
-            timeoutId = setTimeout(() => {
-              streamLiveFees().then(() => {
-                if (!controller.signal.aborted) {
-                  timeoutId = setTimeout(() => streamLiveFees(), LIVE_POLL_INTERVAL_MS);
-                }
-              });
-            }, LIVE_POLL_INTERVAL_MS);
-          }
-        };
-      } catch {
-        if (!controller.signal.aborted) {
-          timeoutId = setTimeout(() => streamLiveFees(), LIVE_POLL_INTERVAL_MS);
-        }
-      }
-    }
-
-    // Initial streaming fetch, then connect webhook SSE for real-time updates
-    streamLiveFees().then(() => {
-      if (!controller.signal.aborted) {
-        connectWebhookSSE();
-      }
-    });
-
-    // Listen for claim-complete events from PlatformBreakdown to trigger
-    // immediate refresh instead of waiting for the next 30s poll cycle.
-    function handleClaimComplete() {
-      if (!controller.signal.aborted) {
-        streamLiveFees();
-      }
-    }
-    window.addEventListener('claimscan:claim-complete', handleClaimComplete);
-
-    function handleVisibility() {
-      if (document.hidden) {
-        clearTimeout(timeoutId);
-      } else if (!webhookSSE || webhookSSE.readyState === EventSource.CLOSED) {
-        streamLiveFees().then(() => {
-          if (!controller.signal.aborted) connectWebhookSSE();
-        });
-      } else {
-        streamLiveFees();
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-      webhookSSE?.close();
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('claimscan:claim-complete', handleClaimComplete);
-    };
-  }, [walletsKey]);
-
   // ── Helpers ──
   const feeToUsd = useCallback((chain: string, amount: bigint) => {
     const prices: Record<string, number> = { sol: solPrice, eth: ethPrice, base: ethPrice, bsc: bnbPrice };
@@ -387,46 +207,43 @@ export function ProfileHero({
   }, [solPrice, ethPrice, bnbPrice]);
 
   // ── Computed values ──
-  // Per-platform merge with floor: live data can increase a platform's unclaimed
-  // total (new fees arrived) but never reduce it below the cached DB value.
-  //
-  // Two guards keep this stat aligned with the PlatformBreakdown "Unclaimed" filter:
-  // 1. Only count cached records whose claim_status is actually unclaimed/partial.
-  //    Records marked `claimed` with a stale non-zero total_unclaimed are DB rot
-  //    and would otherwise inflate the total while the filter shows 0 rows.
-  // 2. Only merge live data for platforms that ALREADY have unclaimed cached
-  //    records. If every cached record on a platform is claimed, we don't
-  //    fabricate a phantom "live unclaimed" total the user can't act on — the
-  //    filter has nothing to show for that platform anyway.
+  // Per-token merge: live data takes precedence over cached total_unclaimed
+  // for any row with a matching composite key, and live-only rows add to the
+  // total as virtual entries. This keeps the Total Unclaimed stat aligned
+  // with the PlatformBreakdown filter + list which apply the same merge.
   const displayUnclaimedUsd = useMemo(() => {
-    const platformUsd = new Map<string, number>();
-    for (const f of initialFees) {
-      if (f.claim_status !== 'unclaimed' && f.claim_status !== 'partially_claimed') continue;
-      const amount = safeBigInt(f.total_unclaimed);
-      if (amount === 0n) continue;
-      platformUsd.set(f.platform, (platformUsd.get(f.platform) ?? 0) + feeToUsd(f.chain, amount));
-    }
-    if (liveFees.length > 0) {
-      const livePlatformUsd = new Map<string, number>();
-      for (const f of liveFees) {
-        const amount = safeBigInt(f.totalUnclaimed);
-        if (amount === 0n) continue;
-        livePlatformUsd.set(f.platform, (livePlatformUsd.get(f.platform) ?? 0) + feeToUsd(f.chain, amount));
-      }
-      for (const [platform, liveUsd] of livePlatformUsd) {
-        // Skip platforms where the cached data shows nothing unclaimed.
-        // Live polling can update an existing unclaimed total, but it cannot
-        // resurrect a fully-claimed platform — users can't claim what the
-        // list doesn't show.
-        if (!platformUsd.has(platform)) continue;
-        const cachedUsd = platformUsd.get(platform) ?? 0;
-        platformUsd.set(platform, Math.max(cachedUsd, liveUsd));
-      }
-    }
     let total = 0;
-    for (const usd of platformUsd.values()) total += usd;
+    const seenKeys = new Set<LiveFeeKey>();
+
+    // 1. Walk cached records, overlay live data when present
+    for (const f of initialFees) {
+      const key = liveFeeKey(f.platform, f.chain, f.token_address);
+      const live = liveRecords.get(key);
+      if (live) seenKeys.add(key);
+
+      if (live) {
+        const unclaimed = safeBigInt(live.totalUnclaimed);
+        if (unclaimed === 0n) continue;
+        total += feeToUsd(f.chain, unclaimed);
+      } else {
+        // Cache-only: respect claim_status so DB data rot never inflates the stat
+        if (f.claim_status !== 'unclaimed' && f.claim_status !== 'partially_claimed') continue;
+        const unclaimed = safeBigInt(f.total_unclaimed);
+        if (unclaimed === 0n) continue;
+        total += feeToUsd(f.chain, unclaimed);
+      }
+    }
+
+    // 2. Virtual rows: live records with no cached counterpart
+    for (const [key, live] of liveRecords) {
+      if (seenKeys.has(key)) continue;
+      const amount = safeBigInt(live.totalUnclaimed);
+      if (amount === 0n) continue;
+      total += feeToUsd(live.chain, amount);
+    }
+
     return total;
-  }, [initialFees, liveFees, feeToUsd]);
+  }, [initialFees, liveRecords, feeToUsd]);
 
   // Claimed USD computed directly from DB total_claimed — not derived from
   // totalEarned - unclaimed, which drifts when live polling updates unclaimed.
