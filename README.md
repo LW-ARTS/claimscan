@@ -20,7 +20,7 @@
 
 ## What is ClaimScan?
 
-ClaimScan is a free tool that scans and claims unclaimed creator fees across 10 DeFi launchpads on Solana, Base, Ethereum, and BNB Chain.
+ClaimScan is a free tool that scans and claims unclaimed creator fees across 9 DeFi launchpads on Solana, Base, Ethereum, and BNB Chain.
 
 Around 40% of creator fees go unclaimed. Creators launch tokens, generate volume, earn fees, and never collect them. ClaimScan finds that money and lets you claim it.
 
@@ -33,7 +33,7 @@ Around 40% of creator fees go unclaimed. Creators launch tokens, generate volume
 ## How It Works
 
 1. Paste a Twitter handle, GitHub username, Farcaster name, or wallet address
-2. ClaimScan scans 10 launchpads across Solana, Base, Ethereum, and BNB Chain simultaneously
+2. ClaimScan scans 9 launchpads across Solana, Base, Ethereum, and BNB Chain simultaneously
 3. Full breakdown: earned, claimed, unclaimed in USD with live pricing
 4. Connect your wallet and claim uncollected fees directly from ClaimScan
 
@@ -104,7 +104,7 @@ ClaimScan V2 introduces a paid API powered by the [x402 protocol](https://x402.o
 
 | Endpoint | Price | What you get |
 |----------|-------|--------------|
-| `GET /api/v2/fees?wallet=<address>` | $0.01 | Full fee report across all 10 platforms and 4 chains |
+| `GET /api/v2/fees?wallet=<address>` | $0.01 | Full fee report across all 9 platforms and 4 chains |
 | `GET /api/v2/export?wallet=<address>` | $0.05 | CSV or JSON export of all fee records |
 | `GET /api/v2/intelligence?wallet=<address>` | $0.02 | Intelligence report: ClaimScan fees + Allium cross-chain enrichment |
 | `GET /api/v2/resolve?ows_wallet=<name>` | $0.01 | Resolve an OWS wallet name into multi-chain addresses |
@@ -172,7 +172,7 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 
 ## Stats
 
-- 10 launchpads supported
+- 9 launchpads supported
 - 4 chains (Solana + Base + Ethereum + BNB Chain)
 - Under 30 second scan time
 - $0 to scan and claim (always free)
@@ -184,7 +184,7 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 |---------|--------|------------|
 | V1.0 | Live | 9 platforms, cross-chain scanning, identity resolution |
 | **V1.5** | **Live** | First on-chain claim flow (Bags.fm), Turnstile + priority fees, defense-in-depth security, Helius DAS indexing |
-| **V2.0** | **Live** | 10th platform (Raydium LaunchLab), 4 chains (added ETH + BSC), **paid API via x402 on Base Mainnet**, Allium intelligence, OWS wallet support, Pump.fun V2 |
+| **V2.0** | **Live** | 9th platform added (Raydium LaunchLab), 4 chains (added ETH + BSC), **paid API via x402 on Base Mainnet**, Allium intelligence, OWS wallet support, Pump.fun V2 |
 | **V2.1** | **Live** | x402 hardening: bazaar extension for agent discovery, payment-identifier for idempotency, lifecycle hooks, CSV injection protection, mainnet facilitator |
 | **V2.2** | **Live** | Audit hardening pass — anti-enumeration enforcement on profile routes, x402 wrapper consistency across all V2 endpoints (`/v2/resolve` now paid), Helius restricted frontend RPC key with domain-locked allowlist, framework + dependency upgrades |
 | V2.5 | Next | Token Fee Scanner (paste any CA), multi-platform claim |
