@@ -318,17 +318,13 @@ export default async function Home() {
                       : ''
                 } ${idx < leaderboardPreview.length - 1 ? 'border-b border-[var(--border-subtle)]' : ''}`}
               >
-                <span className={`w-12 tabular-nums ${idx === 0 ? 'text-[18px] font-extrabold text-white' : 'text-sm font-bold text-[var(--text-tertiary)]'}`}>
-                  {idx === 0 ? (
-                    <span className="flex items-center gap-2.5">
-                      <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-                      </svg>
-                      {idx + 1}
-                    </span>
-                  ) : (
-                    idx + 1
+                <span className={`flex w-12 shrink-0 items-center justify-center gap-1 tabular-nums text-sm font-bold ${idx === 0 ? 'text-white' : 'text-[var(--text-tertiary)]'}`}>
+                  {idx === 0 && (
+                    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+                    </svg>
                   )}
+                  {idx + 1}
                 </span>
                 <span className="flex flex-1 items-center gap-2.5 text-left">
                   {entry.handle_type === 'twitter' ? (
