@@ -20,6 +20,7 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     console.error('[balance] RPC call failed', { wallet, error: err instanceof Error ? err.message : String(err) });
-    return NextResponse.json({ error: 'RPC error' }, { status: 502 });
+    // L-03: don't leak the dependency chain in the error message
+    return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 503 });
   }
 }

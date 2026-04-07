@@ -16,6 +16,41 @@ const log = createLogger('x402');
 const MAINNET_NETWORKS = ['eip155:8453', 'eip155:4326', 'eip155:143', 'eip155:43114'];
 const DEFAULT_FACILITATOR = 'https://x402.org/facilitator';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// FACILITATOR NOTES
+//
+// Production currently uses Bitrefill's x402 facilitator
+// (https://api.bitrefill.com/x402). Bitrefill maintains a fork of the x402
+// protocol and runs its own facilitator infrastructure for paid API customers.
+//
+// Trust model: the facilitator validates and settles USDC payments on Base
+// mainnet on behalf of ClaimScan. If the facilitator is compromised or goes
+// down, ALL paid API revenue is affected. The address that receives payments
+// (X402_WALLET_ADDRESS) is independent — funds settle directly to that wallet.
+//
+// Fallback strategy (recommended): Coinbase Developer Platform also operates a
+// fee-free x402 facilitator on Base mainnet. Consider documenting an alternate
+// facilitator URL and a runtime switch in case Bitrefill becomes unavailable.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// M-01: Fail closed in production if X402_NETWORK is still the testnet default.
+// Defense-in-depth — production env should explicitly set eip155:8453 (Base mainnet).
+// NEXT_PHASE is set during build; skip the check then so the build doesn't fail.
+if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PHASE) {
+  if (NETWORK === 'eip155:84532') {
+    throw new Error(
+      '[x402] X402_NETWORK is set to Sepolia testnet (eip155:84532) in production. ' +
+      'Set X402_NETWORK=eip155:8453 (Base mainnet) before deploying paid endpoints.'
+    );
+  }
+  if (FACILITATOR_URL === DEFAULT_FACILITATOR && MAINNET_NETWORKS.includes(NETWORK)) {
+    throw new Error(
+      `[x402] Default facilitator ${DEFAULT_FACILITATOR} is testnet-only and cannot serve mainnet network ${NETWORK}. ` +
+      'Set X402_FACILITATOR_URL to a mainnet-compatible facilitator (e.g. Bitrefill or Coinbase Developer Platform).'
+    );
+  }
+}
+
 if (MAINNET_NETWORKS.includes(NETWORK) && FACILITATOR_URL === DEFAULT_FACILITATOR) {
   console.warn(
     `[x402] Network ${NETWORK} is mainnet but facilitator is the default testnet-only (${DEFAULT_FACILITATOR}). ` +

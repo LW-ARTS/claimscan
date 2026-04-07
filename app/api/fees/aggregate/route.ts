@@ -48,6 +48,8 @@ export async function GET(request: Request) {
     if (fee.claim_status === 'partially_claimed') totalPartialCount++;
   }
 
+  // M-02: Cache-Control is set centrally by proxy.ts (no-store for /api/* except
+  // /api/prices). Don't override here — stay consistent with the documented policy.
   return NextResponse.json({
     fees: fees ?? [],
     summary: {
@@ -58,7 +60,5 @@ export async function GET(request: Request) {
       partiallyClaimedCount: totalPartialCount,
       truncated,
     },
-  }, {
-    headers: { 'Cache-Control': 'private, s-maxage=60, stale-while-revalidate=120' },
   });
 }
