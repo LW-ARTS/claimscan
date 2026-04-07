@@ -262,7 +262,10 @@ function buildCspHeader(nonce: string): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${devEval} https://challenges.cloudflare.com`,
-    "style-src 'self' 'unsafe-inline'",
+    // Google Fonts CDN allowlisted because @solana/wallet-adapter-react-ui's
+    // styles.css imports DM Sans from fonts.googleapis.com. The matching .woff2
+    // files come from fonts.gstatic.com (already in font-src).
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https://pbs.twimg.com https://abs.twimg.com https://avatars.githubusercontent.com https://imagedelivery.net https://ipfs.io https://unavatar.io",
     "font-src 'self' https://fonts.gstatic.com",
     "connect-src 'self' https://*.supabase.co https://api.coingecko.com https://api.dexscreener.com https://api.jup.ag https://*.ingest.sentry.io https://*.helius-rpc.com wss://*.helius-rpc.com https://api.mainnet-beta.solana.com",
