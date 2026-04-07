@@ -40,7 +40,7 @@ Around 40% of creator fees go unclaimed. Creators launch tokens, generate volume
 No signup. Read-only scanning. Zero-custody claiming. Always free.
 
 <div align="center">
-  <img src="assets/screenshot-scan.png" alt="ClaimScan Scan Result" width="700" />
+  <img src="assets/screenshot-scan.png" alt="ClaimScan creator profile - @finnbags scan result" width="700" />
 </div>
 
 ## Supported Platforms
@@ -81,6 +81,10 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 - **Pagination scrolls back to the top** automatically on page change
 - **Dynamic Open Graph image** for the leaderboard route, share the live ranking on socials
 
+<div align="center">
+  <img src="assets/screenshot-leaderboard.png" alt="ClaimScan Leaderboard - Top creator fee earners" width="700" />
+</div>
+
 ### UI and UX
 - **Visual redesign v2** with consistent spacing, typography, color tokens, and motion across every page
 - **Per route skeleton loading states** for home, docs, terms, leaderboard, and creator profiles. No more blank flashes during navigation.
@@ -88,6 +92,10 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 - **Animation system** with shared duration tokens, easing curves, and full `prefers-reduced-motion` support so users who opt out of animation still get a great experience.
 - **Dynamic Open Graph images** per creator profile and per leaderboard route. Share any handle, see a beautiful preview card.
 - **Tight currency typography** with proper digit alignment so values render correctly at every size.
+
+<div align="center">
+  <img src="assets/screenshot-og-finnbags.png" alt="ClaimScan dynamic OG card for @finnbags profile" width="700" />
+</div>
 
 ### Claiming (V1.5) ✦ Bags.fm Live
 V1.5 is the update where ClaimScan went from read-only scanner to full claimer. Bags.fm is the first platform with direct on-chain claiming built in. No third-party custody, no approvals, no token permissions. Connect your wallet, review the simulation, sign, done.
