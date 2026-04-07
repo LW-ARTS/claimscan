@@ -10,10 +10,10 @@ const log = createLogger('honeypot');
  * Logs the attempt via structured logger for forensic review.
  */
 function logAndReject(request: NextRequest) {
+  // L-02: only trust x-real-ip on Vercel (spoofable in any other environment)
   const ip =
     (request as unknown as { ip?: string }).ip ??
-    request.headers.get('x-real-ip') ??
-    'unknown';
+    (process.env.VERCEL ? (request.headers.get('x-real-ip') ?? 'unknown') : 'unknown');
   const ua = request.headers.get('user-agent') ?? 'none';
   const path = request.nextUrl.pathname;
 

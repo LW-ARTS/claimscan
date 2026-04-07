@@ -36,10 +36,12 @@ export async function GET(request: Request) {
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://claimscan.tech';
     const host = process.env.VERCEL_URL ?? new URL(appUrl).host;
+    // L-01: tightened regex requires hyphen separator after "claimscan" so we
+    // don't match attacker-owned projects like claimscanevil.vercel.app.
     if (
       host !== 'claimscan.tech' &&
       host !== 'www.claimscan.tech' &&
-      !(/^claimscan[a-z0-9-]*\.vercel\.app$/.test(host))
+      !(/^claimscan(-[a-z0-9-]+)?\.vercel\.app$/.test(host))
     ) {
       console.error(`[flex] SSRF blocked: resolved host "${host}" is not in allowlist`);
       return NextResponse.json({ error: 'Internal error' }, { status: 500 });

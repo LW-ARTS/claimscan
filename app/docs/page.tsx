@@ -749,6 +749,7 @@ curl https://claimscan.tech/api/v2/export?wallet=0xEvmAddress...&format=json`}</
                 </p>
                 <div className="mt-5 space-y-2">
                   {[
+                    '/v2/resolve: $0.01/query',
                     '/v2/fees: $0.01/query',
                     '/v2/export: $0.05/query',
                     '/v2/intelligence: $0.02/query',
@@ -760,6 +761,9 @@ curl https://claimscan.tech/api/v2/export?wallet=0xEvmAddress...&format=json`}</
                     </div>
                   ))}
                 </div>
+                <p className="mt-4 text-[11px] text-[var(--text-tertiary)] leading-relaxed">
+                  Privacy: all creator data exposed via the V2 API is already public. Paying unlocks fast lookup, not access to private data.
+                </p>
               </div>
 
               {/* Enterprise */}

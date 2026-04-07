@@ -304,11 +304,51 @@ export async function proxy(request: NextRequest) {
   applySecurityHeaders(response, nonce);
 
   // ═══════════════════════════════════════════════
+  // HANDLE ROUTE PROTECTIONS (before fast path)
+  // /{handle} routes are GET requests to non-API paths, so they would otherwise
+  // be fast-pathed without any anti-scraping protection. Run scraper UA block,
+  // anti-enumeration, and a capped tarpit for handle routes BEFORE the fast
+  // path so the documented "20 handles/5min anti-enumeration" rule actually
+  // fires (audit finding H-02).
+  // ═══════════════════════════════════════════════
+  const handleMatchEarly = pathname.match(HANDLE_ROUTE_RE);
+  if (handleMatchEarly && request.method === 'GET') {
+    const ua = request.headers.get('user-agent')?.toLowerCase() ?? '';
+    if (SCRAPER_UA_RE.test(ua)) {
+      return applySecurityHeaders(NextResponse.json(
+        { error: 'Automated access is not permitted' },
+        { status: 403 }
+      ), nonce);
+    }
+    // Require User-Agent for handle routes too (legitimate browsers always send one)
+    if (!request.headers.get('user-agent')) {
+      return applySecurityHeaders(NextResponse.json(
+        { error: 'User-Agent header is required' },
+        { status: 400 }
+      ), nonce);
+    }
+    const handleIp = getClientIp(request);
+    if (isEnumerating(handleIp, handleMatchEarly[1])) {
+      await sleep(3000);
+      return applySecurityHeaders(NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': '300' } }
+      ), nonce);
+    }
+    // Tarpit for suspicious requests on handle routes (capped at 500ms — pages are user-facing)
+    const handleDelay = Math.min(getTarpitDelayMs(request), 500);
+    if (handleDelay > 0) {
+      await sleep(handleDelay);
+    }
+  }
+
+  // ═══════════════════════════════════════════════
   // FAST PATH: Static page GET requests
-  // Skip rate limiting, signature verification, anti-enumeration, and tarpit
+  // Skip rate limiting, signature verification, and the API-specific tarpit
   // for non-API GET requests to known static pages.
   // These pages don't need protection beyond security headers.
   // Saves ~200-400ms TTFB on homepage and other static pages.
+  // Handle routes already passed through the protections above.
   // ═══════════════════════════════════════════════
   if (
     request.method === 'GET' &&
