@@ -21,11 +21,20 @@ interface TokenFeeTableProps {
   onClaimToken?: (tokenMint: string) => void;
 }
 
-/** Format token display: $SYMBOL when available, shortened address as fallback */
+/**
+ * Format token display: $SYMBOL when available, shortened address as fallback.
+ *
+ * Some adapters annotate the symbol with a pool/source descriptor in
+ * parentheses (e.g. Pump.fun's synthetic PumpSwap row returns
+ * "SOL (PumpSwap)"). After stripping non-word/whitespace characters the
+ * result becomes "SOL PumpSwap" — we keep only the first whitespace-
+ * delimited token so the label stays a clean coin symbol.
+ */
 function tokenDisplay(fee: FeeRecord): { label: string; badge: string } {
-  const raw = (fee.token_symbol || '').replace(/[^\w\s\-\.]/g, '').trim().slice(0, 20);
-  if (raw) {
-    return { label: `$${raw}`, badge: raw[0] };
+  const cleaned = (fee.token_symbol || '').replace(/[^\w\s\-\.]/g, '').trim();
+  const symbol = cleaned.split(/\s+/)[0]?.slice(0, 20) ?? '';
+  if (symbol) {
+    return { label: `$${symbol}`, badge: symbol[0] };
   }
   const addr = fee.token_address || '';
   const short = addr.length > 8 ? addr.slice(0, 6) + '...' : addr;

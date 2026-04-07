@@ -335,7 +335,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
       {/* Top Bar Section — 3-row filter system */}
       <div className="space-y-3 px-4 pt-6 sm:px-8">
         {/* Row 1 — Chain Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 pr-4 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:pr-0">
           {(['all', 'sol', 'base', 'eth', 'bsc'] as const).map(ch => (
             <button
               key={ch}
@@ -355,7 +355,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
         <div
           role="radiogroup"
           aria-label="Filter by claim status"
-          className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0"
+          className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-1 pr-4 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:pr-0"
           onKeyDown={(e) => {
             if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
             e.preventDefault();
@@ -396,7 +396,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
         <div
           role="tablist"
           aria-label="Filter by platform"
-          className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0"
+          className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 pr-4 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:pr-0"
           onKeyDown={(e) => handleTabKeyDown(e, tabKeys)}
         >
           <button
@@ -406,14 +406,14 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
             id={`${tabsId}-tab-all`}
             tabIndex={activeTab === 'all' ? 0 : -1}
             onClick={() => setActiveTab('all')}
-            className={`pressable hover-glow inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium ${
+            className={`pressable hover-glow inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium ${
               activeTab === 'all'
                 ? 'bg-[var(--bg-surface-hover)] border border-[var(--border-accent)] text-[var(--text-primary)]'
                 : 'bg-[var(--bg-surface)] text-[var(--text-secondary)]'
             }`}
           >
             All
-            <span className={`font-mono text-xs tabular-nums ${activeTab === 'all' ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'}`}>
+            <span className={`text-xs tabular-nums ${activeTab === 'all' ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'}`}>
               {chainFiltered.length}
             </span>
           </button>
@@ -430,15 +430,15 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
                 id={`${tabsId}-tab-${platform}`}
                 tabIndex={isActive ? 0 : -1}
                 onClick={() => setActiveTab(platform)}
-                className={`pressable hover-glow inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium ${
+                className={`pressable hover-glow inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[13px] font-medium ${
                   isActive
                     ? 'bg-[var(--bg-surface-hover)] border border-[var(--border-accent)] text-[var(--text-primary)]'
                     : 'bg-[var(--bg-surface)] text-[var(--text-secondary)]'
                 }`}
               >
-                <PlatformIcon platform={platform} className="h-3.5 w-3.5" aria-hidden />
+                <PlatformIcon platform={platform} className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 <span>{config?.name ?? platform}</span>
-                <span className={`font-mono text-xs tabular-nums ${isActive ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'}`}>
+                <span className={`text-xs tabular-nums ${isActive ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'}`}>
                   {count}
                 </span>
               </button>
