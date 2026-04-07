@@ -116,19 +116,58 @@ design-reference/             # PNGs @2x do design (referencia visual)
 
 ## Env (principais)
 - .env.example existe na raiz — usar como base pra setup local
+- **IMPORTANTE:** ao setar env vars na Vercel UI, SEMPRE usar `printf '%s' '<value>' | npx vercel env add <NAME> production` em vez de copy-paste no formulário web — copy-paste do navegador frequentemente acrescenta `\n` literal ao final do valor, que vira newline real após o dotenv parser. Esse bug quebrou `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SOLANA_RPC_URL` e `ETH_RPC_URL` em produção (audit 2026-04-07 findings N-01 e similares). Pra verificar valores existentes: `vercel env pull /tmp/.env && grep '^NAME=' /tmp/.env | od -c` — checa os bytes finais
 ```
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
-SOLANA_RPC_URL, NEXT_PUBLIC_SOLANA_RPC_URL, BASE_RPC_URL, BSC_RPC_URL
-BAGS_API_KEY, ZORA_API_KEY, HELIUS_API_KEY, HELIUS_WEBHOOK_SECRET
-CRON_SECRET, CLAIM_HMAC_SECRET
+
+# RPC endpoints — providers atuais em produção:
+SOLANA_RPC_URL              # Helius (server-only, com api-key principal)
+NEXT_PUBLIC_SOLANA_RPC_URL  # Helius restricted frontend key — domain-locked aos 5 hosts canônicos (claimscan.tech, www.claimscan.tech, claimscan-nine.vercel.app, claimscan-screwks-projects.vercel.app, claimscan-screwk-screwks-projects.vercel.app). NÃO suporta preview deploys.
+BASE_RPC_URL                # Alchemy (base-mainnet.g.alchemy.com)
+ETH_RPC_URL                 # Alchemy (eth-mainnet.g.alchemy.com)
+BSC_RPC_URL                 # Alchemy (bnb-mainnet.g.alchemy.com)
+
+# Platform API keys
+BAGS_API_KEY                # legacy single key (mantido por compat)
+BAGS_API_KEYS               # comma-separated multi-key rotation (preferred — round-robin para evitar rate limits)
+ZORA_API_KEY
+BANKR_API_KEY               # Bankr platform API
+NEYNAR_API_KEY              # Farcaster Neynar (alternativa ao public Farcaster Hub para identity resolution)
+HELIUS_API_KEY              # Helius DAS / Enhanced Transactions / Webhooks management
+
+# Webhooks + cron auth
+HELIUS_WEBHOOK_SECRET       # Bearer token validado em /api/webhooks/helius com timingSafeEqual
+CRON_SECRET                 # min 32 chars, bearer pra /api/cron/* — verificado em proxy.ts e lib/supabase/service.ts
+
+# Claim flow
+CLAIM_HMAC_SECRET           # min 32 chars, HMAC-SHA256 pra confirmation tokens em lib/claim/hmac.ts
+
+# Rate limiting / replay protection
 UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+
+# CAPTCHA
 NEXT_PUBLIC_TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY
+
+# Anti-scraping (intencionalmente exposto ao browser — NÃO é security boundary)
 NEXT_PUBLIC_API_SIGN_KEY
+
+# Monitoring
 NEXT_PUBLIC_SENTRY_DSN
-X402_WALLET_ADDRESS, X402_NETWORK, X402_FACILITATOR_URL
-ALLIUM_API_KEY
+
+# x402 paid API v2
+X402_WALLET_ADDRESS         # EVM address que recebe USDC. Em prod: 0xAb0800673c3E80587e48ACdB7d2a81089aC22DD4 (Base mainnet)
+X402_NETWORK                # MUST be 'eip155:8453' em produção. Default no código é 'eip155:84532' (Sepolia testnet) — lib/x402/server.ts faz fail-closed throw se mainnet não setado em prod
+X402_FACILITATOR_URL        # https://api.bitrefill.com/x402 (Bitrefill, terceiro). Trust model documentado em lib/x402/server.ts. Coinbase Developer Platform é fallback recomendado se Bitrefill ficar indisponível.
+
+# Intelligence enrichment
+ALLIUM_API_KEY              # Allium wallet PnL (opcional — /v2/intelligence degrade graceful sem)
+
+# Price providers
 COINGECKO_API_KEY, JUP_API_KEY
-RESOLVE_TIMEOUT_MS (optional, default 55000 — override para deploys externos)
+
+# Misc
+RESOLVE_TIMEOUT_MS          # optional, default 55000 — override para deploys externos
 ```
 
 ## Git
@@ -159,3 +198,5 @@ npm run test:e2e:ui      # Playwright UI mode
 - **Pump.fun synthetic token IDs**: o adapter retorna `tokenAddress: 'SOL:pump'` (`tokenSymbol: 'SOL'`) e `tokenAddress: 'SOL:pumpswap'` (`tokenSymbol: 'SOL (PumpSwap)'`) — vault aggregates, nao mints reais. Cache e live stream usam os mesmos IDs sinteticos. O `(PumpSwap)` é stripado pelo `tokenDisplay()` em TokenFeeTable que pega só o primeiro whitespace token
 - **Stat card vs filter invariant** no perfil: o que `Total Unclaimed` mostrar TEM que ser igual à soma USD das rows visíveis no filtro Unclaimed. Se quebrar, é porque alguém reintroduziu um data source diferente entre `displayUnclaimedUsd` (ProfileHero) e `displayFees` (PlatformBreakdown). Ambos lêem do mesmo `useLiveFees().liveRecords` Map
 - **Turbopack file watcher dies on long sessions** (Next.js 16 dev server). Sintoma: source file modificado mas dev server serve código velho. Antes de "re-fixar" qualquer bug que parece não pegar, fazer `curl -s http://localhost:3001/<route> | grep <className-novo>`. Se vier vazio → kill PID e restart com `rm -rf .next/ && npm run dev -- -p 3001`
+- **TODO performance — Helius Enhanced Transactions APIs**: o cron `index-fees` e o `claim/confirm` (verificação de fee tx) atualmente fazem `getSignaturesForAddress` + N × `getTransaction` raw e parseiam preBalances/postBalances no braço. O Helius oferece 2 endpoints já parseados que substituiriam isso com 1 call: `https://api-mainnet.helius-rpc.com/v0/transactions/?api-key=...` (parse N tx signatures) e `https://api-mainnet.helius-rpc.com/v0/addresses/{addr}/transactions/?api-key=...` (parse history paginado por address). Retorna `tokenTransfers[]`, `nativeTransfers[]`, instruction types tipados (`SWAP`, `TRANSFER`, `NFT_SALE`, etc). Reduziria latência do cron + simplificaria os adapters de plataforma. Não está adotado ainda — usar a `SOLANA_RPC_URL` (que tbm é Helius) é o padrão atual
+- **TODO arquitetural — migrar wallet stack pra Reown AppKit Multi-Adapter quando entrar a Fase 2 (claims EVM)**: ClaimScan hoje só assina Solana (claims Bags.fm). Quando começar a fazer claims EVM (Clanker/Zora/Bankr em Base, BSC, ETH), o caminho recomendado é substituir `@solana/wallet-adapter-react-ui` por `@reown/appkit` com `WagmiAdapter` + `SolanaAdapter` no mesmo `createAppKit({ adapters: [wagmiAdapter, solanaAdapter], networks: [mainnet, base, bsc, solana] })`. Vantagens: (1) modal único pra todas as 4 chains do estilo `kolscanbrasil.io` (Phantom + MetaMask + WalletConnect categorizados), (2) `<appkit-button />` é Web Component em Shadow DOM — provavelmente resolve o L-04 (`'unsafe-inline'` em `style-src` no `proxy.ts`), (3) WalletConnect built-in com 600+ wallets, (4) uma única API (`useAppKitAccount`/`useAppKitProvider`) em vez de wagmi + solana hooks separados. **Caveats conhecidos** (issues abertas em `reown-com/appkit`): #5095 switchNetwork bugado entre Solana↔EVM em multi-chain wallets, #4675 Solana provider pode falhar ao trocar de EVM pra Solana, #4674 MetaMask connection mostra MULTICHAIN baseado em adapters não networks. Nenhum é showstopper pro caso ClaimScan (user com Phantom + MetaMask separados), mas validar com POC de 4-8h em branch antes de comprometer. Migração estimada: 3-5 dias depois do POC. Ao migrar, pode remover `'unsafe-inline'` do `proxy.ts:268` e fechar L-04 do audit 2026-04-07
