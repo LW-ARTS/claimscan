@@ -10,6 +10,7 @@ import { ProfileJsonLd } from '../components/ProfileJsonLd';
 import { ProfileHero } from '../components/ProfileHero';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LazySection } from '../components/LazySection';
+import { LiveFeesProvider } from '../components/LiveFeesProvider';
 import type { Chain } from '@/lib/supabase/types';
 
 export const revalidate = 1800; // 30 minutes
@@ -160,7 +161,10 @@ export default async function ProfilePage({ params }: PageProps) {
         />
       )}
 
-      {/* ZONE 1: Profile Hero */}
+      {/* ZONE 1: Profile Hero — wrapped in LiveFeesProvider so both
+          ProfileHero and the PlatformBreakdown further down share the
+          same live SSE stream via useLiveFees(). */}
+      <LiveFeesProvider walletsForLive={walletsForLive}>
       <div className="animate-fade-in-up">
         <ErrorBoundary>
           <ProfileHero
@@ -241,6 +245,7 @@ export default async function ProfilePage({ params }: PageProps) {
           </div>
         </LazySection>
       </Suspense>
+      </LiveFeesProvider>
     </div>
   );
 }
