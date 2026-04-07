@@ -387,9 +387,19 @@ export function ProfileHero({
   // ── Computed values ──
   // Per-platform merge with floor: live data can increase a platform's unclaimed
   // total (new fees arrived) but never reduce it below the cached DB value.
+  //
+  // Two guards keep this stat aligned with the PlatformBreakdown "Unclaimed" filter:
+  // 1. Only count cached records whose claim_status is actually unclaimed/partial.
+  //    Records marked `claimed` with a stale non-zero total_unclaimed are DB rot
+  //    and would otherwise inflate the total while the filter shows 0 rows.
+  // 2. Only merge live data for platforms that ALREADY have unclaimed cached
+  //    records. If every cached record on a platform is claimed, we don't
+  //    fabricate a phantom "live unclaimed" total the user can't act on — the
+  //    filter has nothing to show for that platform anyway.
   const displayUnclaimedUsd = useMemo(() => {
     const platformUsd = new Map<string, number>();
     for (const f of initialFees) {
+      if (f.claim_status !== 'unclaimed' && f.claim_status !== 'partially_claimed') continue;
       const amount = safeBigInt(f.total_unclaimed);
       if (amount === 0n) continue;
       platformUsd.set(f.platform, (platformUsd.get(f.platform) ?? 0) + feeToUsd(f.chain, amount));
@@ -402,6 +412,11 @@ export function ProfileHero({
         livePlatformUsd.set(f.platform, (livePlatformUsd.get(f.platform) ?? 0) + feeToUsd(f.chain, amount));
       }
       for (const [platform, liveUsd] of livePlatformUsd) {
+        // Skip platforms where the cached data shows nothing unclaimed.
+        // Live polling can update an existing unclaimed total, but it cannot
+        // resurrect a fully-claimed platform — users can't claim what the
+        // list doesn't show.
+        if (!platformUsd.has(platform)) continue;
         const cachedUsd = platformUsd.get(platform) ?? 0;
         platformUsd.set(platform, Math.max(cachedUsd, liveUsd));
       }
