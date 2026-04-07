@@ -37,7 +37,6 @@ export function MobileNav() {
   const links = [
     { href: '/leaderboard', label: 'Leaderboard' },
     { href: '/docs', label: 'Docs' },
-    { href: '/docs#api-pricing', label: 'API' },
     { href: '/terms', label: 'Terms' },
   ];
 
