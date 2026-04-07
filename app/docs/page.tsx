@@ -142,11 +142,11 @@ export default function DocsPage() {
       />
 
       {/* ═══ HEADER ═══ */}
-      <header className="mx-auto max-w-[1200px] pt-20 pb-12 px-5 sm:px-12 text-center flex flex-col items-center gap-4">
+      <header className="mx-auto flex max-w-[1200px] flex-col items-center gap-4 px-5 pt-20 pb-12 text-center sm:px-12">
         <span className="text-[11px] font-semibold tracking-[2px] text-white uppercase">
           DOCUMENTATION
         </span>
-        <h1 className="text-[40px] font-bold text-[var(--text-primary)]">
+        <h1 className="text-[28px] font-bold leading-tight text-[var(--text-primary)] sm:text-[40px]">
           API REFERENCE &amp; GUIDES
         </h1>
         <p className="max-w-lg text-base text-[var(--text-secondary)]">
@@ -155,12 +155,12 @@ export default function DocsPage() {
       </header>
 
       {/* ═══ 2-COLUMN LAYOUT ═══ */}
-      <div className="mx-auto flex w-full max-w-[1200px] px-5 sm:px-12 pb-24">
+      <div className="mx-auto flex w-full max-w-[1200px] px-5 pb-24 sm:px-12">
         {/* ── Sidebar (client component with scroll spy) ── */}
         <DocsSidebar />
 
         {/* ── Main content ── */}
-        <main className="flex-1 lg:pl-12">
+        <main className="min-w-0 flex-1 lg:pl-12">
           <RevealMount />
 
           {/* ═══ INTRODUCTION ═══ */}
@@ -185,8 +185,8 @@ export default function DocsPage() {
             </div>
 
             <h3 className="mt-8 text-[14px] font-semibold text-[var(--text-primary)]">Supported Chains</h3>
-            <div className="mt-3 overflow-hidden rounded-[10px] border border-[var(--border-default)]">
-              <table className="w-full text-left">
+            <div className="mt-3 overflow-x-auto rounded-[10px] border border-[var(--border-default)]">
+              <table className="w-full min-w-[600px] text-left">
                 <thead>
                   <tr className="bg-[#FFFFFF08]">
                     <th className="px-4 py-3 text-[12px] font-semibold uppercase tracking-[1px] text-[var(--text-tertiary)]">Chain</th>
@@ -345,8 +345,8 @@ curl https://claimscan.tech/api/v2/fees?wallet=0x... \\
               All limits are per IP. Exceeding them returns <code className="font-mono text-[13px] bg-[#FFFFFF08] px-1.5 py-0.5 rounded">429 Too Many Requests</code>.
             </p>
 
-            <div className="mt-6 overflow-hidden rounded-[10px] border border-[var(--border-default)]">
-              <table className="w-full text-left">
+            <div className="mt-6 overflow-x-auto rounded-[10px] border border-[var(--border-default)]">
+              <table className="w-full min-w-[600px] text-left">
                 <thead>
                   <tr className="bg-[#FFFFFF08]">
                     <th className="px-4 py-3 text-[12px] font-semibold uppercase tracking-[1px] text-[var(--text-tertiary)]">Endpoint</th>

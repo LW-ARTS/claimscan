@@ -149,8 +149,8 @@ export default function TermsPage() {
         <span className="text-[11px] font-semibold uppercase tracking-[2px] text-white">
           LEGAL
         </span>
-        <h1 className="mt-6 text-[40px] font-bold text-[var(--text-primary)] text-center">
-          TERMS OF SERVICE & API PRICING
+        <h1 className="mt-6 text-[28px] font-bold leading-tight text-[var(--text-primary)] text-center sm:text-[40px]">
+          TERMS OF SERVICE &amp; API PRICING
         </h1>
         <p className="mt-4 text-base text-[var(--text-secondary)] text-center">
           Terms of service, privacy policy, and pricing for ClaimScan API
@@ -895,7 +895,7 @@ export default function TermsPage() {
         <div className="my-16 h-px bg-[var(--border-subtle)]" />
 
         <div className="text-center space-y-4">
-          <h2 className="text-[32px] font-bold text-[var(--text-primary)]">API PRICING</h2>
+          <h2 className="text-[24px] font-bold text-[var(--text-primary)] sm:text-[32px]">API PRICING</h2>
           <p className="text-[15px] text-[var(--text-secondary)]">Free to scan. Pay per query for API access via x402 protocol.</p>
         </div>
 
