@@ -328,7 +328,7 @@ export function ProfileHero({
     } finally {
       setSaving(false);
     }
-  }, [handle, saving, ogUrl]);
+  }, [handle, saving]);
 
   const displayWallets = wallets.slice(0, 6);
   const remainingWallets = wallets.length - displayWallets.length;
