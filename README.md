@@ -32,7 +32,7 @@ Around 40% of creator fees go unclaimed. Creators launch tokens, generate volume
 
 ## How It Works
 
-1. Paste a Twitter handle, GitHub username, Farcaster name, or wallet address
+1. Paste a Twitter handle, TikTok URL, GitHub username, Farcaster name, or wallet address
 2. ClaimScan scans 9 launchpads across Solana, Base, Ethereum, and BNB Chain simultaneously
 3. Full breakdown: earned, claimed, unclaimed in USD with live pricing
 4. Connect your wallet and claim uncollected fees directly from ClaimScan
@@ -66,7 +66,7 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 
 ### Scanning
 - **4 chains**: Solana, Base, Ethereum, and BNB Chain in a single scan
-- **Identity resolution**: Twitter, GitHub, Farcaster handles, ENS, and raw wallet addresses
+- **Identity resolution**: Twitter, TikTok, GitHub, Farcaster handles, ENS, and raw wallet addresses
 - **Real-time streaming**: Scan progress updates as each platform completes via SSE
 - **True real time fees**: The unclaimed total, the status filter, and the token list all read from the same live data stream. What you see and what you can act on are always in sync. Tokens appear within seconds of being detected on chain instead of waiting for the next sync.
 - **Dynamic dust filter**: Filters noise using live token prices
@@ -185,7 +185,7 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 | Blockchain | Solana (web3.js) + EVM (Viem) |
 | Database | Supabase (PostgreSQL with row-level security) |
 | Cache | Redis with in-memory fallback |
-| Identity | Cross-platform resolution (Twitter, GitHub, Farcaster, wallets) |
+| Identity | Cross-platform resolution (Twitter, TikTok, GitHub, Farcaster, wallets) |
 | Pricing | Multi-source aggregation (DexScreener, Jupiter, CoinGecko) |
 | Payments | x402 protocol (USDC on Base Mainnet) + bazaar discovery + payment-identifier |
 | Intelligence | Allium (cross-chain wallet data) |
@@ -211,6 +211,7 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 | **V2.0** | **Live** | Raydium LaunchLab support, 4 chains (added ETH + BSC), **paid API via x402 on Base Mainnet**, Allium intelligence, OWS wallet support, Pump.fun V2 |
 | **V2.1** | **Live** | x402 hardening: bazaar extension for agent discovery, payment-identifier for idempotency, lifecycle hooks, CSV injection protection, mainnet facilitator |
 | **V2.5** | **Live** | Visual redesign v2, real time live fees architecture, leaderboard polish, mobile first pass, skeleton loading states, animation system, hardening pass. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v2.5.0). |
+| **V2.6** | **Live** | TikTok profile search powered by Bags.fm TikTok Fee Sharing, fee sync reliability pass (per creator distributed lock, Sentry routing for prune failures, batch DELETE with tripwire), GitHub leaderboard navigation fix. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v2.6.0). |
 | V3 | Next | Token Fee Scanner (paste any contract address), multi platform direct claim (Clanker + Zora), EVM wallet integration (MetaMask alongside Phantom in a unified flow) |
 | V3.5 | Planned | Automated claim scheduling, creator analytics, portfolio dashboard |
 
