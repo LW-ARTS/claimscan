@@ -160,13 +160,24 @@ export async function resolveWallets(
 // Fee Aggregation
 // ═══════════════════════════════════════════════
 
+export interface FetchFeesResult {
+  fees: TokenFee[];
+  /** Set of platforms whose adapter call(s) completed without throwing.
+   * Empty set means we cannot trust "no fees" as a signal — leaves stale
+   * rows alone. */
+  syncedPlatforms: Set<string>;
+}
+
 /**
  * Fetch historical fees for wallets across all chain-matching platform adapters.
  * Uses Promise.allSettled to tolerate individual adapter failures.
+ *
+ * Returns both the fees and the set of platforms that successfully completed,
+ * so callers (persistFees) can prune stale rows scoped to successful syncs only.
  */
 export async function fetchAllFees(
   wallets: ResolvedWallet[]
-): Promise<TokenFee[]> {
+): Promise<FetchFeesResult> {
   const allAdapters = getAllAdapters();
   const liveAdapters = getLiveFeeAdapters();
 
@@ -214,11 +225,16 @@ export async function fetchAllFees(
   // When the same token appears from multiple wallets, sum the amounts
   // instead of discarding duplicates. Historical results take priority over live.
   const feeMap = new Map<string, { fee: TokenFee; isHistorical: boolean }>();
+  const syncedPlatforms = new Set<string>();
 
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
     const meta = taskMeta[i];
     if (result.status === 'fulfilled') {
+      // Track success per platform regardless of whether the result is empty.
+      // An empty success result is a legitimate "no fees here" — it should
+      // still authorize stale-row pruning for that platform.
+      if (meta) syncedPlatforms.add(meta.platform);
       for (const fee of result.value) {
         const key = `${fee.platform}:${fee.chain}:${fee.tokenAddress}`;
         const existing = feeMap.get(key);
@@ -274,7 +290,10 @@ export async function fetchAllFees(
     }
   }
 
-  return Array.from(feeMap.values()).map((entry) => entry.fee);
+  return {
+    fees: Array.from(feeMap.values()).map((entry) => entry.fee),
+    syncedPlatforms,
+  };
 }
 
 /**
@@ -283,32 +302,36 @@ export async function fetchAllFees(
  * fee allocations by social identity (Twitter, GitHub, etc.), so fees can
  * accumulate even if the recipient hasn't connected a wallet.
  * Uses Promise.allSettled to tolerate individual adapter failures.
+ *
+ * Returns both the fees and the set of platforms that successfully completed.
  */
 export async function fetchFeesByHandle(
   handle: string,
   provider: IdentityProvider
-): Promise<TokenFee[]> {
-  if (provider === 'wallet') return [];
+): Promise<FetchFeesResult> {
+  if (provider === 'wallet') return { fees: [], syncedPlatforms: new Set() };
 
   const adapters = getHandleFeeAdapters();
-  if (adapters.length === 0) return [];
+  if (adapters.length === 0) return { fees: [], syncedPlatforms: new Set() };
 
   const results = await Promise.allSettled(
     adapters.map((adapter) => adapter.getFeesByHandle(handle, provider))
   );
 
   const allFees: TokenFee[] = [];
+  const syncedPlatforms = new Set<string>();
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
+    const platform = adapters[i]?.platform ?? 'unknown';
     if (result.status === 'fulfilled') {
+      syncedPlatforms.add(platform);
       allFees.push(...result.value);
     } else {
-      const platform = adapters[i]?.platform ?? 'unknown';
       log.warn('getFeesByHandle failed', { platform, error: result.reason instanceof Error ? result.reason.message : String(result.reason) });
     }
   }
 
-  return allFees;
+  return { fees: allFees, syncedPlatforms };
 }
 
 /** Route-level budget for the entire live-fee aggregation.

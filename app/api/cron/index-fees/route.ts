@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient, verifyCronSecret } from '@/lib/supabase/service';
 import { fetchAllFees } from '@/lib/resolve/identity';
+import { pruneStaleFeeRowsForCreator } from '@/lib/services/fee-sync';
 import { readBondingCurve, readSharingConfig } from '@/lib/chains/solana';
 import { PublicKey } from '@solana/web3.js';
 import { safeBigInt } from '@/lib/utils';
+import { createLogger } from '@/lib/logger';
 import type { ResolvedWallet, TokenFee } from '@/lib/platforms/types';
 import type { Platform, Chain } from '@/lib/supabase/types';
+
+const log = createLogger('cron:index-fees');
 
 export const maxDuration = 60;
 
@@ -66,7 +70,20 @@ export async function GET(request: Request) {
         sourcePlatform: w.source_platform as ResolvedWallet['sourcePlatform'],
       }));
 
-      const fees = await fetchAllFees(resolvedWallets);
+      const { fees, syncedPlatforms } = await fetchAllFees(resolvedWallets);
+
+      // Prune stale rows for any successfully-synced platform whose fresh
+      // data no longer includes a previously-stored token. Runs even when
+      // `fees` is empty so that creators who lost fee-recipient status get
+      // cleaned up. Bags is exempt (uses detectDisappearedTokens elsewhere).
+      try {
+        const pruned = await pruneStaleFeeRowsForCreator(creator.id, fees, syncedPlatforms, supabase, log);
+        if (pruned > 0) {
+          console.info(`[index-fees] pruned ${pruned} stale fee_records for creator ${creator.id}`);
+        }
+      } catch (pruneErr) {
+        console.warn(`[index-fees] prune failed for creator ${creator.id}:`, pruneErr instanceof Error ? pruneErr.message : pruneErr);
+      }
 
       if (fees.length > 0) {
         // Fetch existing claimed values to prevent regression (adapters may return '0' on rate limit)
