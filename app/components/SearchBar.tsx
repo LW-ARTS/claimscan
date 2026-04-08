@@ -70,6 +70,14 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
       let handle = trimmed;
 
       try {
+        // Prepend https:// if user pasted a bare social URL like "tiktok.com/khaby.lame".
+        // This lets the existing URL parser below handle bare and protocol-prefixed forms uniformly.
+        const BARE_URL_PREFIXES = ['tiktok.com/', 'www.tiktok.com/', 'twitter.com/', 'www.twitter.com/', 'x.com/', 'www.x.com/', 'github.com/', 'www.github.com/', 'warpcast.com/', 'www.warpcast.com/'];
+        const lowerHandle = handle.toLowerCase();
+        if (!handle.startsWith('http://') && !handle.startsWith('https://') && BARE_URL_PREFIXES.some((prefix) => lowerHandle.startsWith(prefix))) {
+          handle = `https://${handle}`;
+        }
+
         if (handle.startsWith('http://') || handle.startsWith('https://')) {
           const url = new URL(handle);
           const hostname = url.hostname.toLowerCase();

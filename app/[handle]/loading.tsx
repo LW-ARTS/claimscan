@@ -9,7 +9,25 @@ const PLATFORMS = [
 
 export default function Loading() {
   const pathname = usePathname();
-  const handle = pathname?.split('/').filter(Boolean)[0]?.replace(/^@/, '') || '';
+
+  // Extract a clean display handle from the URL segment. Handles:
+  //   - URL encoding (%2F to /)
+  //   - Leaderboard prefixes (gh:, tt:)
+  //   - Social URL forms (tiktok.com/@user, twitter.com/user, etc)
+  //   - Leading @
+  const rawSegment = pathname?.split('/').filter(Boolean)[0] || '';
+  let display = '';
+  try {
+    display = decodeURIComponent(rawSegment);
+  } catch {
+    display = rawSegment;
+  }
+  if (display.startsWith('gh:') || display.startsWith('tt:')) {
+    display = display.slice(3);
+  }
+  const urlMatch = display.match(/(?:tiktok\.com|twitter\.com|x\.com|github\.com|warpcast\.com)\/@?([a-zA-Z0-9_.\-]{2,40})/i);
+  if (urlMatch) display = urlMatch[1];
+  const handle = display.replace(/^@/, '');
 
   return (
     <div role="status" aria-label="Scanning creator fees" className="signal-stage min-h-[60vh] flex items-center justify-center px-6 py-10">

@@ -28,6 +28,13 @@ const GITHUB_NON_USER_PATHS = new Set([
   'features', 'pricing', 'enterprise', 'team', 'login', 'join',
 ]);
 
+/** Known TikTok non-user paths that should not be treated as handles */
+const TIKTOK_NON_USER_PATHS = new Set([
+  'discover', 'following', 'foryou', 'for-you', 'live', 'feed',
+  'business', 'legal', 'about', 'tag', 'challenge', 'music',
+  'effect', 'signup', 'login', 'embed', 'share', 't',
+]);
+
 /**
  * Parse a search query into a normalized identity.
  * Supports: @twitter, github usernames, wallet addresses.
@@ -79,13 +86,16 @@ export function parseSearchQuery(query: string): ParsedQuery {
     if (match) return { value: match[1].toLowerCase(), provider: 'farcaster' };
   }
 
-  // TikTok URL pattern — tiktok.com/@username
-  // TikTok usernames: 2-24 chars, lowercase letters/digits/underscores/periods.
-  // Periods are TikTok-only (Twitter handles cannot contain them), so the
-  // bare-handle default below stays Twitter — TikTok requires an explicit URL.
+  // TikTok URL pattern — accepts both tiktok.com/@username and tiktok.com/username
+  // (the second form is what users type when omitting the @ from a paste).
+  // Filter known non-user paths so /discover, /following, /live etc don't false-positive.
+  // The default fallback below stays Twitter, so a bare username with a period (TikTok-only)
+  // still requires the user to include the URL prefix to route correctly.
   if (handleLower.includes('tiktok.com/')) {
-    const match = handle.match(/tiktok\.com\/@([a-zA-Z0-9_.]{2,24})/i);
-    if (match) return { value: match[1].toLowerCase(), provider: 'tiktok' };
+    const match = handle.match(/tiktok\.com\/@?([a-zA-Z0-9_.]{2,24})(?:\/|$|\?)/i);
+    if (match && !TIKTOK_NON_USER_PATHS.has(match[1].toLowerCase())) {
+      return { value: match[1].toLowerCase(), provider: 'tiktok' };
+    }
   }
 
   // Default: treat as Twitter handle
