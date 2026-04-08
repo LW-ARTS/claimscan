@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { createServiceClient, verifyCronSecret } from '@/lib/supabase/service';
 import { fetchAllFees } from '@/lib/resolve/identity';
 import { pruneStaleFeeRowsForCreator } from '@/lib/services/fee-sync';
@@ -78,11 +79,41 @@ export async function GET(request: Request) {
       // cleaned up. Bags is exempt (uses detectDisappearedTokens elsewhere).
       try {
         const pruneResult = await pruneStaleFeeRowsForCreator(creator.id, fees, syncedPlatforms, supabase, log);
-        if (pruneResult.deleted > 0) {
-          console.info(`[index-fees] pruned ${pruneResult.deleted} stale fee_records for creator ${creator.id}`);
+        if (pruneResult.selectFailed) {
+          log.error('cron prune: SELECT failed for creator', { creatorId: creator.id });
+          Sentry.captureMessage('cron prune SELECT failed', {
+            level: 'error',
+            extra: { creatorId: creator.id },
+          });
+        } else if (pruneResult.deleteFailures > 0) {
+          log.error('cron prune: partial DELETE failures', {
+            creatorId: creator.id,
+            attempted: pruneResult.deleteAttempted,
+            failures: pruneResult.deleteFailures,
+          });
+          Sentry.captureMessage('cron prune partial failure', {
+            level: 'warning',
+            extra: {
+              creatorId: creator.id,
+              attempted: pruneResult.deleteAttempted,
+              failures: pruneResult.deleteFailures,
+            },
+          });
+        } else if (pruneResult.deleted > 0) {
+          log.info('cron prune: cleaned stale fee_records', {
+            creatorId: creator.id,
+            deleted: pruneResult.deleted,
+          });
         }
       } catch (pruneErr) {
-        console.warn(`[index-fees] prune failed for creator ${creator.id}:`, pruneErr instanceof Error ? pruneErr.message : pruneErr);
+        log.error('cron prune: unexpected exception', {
+          creatorId: creator.id,
+          err: pruneErr instanceof Error ? pruneErr.message : String(pruneErr),
+        });
+        Sentry.captureException(pruneErr, {
+          tags: { phase: 'cron-prune' },
+          extra: { creatorId: creator.id },
+        });
       }
 
       if (fees.length > 0) {
