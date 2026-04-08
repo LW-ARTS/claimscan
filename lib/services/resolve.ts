@@ -48,7 +48,7 @@ export async function checkCache(
 
   const { data } = await supabase
     .from('creators')
-    .select('id, twitter_handle, github_handle, farcaster_handle, farcaster_fid, display_name, avatar_url, created_at, updated_at, last_token_sync_at, wallets(id, creator_id, address, chain, source_platform, verified, created_at)')
+    .select('id, twitter_handle, github_handle, farcaster_handle, farcaster_fid, tiktok_handle, display_name, avatar_url, created_at, updated_at, last_token_sync_at, wallets(id, creator_id, address, chain, source_platform, verified, created_at)')
     .eq(handleColumn, parsed.value)
     .single();
 
@@ -138,6 +138,7 @@ export async function resolveAndUpsertIdentity(
       ...(parsed.provider === 'twitter' && { twitter_handle: parsed.value }),
       ...(parsed.provider === 'github' && { github_handle: parsed.value }),
       ...(parsed.provider === 'farcaster' && { farcaster_handle: parsed.value }),
+      ...(parsed.provider === 'tiktok' && { tiktok_handle: parsed.value }),
     };
 
     // For wallet searches, check if a creator already exists for this wallet
@@ -214,5 +215,6 @@ export function getHandleColumn(provider: IdentityProvider): string | null {
   if (provider === 'twitter') return 'twitter_handle';
   if (provider === 'github') return 'github_handle';
   if (provider === 'farcaster') return 'farcaster_handle';
+  if (provider === 'tiktok') return 'tiktok_handle';
   return null;
 }

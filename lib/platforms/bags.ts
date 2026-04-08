@@ -99,12 +99,14 @@ function positionToFee(
 // ═══════════════════════════════════════════════
 
 /** Map ClaimScan providers to Bags-supported providers.
- * Bags only supports: twitter, kick, github. */
+ * Bags supports many providers (twitter, github, tiktok, kick, instagram, onlyfans, ...);
+ * we only map the ones ClaimScan exposes today. */
 function mapIdentityProvider(
   provider: IdentityProvider
 ): string | null {
   if (provider === 'twitter') return 'twitter';
   if (provider === 'github') return 'github';
+  if (provider === 'tiktok') return 'tiktok';
   // Bags does not support farcaster or wallet-based lookups
   return null;
 }

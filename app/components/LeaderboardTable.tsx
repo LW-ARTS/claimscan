@@ -6,9 +6,13 @@ import { formatUsd } from '@/lib/utils';
 
 function CreatorAvatar({ handle, handleType }: { handle: string; handleType: string }) {
   const [error, setError] = useState(false);
-  const isTwitter = handleType === 'twitter';
 
-  if (!isTwitter || error) {
+  // unavatar.io supports both /x/{username} and /tiktok/{username}.
+  // GitHub creators fall through to the initials fallback because GitHub
+  // avatars are usually generic and rarely meaningful in this context.
+  const provider = handleType === 'twitter' ? 'x' : handleType === 'tiktok' ? 'tiktok' : null;
+
+  if (!provider || error) {
     return (
       <span className="avatar-ring inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[11px] font-bold uppercase text-[var(--text-secondary)]">
         {handle[0].toUpperCase()}
@@ -18,7 +22,7 @@ function CreatorAvatar({ handle, handleType }: { handle: string; handleType: str
 
   return (
     <img
-      src={`https://unavatar.io/x/${handle}`}
+      src={`https://unavatar.io/${provider}/${handle}`}
       alt=""
       className="avatar-ring h-7 w-7 shrink-0 rounded-full object-cover"
       onError={() => setError(true)}
@@ -30,7 +34,7 @@ function CreatorAvatar({ handle, handleType }: { handle: string; handleType: str
 
 interface LeaderboardEntry {
   handle: string;
-  handle_type: 'twitter' | 'github';
+  handle_type: 'twitter' | 'github' | 'tiktok';
   display_name: string | null;
   total_earned_usd: number;
   platform_count: number;
@@ -85,9 +89,19 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
   const pageOffset = (currentPage - 1) * PER_PAGE;
 
-  const resolveProfileUrl = (entry: LeaderboardEntry) => `/${entry.handle}`;
-  const formatHandle = (entry: LeaderboardEntry) =>
-    entry.handle_type === 'github' ? `${entry.handle} (GitHub)` : `@${entry.handle}`;
+  // The SQL function returns prefixed handles for non-twitter creators
+  // (`gh:gakonst`, `tt:khaby.lame`); strip the prefix for display while
+  // keeping it in the URL so parseSearchQuery routes to the right provider.
+  const stripPrefix = (h: string) =>
+    h.startsWith('gh:') || h.startsWith('tt:') ? h.slice(3) : h;
+  const resolveProfileUrl = (entry: LeaderboardEntry) => `/${encodeURIComponent(entry.handle)}`;
+  const formatHandle = (entry: LeaderboardEntry) => {
+    const bare = stripPrefix(entry.handle);
+    if (entry.handle_type === 'github') return `${bare} (GitHub)`;
+    if (entry.handle_type === 'tiktok') return `@${bare} (TikTok)`;
+    return `@${bare}`;
+  };
+  const avatarHandle = (entry: LeaderboardEntry) => stripPrefix(entry.handle);
 
   // Build page numbers to display (max 7 visible)
   const getVisiblePages = (): number[] => {
@@ -144,7 +158,7 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                 <span className="w-5 shrink-0 text-center text-xs font-bold tabular-nums text-[var(--text-tertiary)]">
                   {pageOffset + idx + 1}
                 </span>
-                <CreatorAvatar handle={entry.handle} handleType={entry.handle_type} />
+                <CreatorAvatar handle={avatarHandle(entry)} handleType={entry.handle_type} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                     {formatHandle(entry)}
@@ -185,7 +199,7 @@ export function LeaderboardTable({ initialEntries, initialTotal }: LeaderboardTa
                     </td>
                     <td className="py-3.5">
                       <Link href={resolveProfileUrl(entry)} className="flex items-center gap-2.5 hover:text-[var(--text-primary)]">
-                        <CreatorAvatar handle={entry.handle} handleType={entry.handle_type} />
+                        <CreatorAvatar handle={avatarHandle(entry)} handleType={entry.handle_type} />
                         <span className="text-sm font-semibold text-[var(--text-primary)]">
                           {formatHandle(entry)}
                         </span>

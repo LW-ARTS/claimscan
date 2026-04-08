@@ -258,14 +258,24 @@ export function ProfileHero({
   }, [initialFees, feeToUsd]);
 
   // ── Display values ──
-  const displayName = creator.display_name || creator.twitter_handle || creator.github_handle || 'Unknown';
+  const displayName = creator.display_name || creator.twitter_handle || creator.tiktok_handle || creator.github_handle || 'Unknown';
   const chains = [...new Set(wallets.map((w) => w.chain))];
-  // Use unavatar.io directly (same source as OG card) — bypasses /api/avatar proxy
-  // Daily cache buster ensures browser doesn't serve stale avatars after profile pic changes
-  const avatarHandle = handle || creator.twitter_handle;
-  const isValidHandle = avatarHandle && /^[a-zA-Z0-9_]{1,50}$/.test(avatarHandle);
+  // Avatar source: unavatar.io supports both /x/{username} and /tiktok/{username}.
+  // Pick provider by which handle column is populated — Twitter avatars take
+  // priority for crypto recognizability, then fall back to TikTok. The handle
+  // regex permits `.` because TikTok usernames can contain periods (e.g. jane.doe)
+  // even though Twitter handles cannot.
+  const avatarHandle = creator.twitter_handle || creator.tiktok_handle || handle;
+  const isValidHandle = !!avatarHandle && /^[a-zA-Z0-9_.]{1,50}$/.test(avatarHandle);
+  const unavatarProvider: 'x' | 'tiktok' | null = creator.twitter_handle
+    ? 'x'
+    : creator.tiktok_handle
+    ? 'tiktok'
+    : null;
   const cacheBuster = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const avatarUrl = isValidHandle ? `https://unavatar.io/x/${avatarHandle}?_cb=${cacheBuster}` : null;
+  const avatarUrl = isValidHandle && unavatarProvider
+    ? `https://unavatar.io/${unavatarProvider}/${avatarHandle}?_cb=${cacheBuster}`
+    : null;
 
   // ── Computed values for new layout ──
   const solWallets = wallets.filter(w => w.chain === 'sol').length;

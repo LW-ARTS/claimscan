@@ -27,6 +27,26 @@ const PLATFORMS: Record<string, { name: string }> = {
 // Inline utilities (can't import from lib/ in edge)
 // ═══════════════════════════════════════════════
 
+/** Resolve the URL segment into a clean username + social provider hint.
+ * Mirrors a subset of parseSearchQuery() but stays edge-runtime friendly
+ * (no chain validation imports). Recognizes:
+ *   - `tt:username` / `gh:username` shorthand from leaderboard links
+ *   - `tiktok.com/@username` URL form from the search bar
+ *   - bare handles fall through to twitter (the current default everywhere) */
+function parseHandle(decoded: string): { username: string; provider: 'twitter' | 'tiktok' | 'github' } {
+  if (decoded.startsWith('tt:') && decoded.length > 3) {
+    return { username: decoded.slice(3), provider: 'tiktok' };
+  }
+  if (decoded.startsWith('gh:') && decoded.length > 3) {
+    return { username: decoded.slice(3), provider: 'github' };
+  }
+  const tiktokUrl = decoded.toLowerCase().includes('tiktok.com/')
+    ? decoded.match(/tiktok\.com\/@([a-zA-Z0-9_.]{2,24})/i)
+    : null;
+  if (tiktokUrl) return { username: tiktokUrl[1], provider: 'tiktok' };
+  return { username: decoded, provider: 'twitter' };
+}
+
 function fmtUsd(value: number): string {
   if (!Number.isFinite(value) || value < 0) return '$0.00';
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
@@ -97,8 +117,12 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
     );
   }
 
-  const isWallet = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(decoded);
-  const displayName = isWallet ? `${decoded.slice(0, 8)}...${decoded.slice(-6)}` : `@${decoded}`;
+  // Resolve display username + provider hint (handles tt:/gh: prefixes
+  // from leaderboard links and tiktok.com/@username from search-bar URLs)
+  const { username: cleanHandle, provider: providerHint } = parseHandle(decoded);
+
+  const isWallet = /^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(cleanHandle);
+  const displayName = isWallet ? `${cleanHandle.slice(0, 8)}...${cleanHandle.slice(-6)}` : `@${cleanHandle}`;
 
   let totalUsd = 0;
   let platformCount = 0;
@@ -118,15 +142,28 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
       if (isWallet) {
         // EVM addresses are stored checksummed (mixed-case) but users may paste lowercase.
         // Use case-insensitive match for EVM (0x...) addresses, exact match for Solana (base58).
-        const isEvm = decoded.startsWith('0x');
+        const isEvm = cleanHandle.startsWith('0x');
         const query = supabase.from('wallets').select('creator_id').limit(1);
         const { data } = await (isEvm
-          ? query.ilike('address', decoded)
-          : query.eq('address', decoded)
+          ? query.ilike('address', cleanHandle)
+          : query.eq('address', cleanHandle)
         ).maybeSingle();
         creatorId = data?.creator_id ?? null;
+      } else if (providerHint === 'tiktok') {
+        // TikTok usernames can contain dots (e.g. jane.doe), which collide with
+        // PostgREST .or() filter delimiters — use a targeted .eq() query instead.
+        const lc = cleanHandle.toLowerCase();
+        const { data } = await supabase
+          .from('creators')
+          .select('id')
+          .eq('tiktok_handle', lc)
+          .limit(1)
+          .maybeSingle();
+        creatorId = data?.id ?? null;
       } else {
-        const lc = decoded.toLowerCase().replace(/[(),."'\\]/g, '');
+        // Strip characters that could break the .or() filter syntax
+        // (commas/parentheses/quotes/dots are PostgREST filter delimiters)
+        const lc = cleanHandle.toLowerCase().replace(/[(),."'\\]/g, '');
         const { data } = await supabase
           .from('creators')
           .select('id')
@@ -186,10 +223,14 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
 
   // ── Avatar ──
   let avatarSrc: string | null = null;
-  // Validate handle format before external fetch (prevent path traversal / param injection)
-  if (!isWallet && /^[a-zA-Z0-9_]{1,50}$/.test(decoded)) {
+  // Validate handle format before external fetch (prevent path traversal / param injection).
+  // Regex permits `.` because TikTok usernames can contain periods (jane.doe).
+  // Provider routes to unavatar's /tiktok/ endpoint when the handle came from a
+  // TikTok URL or a tt: leaderboard prefix; otherwise defaults to /x/ (Twitter).
+  const unavatarProvider = providerHint === 'tiktok' ? 'tiktok' : 'x';
+  if (!isWallet && /^[a-zA-Z0-9_.]{1,50}$/.test(cleanHandle)) {
     try {
-      const res = await fetch(`https://unavatar.io/x/${decoded}`, {
+      const res = await fetch(`https://unavatar.io/${unavatarProvider}/${cleanHandle}`, {
         signal: AbortSignal.timeout(2500),
       });
       if (res.ok) {
@@ -415,7 +456,7 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
                 fontFamily: 'Sora',
               }}
             >
-              {(decoded[0] || '?').toUpperCase()}
+              {(cleanHandle[0] || '?').toUpperCase()}
             </div>
           )}
           <span

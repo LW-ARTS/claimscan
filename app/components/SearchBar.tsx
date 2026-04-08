@@ -81,6 +81,13 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             handle = `github.com${url.pathname}`;
           } else if (['warpcast.com', 'www.warpcast.com'].includes(hostname)) {
             if (pathParts.length > 0) handle = `warpcast.com/${pathParts[0]}`;
+          } else if (['tiktok.com', 'www.tiktok.com'].includes(hostname)) {
+            // TikTok URLs look like /@username; preserve the @ so parseSearchQuery
+            // routes to the tiktok provider instead of falling through to twitter.
+            if (pathParts.length > 0) {
+              const username = pathParts[0].startsWith('@') ? pathParts[0].slice(1) : pathParts[0];
+              handle = `tiktok.com/@${username}`;
+            }
           }
         }
       } catch {
@@ -122,8 +129,8 @@ export function SearchBar({ size = 'default' }: { size?: 'default' | 'lg' }) {
             name="query"
             autoComplete="off"
             spellCheck={false}
-            placeholder={isNarrow ? '@handle or wallet' : '@handle, wallet address, or X/GitHub URL'}
-            aria-label="Search by Twitter handle, GitHub username, or wallet address"
+            placeholder={isNarrow ? '@handle or wallet' : '@handle, wallet, or X/TikTok/GitHub URL'}
+            aria-label="Search by Twitter handle, TikTok URL, GitHub username, or wallet address"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setFocused(true)}
