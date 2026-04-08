@@ -244,9 +244,13 @@ export async function pruneStaleFeeRowsForCreator(
 
 /**
  * Persist fee records to Supabase with:
+ * - Stale-row pruning for synced non-Bags platforms (delegated to pruneStaleFeeRowsForCreator)
  * - Claimed-preservation (monotonic claimed values)
  * - Disappeared Bags token detection
- * - Stale-row pruning for synced non-Bags platforms (`syncedPlatforms`)
+ *
+ * Fail-fast: if either the prune SELECT or the claimed-preservation SELECT
+ * fails, persistFees aborts WITHOUT running upsert. This prevents claim_status
+ * regression and incorrect attribution when the DB is temporarily unreadable.
  */
 export async function persistFees(
   creatorId: string,
@@ -255,41 +259,38 @@ export async function persistFees(
   supabase: SupabaseClient,
   log: Logger
 ): Promise<void> {
-  // Fetch existing fees for claimed-preservation AND stale-row pruning.
-  // We fetch even when allFees is empty so pruning can still run if a sync
-  // legitimately returned zero results (e.g., creator stopped being a fee recipient).
+  // Step 1: Prune stale rows. Delegates to the standalone helper which now
+  // handles SELECT failure, batching, and partial-failure reporting.
+  const pruneResult = await pruneStaleFeeRowsForCreator(creatorId, allFees, syncedPlatforms, supabase, log);
+  if (pruneResult.selectFailed) {
+    // SELECT failed, we cannot trust state. Skip the rest of persistence
+    // to avoid running disappear-detection or upsert against empty assumptions.
+    log.error('persistFees: aborting due to prune SELECT failure', { creatorId });
+    return;
+  }
+  if (pruneResult.deleteFailures > 0) {
+    log.error('persistFees: partial prune failure', {
+      creatorId,
+      attempted: pruneResult.deleteAttempted,
+      failures: pruneResult.deleteFailures,
+    });
+    // Continue with upsert anyway, partial prune is better than no upsert.
+  }
+
+  // Step 2: Re-fetch existing rows for claimed-preservation. The prune helper
+  // already consumed its own SELECT and we need the additional columns
+  // (total_claimed, total_earned, etc.) that the prune SELECT did not fetch.
   const { data: existingFees, error: existingError } = await supabase
     .from('fee_records')
     .select('platform, chain, token_address, total_claimed, total_earned, total_unclaimed, total_earned_usd, token_symbol, royalty_bps')
     .eq('creator_id', creatorId);
 
   if (existingError) {
-    log.error('failed to fetch existing fees for claimed-preservation', { error: existingError.message });
-  }
-
-  // Prune stale rows for any platform that was successfully synced this run
-  // but whose existing DB rows are no longer present in `allFees`.
-  const staleRows = findStaleFeeRows(existingFees ?? [], allFees, syncedPlatforms);
-  if (staleRows.length > 0) {
-    log.info('pruning stale fee_records', {
-      count: staleRows.length,
-      platforms: [...new Set(staleRows.map((r) => r.platform))],
+    log.error('persistFees: claimed-preservation SELECT failed, skipping upsert', {
+      creatorId,
+      error: existingError.message,
     });
-    for (const row of staleRows) {
-      const { error: deleteError } = await supabase
-        .from('fee_records')
-        .delete()
-        .eq('creator_id', creatorId)
-        .eq('platform', row.platform)
-        .eq('chain', row.chain)
-        .eq('token_address', row.token_address);
-      if (deleteError) {
-        log.warn('stale fee_records delete failed', {
-          error: deleteError.message,
-          key: `${row.platform}:${row.chain}:${row.token_address}`,
-        });
-      }
-    }
+    return;
   }
 
   if (allFees.length === 0) {
