@@ -1,6 +1,6 @@
 import 'server-only';
 import { safeBigInt } from '@/lib/utils';
-import type { Database } from '@/lib/supabase/types';
+import type { Database, Platform, Chain } from '@/lib/supabase/types';
 import type { IdentityProvider } from '@/lib/supabase/types';
 import type { TokenFee, ResolvedWallet } from '@/lib/platforms/types';
 import {
@@ -124,12 +124,31 @@ export function findStaleFeeRows<R extends { platform: string; chain: string; to
   });
 }
 
+/** Result of a prune operation. Used by callers to detect partial failures. */
+export interface PruneResult {
+  /** Number of rows successfully deleted. */
+  deleted: number;
+  /** True if the SELECT of existing rows failed, caller should treat as outage. */
+  selectFailed: boolean;
+  /** Total number of stale rows we tried to delete (deleted + deleteFailures). */
+  deleteAttempted: number;
+  /** Number of stale rows whose batch DELETE returned an error. */
+  deleteFailures: number;
+}
+
 /**
  * Fetch existing rows + delete stale ones for a creator. Standalone helper
  * usable by code paths that don't go through `persistFees` (e.g. the
  * cron `index-fees` route, which has its own upsert flow).
  *
- * Returns the number of rows deleted.
+ * Returns a discriminated result so callers can distinguish:
+ *  - Success with no work needed (all zeros, selectFailed = false)
+ *  - Successful prune (deleted > 0, deleteFailures = 0)
+ *  - Partial failure (deleteFailures > 0), should alert
+ *  - Total failure (selectFailed = true), should alert and skip the rest of persistence
+ *
+ * Uses batched DELETE: one query per (platform, chain) tuple via `.in()`,
+ * not one query per row.
  */
 export async function pruneStaleFeeRowsForCreator(
   creatorId: string,
@@ -137,21 +156,40 @@ export async function pruneStaleFeeRowsForCreator(
   syncedPlatforms: Set<string>,
   supabase: SupabaseClient,
   log: Logger
-): Promise<number> {
-  if (syncedPlatforms.size === 0) return 0;
-
-  const { data: existingRows, error } = await supabase
+): Promise<PruneResult> {
+  // Always SELECT first so the tripwire below can detect "empty syncedPlatforms
+  // but rows exist that should have been considered", that's the refactor-bug
+  // smell we want to surface. Cost: one SELECT (~5ms) per call.
+  const { data: existingRows, error: selectError } = await supabase
     .from('fee_records')
     .select('platform, chain, token_address')
     .eq('creator_id', creatorId);
 
-  if (error) {
-    log.warn('pruneStaleFeeRowsForCreator: failed to fetch existing rows', { error: error.message });
-    return 0;
+  if (selectError) {
+    log.error('pruneStaleFeeRowsForCreator: SELECT existing rows failed', {
+      creatorId,
+      error: selectError.message,
+    });
+    return { deleted: 0, selectFailed: true, deleteAttempted: 0, deleteFailures: 0 };
+  }
+
+  // Tripwire: caller passed empty syncedPlatforms but the creator HAS rows we
+  // could have considered pruning. Usually means a refactor bug upstream
+  // (e.g. forgot to thread syncedPlatforms through). Log and bail safely.
+  if (syncedPlatforms.size === 0) {
+    if ((existingRows ?? []).length > 0) {
+      log.warn('pruneStaleFeeRowsForCreator: empty syncedPlatforms but rows exist', {
+        creatorId,
+        existingCount: (existingRows ?? []).length,
+      });
+    }
+    return { deleted: 0, selectFailed: false, deleteAttempted: 0, deleteFailures: 0 };
   }
 
   const stale = findStaleFeeRows(existingRows ?? [], freshFees, syncedPlatforms);
-  if (stale.length === 0) return 0;
+  if (stale.length === 0) {
+    return { deleted: 0, selectFailed: false, deleteAttempted: 0, deleteFailures: 0 };
+  }
 
   log.info('pruning stale fee_records', {
     creatorId,
@@ -159,22 +197,49 @@ export async function pruneStaleFeeRowsForCreator(
     platforms: [...new Set(stale.map((r) => r.platform))],
   });
 
+  // Group stale rows by (platform, chain) so we can issue one DELETE per group
+  // using `.in('token_address', [...])`. Avoids row-by-row DB roundtrips.
+  const groups = new Map<string, { platform: string; chain: string; tokens: string[] }>();
   for (const row of stale) {
+    const key = `${row.platform}:${row.chain}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { platform: row.platform, chain: row.chain, tokens: [] };
+      groups.set(key, group);
+    }
+    group.tokens.push(row.token_address);
+  }
+
+  let deleted = 0;
+  let deleteFailures = 0;
+  for (const group of groups.values()) {
     const { error: deleteError } = await supabase
       .from('fee_records')
       .delete()
       .eq('creator_id', creatorId)
-      .eq('platform', row.platform)
-      .eq('chain', row.chain)
-      .eq('token_address', row.token_address);
+      .eq('platform', group.platform as Platform)
+      .eq('chain', group.chain as Chain)
+      .in('token_address', group.tokens);
     if (deleteError) {
-      log.warn('stale fee_records delete failed', {
+      log.error('stale fee_records batch delete failed', {
+        creatorId,
+        platform: group.platform,
+        chain: group.chain,
+        tokenCount: group.tokens.length,
         error: deleteError.message,
-        key: `${row.platform}:${row.chain}:${row.token_address}`,
       });
+      deleteFailures += group.tokens.length;
+    } else {
+      deleted += group.tokens.length;
     }
   }
-  return stale.length;
+
+  return {
+    deleted,
+    selectFailed: false,
+    deleteAttempted: stale.length,
+    deleteFailures,
+  };
 }
 
 /**
