@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/nextjs';
 import { createServiceClient, verifyCronSecret } from '@/lib/supabase/service';
 import { fetchAllFees } from '@/lib/resolve/identity';
 import { pruneStaleFeeRowsForCreator } from '@/lib/services/fee-sync';
+import { tryAcquireLock, releaseLock } from '@/lib/distributed-lock';
 import { readBondingCurve, readSharingConfig } from '@/lib/chains/solana';
 import { PublicKey } from '@solana/web3.js';
 import { safeBigInt } from '@/lib/utils';
@@ -50,6 +51,17 @@ export async function GET(request: Request) {
         break;
       }
 
+      // Acquire fee-sync lock to prevent TOCTOU race with /api/search.
+      // Both this cron and creator.ts:freshResolve contend on the same key.
+      // 90s TTL covers the full per-creator processing budget.
+      const feeSyncLockKey = `fee-sync:${creator.id}`;
+      const gotLock = await tryAcquireLock(feeSyncLockKey, 90);
+      if (!gotLock) {
+        log.info('cron skip: fee-sync lock held by another process', { creatorId: creator.id });
+        continue;
+      }
+
+      try {
       const wallets = (creator.wallets as Array<{
         address: string;
         chain: Chain;
@@ -281,6 +293,9 @@ export async function GET(request: Request) {
           .from('creators')
           .update({ updated_at: new Date().toISOString() })
           .eq('id', creator.id);
+      }
+      } finally {
+        await releaseLock(feeSyncLockKey);
       }
     }
 
