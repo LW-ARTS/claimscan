@@ -30,10 +30,20 @@ interface PageProps {
   params: Promise<{ handle: string }>;
 }
 
+/** Strip leaderboard prefix shorthands (`gh:`, `tt:`) so display names and
+ * metadata read as the bare username, while the resolver still receives the
+ * original prefixed string and routes via parseSearchQuery. */
+function stripHandlePrefix(value: string): string {
+  if (value.startsWith('gh:') && value.length > 3) return value.slice(3);
+  if (value.startsWith('tt:') && value.length > 3) return value.slice(3);
+  return value;
+}
+
 export async function generateMetadata({ params }: PageProps) {
   const { handle } = await params;
   const decoded = decodeURIComponent(handle);
-  const safeName = decoded.replace(/[^a-zA-Z0-9_\-\.]/g, '').slice(0, 64);
+  const cleanHandle = stripHandlePrefix(decoded);
+  const safeName = cleanHandle.replace(/[^a-zA-Z0-9_\-\.]/g, '').slice(0, 64);
   // Don't prefix wallet addresses with @
   const isWallet = isWalletAddress(safeName);
   const displayName = isWallet ? safeName : `@${safeName}`;
@@ -75,6 +85,7 @@ export async function generateMetadata({ params }: PageProps) {
 export default async function ProfilePage({ params }: PageProps) {
   const { handle } = await params;
   const decoded = decodeURIComponent(handle);
+  const cleanHandle = stripHandlePrefix(decoded);
 
   // Validate input length before triggering expensive resolve pipeline
   if (!decoded || decoded.length < 2 || decoded.length > 256) {
@@ -115,7 +126,7 @@ export default async function ProfilePage({ params }: PageProps) {
   const platformCount = new Set(feeRecords.map((f) => f.platform)).size;
 
   // Identity disclaimers for notable handles
-  const handleLower = decoded.toLowerCase();
+  const handleLower = cleanHandle.toLowerCase();
   const IDENTITY_DISCLAIMERS: Record<string, { title: string; body: string }> = {
     elonmusk: {
       title: 'Is this the real Elon Musk? No.',
@@ -134,8 +145,8 @@ export default async function ProfilePage({ params }: PageProps) {
   );
 
   // Build display name for structured data
-  const isWallet = isWalletAddress(decoded);
-  const displayName = isWallet ? decoded : `@${decoded}`;
+  const isWallet = isWalletAddress(cleanHandle);
+  const displayName = isWallet ? cleanHandle : `@${cleanHandle}`;
 
   return (
     <div
@@ -152,7 +163,7 @@ export default async function ProfilePage({ params }: PageProps) {
       </div>
       {!isWallet && (
         <ProfileJsonLd
-          handle={decoded}
+          handle={cleanHandle}
           displayName={displayName}
           totalEarnedUsd={totalEarnedUsd}
           platformCount={platformCount}
@@ -175,7 +186,7 @@ export default async function ProfilePage({ params }: PageProps) {
             solPrice={priceResult.sol}
             ethPrice={priceResult.eth}
             bnbPrice={priceResult.bnb}
-            handle={decoded}
+            handle={cleanHandle}
             totalEarnedUsd={totalEarnedUsd}
             platformCount={platformCount}
             resolveMs={creatorResult.resolveMs}

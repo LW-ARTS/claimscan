@@ -23,7 +23,7 @@ export default async function Home() {
   let stats = { totalFeesUsd: 0, walletsScanned: 0, unclaimedPercent: 0 };
   let leaderboardPreview: Array<{
     handle: string;
-    handle_type: 'twitter' | 'github';
+    handle_type: 'twitter' | 'github' | 'tiktok';
     display_name: string | null;
     total_earned_usd: number;
     platform_count: number;
@@ -305,10 +305,21 @@ export default async function Home() {
             </div>
             {/* Rows */}
             <div className="stagger-in">
-            {leaderboardPreview.map((entry, idx) => (
+            {leaderboardPreview.map((entry, idx) => {
+              // SQL function prefixes non-twitter handles (`gh:`, `tt:`); strip
+              // for display while keeping the prefix in the URL so parseSearchQuery
+              // routes to the right provider on click.
+              const bareHandle = entry.handle.startsWith('gh:') || entry.handle.startsWith('tt:')
+                ? entry.handle.slice(3)
+                : entry.handle;
+              const avatarProvider: 'x' | 'tiktok' | null =
+                entry.handle_type === 'twitter' ? 'x'
+                : entry.handle_type === 'tiktok' ? 'tiktok'
+                : null;
+              return (
               <Link
                 key={entry.handle}
-                href={`/${entry.handle}`}
+                href={`/${encodeURIComponent(entry.handle)}`}
                 style={{ ['--stagger-index' as string]: idx }}
                 className={`row-hover flex items-center gap-3 px-3 py-3.5 sm:gap-8 sm:px-4 hover:bg-[var(--bg-surface-hover)] ${
                   idx === 0
@@ -327,9 +338,9 @@ export default async function Home() {
                   {idx + 1}
                 </span>
                 <span className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                  {entry.handle_type === 'twitter' ? (
+                  {avatarProvider ? (
                     <img
-                      src={`https://unavatar.io/x/${entry.handle}`}
+                      src={`https://unavatar.io/${avatarProvider}/${bareHandle}`}
                       alt=""
                       className="avatar-ring h-7 w-7 shrink-0 rounded-full object-cover"
                       loading="lazy"
@@ -337,10 +348,10 @@ export default async function Home() {
                     />
                   ) : (
                     <span className="avatar-ring flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[11px] font-bold uppercase text-[var(--text-secondary)]">
-                      {entry.handle[0]?.toUpperCase()}
+                      {bareHandle[0]?.toUpperCase()}
                     </span>
                   )}
-                  <span className="truncate text-sm font-semibold text-[var(--text-primary)]">@{entry.handle}</span>
+                  <span className="truncate text-sm font-semibold text-[var(--text-primary)]">@{bareHandle}</span>
                 </span>
                 <span className="w-auto shrink-0 whitespace-nowrap text-right text-sm font-bold text-[var(--text-primary)] sm:w-32">
                   {formatUsd(entry.total_earned_usd).replace(/\.\d+K$/, 'K')}
@@ -352,7 +363,8 @@ export default async function Home() {
                   {entry.token_count}
                 </span>
               </Link>
-            ))}
+              );
+            })}
             </div>
           </div>
         )}

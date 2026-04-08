@@ -1,6 +1,6 @@
 export type Platform = 'bags' | 'clanker' | 'pump' | 'zora' | 'bankr' | 'believe' | 'revshare' | 'coinbarrel' | 'raydium';
 export type Chain = 'sol' | 'base' | 'eth' | 'bsc';
-export type IdentityProvider = 'twitter' | 'github' | 'farcaster' | 'wallet';
+export type IdentityProvider = 'twitter' | 'github' | 'farcaster' | 'tiktok' | 'wallet';
 export type ClaimStatus = 'claimed' | 'unclaimed' | 'partially_claimed' | 'auto_distributed';
 export type ClaimAttemptStatus = 'pending' | 'signing' | 'submitted' | 'confirmed' | 'finalized' | 'failed' | 'expired';
 
@@ -14,6 +14,7 @@ export interface Database {
           github_handle: string | null;
           farcaster_handle: string | null;
           farcaster_fid: number | null;
+          tiktok_handle: string | null;
           display_name: string | null;
           avatar_url: string | null;
           created_at: string;
@@ -26,6 +27,7 @@ export interface Database {
           github_handle?: string | null;
           farcaster_handle?: string | null;
           farcaster_fid?: number | null;
+          tiktok_handle?: string | null;
           display_name?: string | null;
           avatar_url?: string | null;
           created_at?: string;
@@ -38,6 +40,7 @@ export interface Database {
           github_handle?: string | null;
           farcaster_handle?: string | null;
           farcaster_fid?: number | null;
+          tiktok_handle?: string | null;
           display_name?: string | null;
           avatar_url?: string | null;
           created_at?: string;
@@ -368,6 +371,7 @@ export interface Database {
           creator_id: string;
           twitter_handle: string | null;
           github_handle: string | null;
+          tiktok_handle: string | null;
           display_name: string | null;
           platform: Platform;
           chain: Chain;

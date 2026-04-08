@@ -43,6 +43,17 @@ export function parseSearchQuery(query: string): ParsedQuery {
     return { value: trimmed, provider: 'wallet' };
   }
 
+  // Leaderboard prefix shorthand (`gh:username` / `tt:username`).
+  // The leaderboard SQL prefixes non-twitter handles so a single `handle`
+  // column can disambiguate the provider. These shorthands are only valid
+  // pre-strip — twitter/github/tiktok usernames cannot themselves contain ':'.
+  if (trimmed.startsWith('gh:') && trimmed.length > 3) {
+    return { value: trimmed.slice(3).toLowerCase(), provider: 'github' };
+  }
+  if (trimmed.startsWith('tt:') && trimmed.length > 3) {
+    return { value: trimmed.slice(3).toLowerCase(), provider: 'tiktok' };
+  }
+
   // Strip @ prefix for Twitter handles
   const handle = trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
 
@@ -66,6 +77,15 @@ export function parseSearchQuery(query: string): ParsedQuery {
   if (handleLower.includes('warpcast.com/')) {
     const match = handle.match(/warpcast\.com\/([a-zA-Z0-9][a-zA-Z0-9_\-\.]{0,20})/i);
     if (match) return { value: match[1].toLowerCase(), provider: 'farcaster' };
+  }
+
+  // TikTok URL pattern — tiktok.com/@username
+  // TikTok usernames: 2-24 chars, lowercase letters/digits/underscores/periods.
+  // Periods are TikTok-only (Twitter handles cannot contain them), so the
+  // bare-handle default below stays Twitter — TikTok requires an explicit URL.
+  if (handleLower.includes('tiktok.com/')) {
+    const match = handle.match(/tiktok\.com\/@([a-zA-Z0-9_.]{2,24})/i);
+    if (match) return { value: match[1].toLowerCase(), provider: 'tiktok' };
   }
 
   // Default: treat as Twitter handle

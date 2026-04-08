@@ -26,7 +26,7 @@ async function getRedis(): Promise<import('@upstash/redis').Redis | null> {
 
 export interface LeaderboardEntry {
   handle: string;
-  handle_type: 'twitter' | 'github';
+  handle_type: 'twitter' | 'github' | 'tiktok';
   display_name: string | null;
   total_earned_usd: number;
   platform_count: number;
@@ -109,7 +109,7 @@ export async function fetchLeaderboard(opts: {
 
   const mapped: LeaderboardEntry[] = (entries ?? []).map((e: Record<string, unknown>) => ({
     handle: String(e.handle),
-    handle_type: e.handle_type as 'twitter' | 'github',
+    handle_type: e.handle_type as 'twitter' | 'github' | 'tiktok',
     display_name: e.display_name ? String(e.display_name) : null,
     total_earned_usd: Number(e.total_earned_usd),
     platform_count: Number(e.platform_count),

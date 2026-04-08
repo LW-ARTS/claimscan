@@ -70,7 +70,7 @@ export default async function LeaderboardPage() {
   // Fetch initial data server-side for SEO (direct DB call, no HTTP self-fetch).
   let initialData: { entries: Array<{
     handle: string;
-    handle_type: 'twitter' | 'github';
+    handle_type: 'twitter' | 'github' | 'tiktok';
     display_name: string | null;
     total_earned_usd: number;
     platform_count: number;
