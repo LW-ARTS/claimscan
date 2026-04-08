@@ -204,12 +204,16 @@ async function freshResolve(
     }
 
     // ── Step 2b: Fee aggregation ──
-    const allFees = await log.time('aggregateFees', () =>
+    const aggregated = await log.time('aggregateFees', () =>
       aggregateFees(parsed.value, parsed.provider, wallets, log)
     );
 
     // ── Step 2c: Persist fees ──
-    await log.time('persistFees', () => persistFees(creatorId, allFees, supabase, log));
+    // syncedPlatforms scopes the stale-row pruning so we never delete data
+    // for adapters that failed silently this run.
+    await log.time('persistFees', () =>
+      persistFees(creatorId, aggregated.fees, aggregated.syncedPlatforms, supabase, log)
+    );
 
     // ── Step 2d: Claim history (fire-and-forget) ──
     syncClaimHistory(creatorId, wallets, supabase, log);

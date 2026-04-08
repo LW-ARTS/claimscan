@@ -14,6 +14,14 @@ import type { Logger } from '@/lib/logger';
 type FeeRecord = Database['public']['Tables']['fee_records']['Row'];
 type SupabaseClient = ReturnType<typeof import('@/lib/supabase/service').createServiceClient>;
 
+export interface AggregatedFees {
+  fees: TokenFee[];
+  /** Set of platforms whose adapter call completed without throwing.
+   * Used by persistFees to scope its stale-row pruning so we never
+   * delete rows for a platform that may have failed silently. */
+  syncedPlatforms: Set<string>;
+}
+
 // ═══════════════════════════════════════════════
 // Fee Aggregation + Merge
 // ═══════════════════════════════════════════════
@@ -27,13 +35,20 @@ export async function aggregateFees(
   provider: IdentityProvider,
   wallets: ResolvedWallet[],
   log: Logger
-): Promise<TokenFee[]> {
+): Promise<AggregatedFees> {
   // Handle-based + wallet-based fees in parallel
-  const [handleFees, walletFees] = await Promise.all([
+  const [handleResult, walletResult] = await Promise.all([
     log.time('fetchFeesByHandle', () => fetchFeesByHandle(handle, provider), { handle }),
     wallets.length > 0
       ? log.time('fetchAllFees', () => fetchAllFees(wallets), { walletCount: wallets.length })
-      : Promise.resolve([]),
+      : Promise.resolve({ fees: [] as TokenFee[], syncedPlatforms: new Set<string>() }),
+  ]);
+
+  const handleFees = handleResult.fees;
+  const walletFees = walletResult.fees;
+  const syncedPlatforms = new Set<string>([
+    ...handleResult.syncedPlatforms,
+    ...walletResult.syncedPlatforms,
   ]);
 
   // Merge + dedup
@@ -65,29 +80,119 @@ export async function aggregateFees(
     handleFeeCount: handleFees.length,
     walletFeeCount: walletFees.length,
     mergedCount: feeMap.size,
+    syncedPlatforms: [...syncedPlatforms],
   });
 
-  return Array.from(feeMap.values());
+  return { fees: Array.from(feeMap.values()), syncedPlatforms };
 }
 
 // ═══════════════════════════════════════════════
 // Fee Persistence (upsert + claimed-preservation)
 // ═══════════════════════════════════════════════
 
+/** Platforms whose stale rows must NOT be auto-pruned by persistFees.
+ *
+ * Bags has its own vanish-detection (`detectDisappearedTokens`) that marks
+ * disappeared tokens as fully claimed instead of deleting them — Bags' API
+ * only returns unclaimed > 0 entries, so a vanish means "they got claimed",
+ * not "they were misattributed". Pruning would lose claim history. */
+const PRUNE_EXEMPT_PLATFORMS = new Set<string>(['bags']);
+
+/** Pure helper: identify rows that should be deleted from `fee_records`
+ * because they exist in the DB but were not returned by the latest sync.
+ *
+ * Only prunes within platforms whose adapters successfully completed
+ * (`syncedPlatforms`). Platforms not in that set may have failed silently
+ * (rate limit, network error, etc.) — leaving their existing rows alone
+ * is a safety guard against data wipes during outages.
+ *
+ * Bags is exempt — see `PRUNE_EXEMPT_PLATFORMS`. */
+export function findStaleFeeRows<R extends { platform: string; chain: string; token_address: string }>(
+  existingRows: R[],
+  freshFees: Pick<TokenFee, 'platform' | 'chain' | 'tokenAddress'>[],
+  syncedPlatforms: Set<string>
+): R[] {
+  if (syncedPlatforms.size === 0) return [];
+  const freshKeys = new Set(
+    freshFees.map((f) => `${f.platform}:${f.chain}:${f.tokenAddress.toLowerCase()}`)
+  );
+  return existingRows.filter((row) => {
+    if (!syncedPlatforms.has(row.platform)) return false;
+    if (PRUNE_EXEMPT_PLATFORMS.has(row.platform)) return false;
+    const key = `${row.platform}:${row.chain}:${row.token_address.toLowerCase()}`;
+    return !freshKeys.has(key);
+  });
+}
+
+/**
+ * Fetch existing rows + delete stale ones for a creator. Standalone helper
+ * usable by code paths that don't go through `persistFees` (e.g. the
+ * cron `index-fees` route, which has its own upsert flow).
+ *
+ * Returns the number of rows deleted.
+ */
+export async function pruneStaleFeeRowsForCreator(
+  creatorId: string,
+  freshFees: TokenFee[],
+  syncedPlatforms: Set<string>,
+  supabase: SupabaseClient,
+  log: Logger
+): Promise<number> {
+  if (syncedPlatforms.size === 0) return 0;
+
+  const { data: existingRows, error } = await supabase
+    .from('fee_records')
+    .select('platform, chain, token_address')
+    .eq('creator_id', creatorId);
+
+  if (error) {
+    log.warn('pruneStaleFeeRowsForCreator: failed to fetch existing rows', { error: error.message });
+    return 0;
+  }
+
+  const stale = findStaleFeeRows(existingRows ?? [], freshFees, syncedPlatforms);
+  if (stale.length === 0) return 0;
+
+  log.info('pruning stale fee_records', {
+    creatorId,
+    count: stale.length,
+    platforms: [...new Set(stale.map((r) => r.platform))],
+  });
+
+  for (const row of stale) {
+    const { error: deleteError } = await supabase
+      .from('fee_records')
+      .delete()
+      .eq('creator_id', creatorId)
+      .eq('platform', row.platform)
+      .eq('chain', row.chain)
+      .eq('token_address', row.token_address);
+    if (deleteError) {
+      log.warn('stale fee_records delete failed', {
+        error: deleteError.message,
+        key: `${row.platform}:${row.chain}:${row.token_address}`,
+      });
+    }
+  }
+  return stale.length;
+}
+
 /**
  * Persist fee records to Supabase with:
  * - Claimed-preservation (monotonic claimed values)
  * - Disappeared Bags token detection
+ * - Stale-row pruning for synced non-Bags platforms (`syncedPlatforms`)
  */
 export async function persistFees(
   creatorId: string,
   allFees: TokenFee[],
+  syncedPlatforms: Set<string>,
   supabase: SupabaseClient,
   log: Logger
 ): Promise<void> {
-  if (allFees.length === 0) return;
-
-  // Fetch existing fees for claimed-preservation
+  // Fetch existing fees for claimed-preservation AND stale-row pruning.
+  // We fetch even when allFees is empty so pruning can still run if a sync
+  // legitimately returned zero results (e.g., creator stopped being a fee recipient).
   const { data: existingFees, error: existingError } = await supabase
     .from('fee_records')
     .select('platform, chain, token_address, total_claimed, total_earned, total_unclaimed, total_earned_usd, token_symbol, royalty_bps')
@@ -95,6 +200,38 @@ export async function persistFees(
 
   if (existingError) {
     log.error('failed to fetch existing fees for claimed-preservation', { error: existingError.message });
+  }
+
+  // Prune stale rows for any platform that was successfully synced this run
+  // but whose existing DB rows are no longer present in `allFees`.
+  const staleRows = findStaleFeeRows(existingFees ?? [], allFees, syncedPlatforms);
+  if (staleRows.length > 0) {
+    log.info('pruning stale fee_records', {
+      count: staleRows.length,
+      platforms: [...new Set(staleRows.map((r) => r.platform))],
+    });
+    for (const row of staleRows) {
+      const { error: deleteError } = await supabase
+        .from('fee_records')
+        .delete()
+        .eq('creator_id', creatorId)
+        .eq('platform', row.platform)
+        .eq('chain', row.chain)
+        .eq('token_address', row.token_address);
+      if (deleteError) {
+        log.warn('stale fee_records delete failed', {
+          error: deleteError.message,
+          key: `${row.platform}:${row.chain}:${row.token_address}`,
+        });
+      }
+    }
+  }
+
+  if (allFees.length === 0) {
+    // Nothing fresh to upsert. Bags' detectDisappearedTokens still needs to run
+    // for the case where Bags returned an empty list (potential outage).
+    await detectDisappearedTokens(creatorId, allFees, existingFees, supabase, log);
+    return;
   }
 
   // Build claimed map for monotonic preservation
