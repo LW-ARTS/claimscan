@@ -77,9 +77,9 @@ export async function GET(request: Request) {
       // `fees` is empty so that creators who lost fee-recipient status get
       // cleaned up. Bags is exempt (uses detectDisappearedTokens elsewhere).
       try {
-        const pruned = await pruneStaleFeeRowsForCreator(creator.id, fees, syncedPlatforms, supabase, log);
-        if (pruned > 0) {
-          console.info(`[index-fees] pruned ${pruned} stale fee_records for creator ${creator.id}`);
+        const pruneResult = await pruneStaleFeeRowsForCreator(creator.id, fees, syncedPlatforms, supabase, log);
+        if (pruneResult.deleted > 0) {
+          console.info(`[index-fees] pruned ${pruneResult.deleted} stale fee_records for creator ${creator.id}`);
         }
       } catch (pruneErr) {
         console.warn(`[index-fees] prune failed for creator ${creator.id}:`, pruneErr instanceof Error ? pruneErr.message : pruneErr);
