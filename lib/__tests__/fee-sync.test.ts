@@ -32,9 +32,10 @@ type ExistingRow = {
 // the helper actually issued. Supports simulated SELECT and DELETE failures.
 
 type SupabaseCall = {
-  op: 'select' | 'delete';
+  op: 'select' | 'delete' | 'upsert';
   filters: Record<string, unknown>;
   in?: string[];
+  upsertRows?: unknown[];
 };
 
 function makeRecorderSupabase(seedRows: ExistingRow[] = []) {
@@ -86,6 +87,10 @@ function makeRecorderSupabase(seedRows: ExistingRow[] = []) {
             resolve({ error: deleteShouldFail ? { message: 'simulated delete failure' } : null });
           };
           return chain;
+        },
+        upsert(rows: unknown[], _opts?: unknown) {
+          calls.push({ op: 'upsert', filters: {}, upsertRows: rows });
+          return Promise.resolve({ error: null });
         },
       };
     },
@@ -362,5 +367,34 @@ describe('pruneStaleFeeRowsForCreator', () => {
     await pruneStaleFeeRowsForCreator('creator-1', [], new Set(), supabase, log);
 
     expect(log.warn).not.toHaveBeenCalled();
+  });
+});
+
+// ─── persistFees fail-fast on SELECT error ───────────────────────────
+
+import { persistFees } from '@/lib/services/fee-sync';
+
+describe('persistFees fail-fast on SELECT error', () => {
+  it('skips prune AND upsert when the existing-rows SELECT fails', async () => {
+    const recorder = makeRecorderSupabase([
+      { platform: 'bankr', chain: 'base', token_address: '0xSTALE' },
+    ]);
+    recorder.setSelectFails(true);
+
+    // Non-empty fresh fees so the upsert WOULD run if we did not fail-fast.
+    const freshFees: TokenFee[] = [fee('bankr', 'base', '0xFRESH')];
+
+    await persistFees(
+      'creator-1',
+      freshFees,
+      new Set(['bankr']),
+      recorder.supabase,
+      makeMockLogger()
+    );
+
+    // No DELETE attempted (no rows to prune from a failed SELECT)
+    expect(recorder.calls.filter((c) => c.op === 'delete')).toHaveLength(0);
+    // No UPSERT attempted (we should bail out on SELECT failure)
+    expect(recorder.calls.filter((c) => c.op === 'upsert')).toHaveLength(0);
   });
 });
