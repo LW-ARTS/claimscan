@@ -95,7 +95,6 @@ export default async function LeaderboardPage() {
     >
       <script
         type="application/ld+json"
-        // eslint-disable-next-line react/no-danger -- static JSON-LD, same pattern used in docs/page.tsx
         dangerouslySetInnerHTML={{ __html: LEADERBOARD_BREADCRUMB_LD }}
       />
       {/* Header. Pencil: padding 48px 40px 32px 40px */}

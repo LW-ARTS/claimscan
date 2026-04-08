@@ -189,7 +189,7 @@ export default async function Home() {
       <div className="mt-12 w-full space-y-8 sm:mt-16">
         <div className="space-y-3 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[2px] text-white">
-            // Supported Platforms
+            {'// '}Supported Platforms
           </p>
           <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] sm:text-[32px]">
             SUPPORTED PLATFORMS
