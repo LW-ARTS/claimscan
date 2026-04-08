@@ -168,9 +168,19 @@ async function freshResolve(
     // ── Step 2c: Persist fees ──
     // syncedPlatforms scopes the stale-row pruning so we never delete data
     // for adapters that failed silently this run.
-    await log.time('persistFees', () =>
-      persistFees(creatorId, aggregated.fees, aggregated.syncedPlatforms, supabase, log)
-    );
+    // Acquire the SAME fee-sync lock the cron uses, to eliminate the TOCTOU
+    // race where cron and user-resolve interleave SELECT/DELETE/UPSERT for
+    // the same creator. Lock is fail-open: if Redis is down or held, we
+    // proceed anyway (correctness optimization, not requirement).
+    const feeSyncLockKey = `fee-sync:${creatorId}`;
+    const gotFeeSyncLock = await tryAcquireLock(feeSyncLockKey, 90);
+    try {
+      await log.time('persistFees', () =>
+        persistFees(creatorId, aggregated.fees, aggregated.syncedPlatforms, supabase, log)
+      );
+    } finally {
+      if (gotFeeSyncLock) await releaseLock(feeSyncLockKey);
+    }
 
     // ── Step 2d: Claim history (fire-and-forget) ──
     syncClaimHistory(creatorId, wallets, supabase, log);
