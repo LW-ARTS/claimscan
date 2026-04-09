@@ -2,16 +2,18 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { resolveAndPersistCreator } from '@/lib/services/creator';
+import { parseSearchQuery } from '@/lib/resolve/identity';
 import { getNativeTokenPrices } from '@/lib/prices';
 import { computeFeeUsd, isWalletAddress } from '@/lib/utils';
 import { PLATFORM_CONFIG } from '@/lib/constants';
 import { SearchBar } from '../components/SearchBar';
 import { ProfileJsonLd } from '../components/ProfileJsonLd';
 import { ProfileHero } from '../components/ProfileHero';
+import { EmptyFeesCallout } from '../components/EmptyFeesCallout';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LazySection } from '../components/LazySection';
 import { LiveFeesProvider } from '../components/LiveFeesProvider';
-import type { Chain } from '@/lib/supabase/types';
+import type { Chain, Database } from '@/lib/supabase/types';
 
 export const revalidate = 1800; // 30 minutes
 
@@ -100,8 +102,65 @@ export default async function ProfilePage({ params }: PageProps) {
     getNativeTokenPrices().catch(() => ({ sol: 0, eth: 0, bnb: 0, stale: true as const })),
   ]);
 
+  // When the resolve pipeline fails to find or create a real creator row
+  // (wallet search with no data, transient error, timeout), render a zeroed
+  // profile instead of a generic not-found page. Synthesizes a Creator
+  // in-memory from parseSearchQuery so ProfileHero can render normally
+  // with 0 stats, and the EmptyFeesCallout explains the empty state.
   if (!creatorResult.creator) {
-    return notFound();
+    const parsed = parseSearchQuery(decoded);
+    const now = new Date().toISOString();
+    const syntheticCreator: Database['public']['Tables']['creators']['Row'] = {
+      id: `synthetic-${parsed.value}`,
+      twitter_handle: parsed.provider === 'twitter' ? parsed.value : null,
+      github_handle: parsed.provider === 'github' ? parsed.value : null,
+      farcaster_handle: parsed.provider === 'farcaster' ? parsed.value : null,
+      tiktok_handle: parsed.provider === 'tiktok' ? parsed.value : null,
+      farcaster_fid: null,
+      display_name: cleanHandle,
+      avatar_url: null,
+      created_at: now,
+      updated_at: now,
+      last_token_sync_at: null,
+    };
+
+    return (
+      <div
+        className="space-y-0"
+        style={{
+          background: `
+            radial-gradient(ellipse 50% 35% at 75% 30%, #FFFFFF06 0%, transparent 100%),
+            radial-gradient(ellipse 90% 50% at 30% 8%, #FFFFFF0C 0%, transparent 70%),
+            linear-gradient(180deg, #16161A 0%, #09090B 100%)
+          `,
+        }}>
+        <div className="px-5 py-4 sm:px-12">
+          <SearchBar />
+        </div>
+        {/* LiveFeesProvider is required because ProfileHero consumes useLiveFees().
+            Empty walletsForLive means the provider never starts SSE polling. */}
+        <LiveFeesProvider walletsForLive={[]}>
+          <div className="animate-fade-in-up">
+            <ErrorBoundary>
+              <ProfileHero
+                creator={syntheticCreator}
+                wallets={[]}
+                initialFees={[]}
+                walletsForLive={[]}
+                solPrice={priceResult.sol}
+                ethPrice={priceResult.eth}
+                bnbPrice={priceResult.bnb}
+                handle={cleanHandle}
+                totalEarnedUsd={0}
+                platformCount={0}
+                resolveMs={creatorResult.resolveMs}
+              />
+            </ErrorBoundary>
+          </div>
+          <EmptyFeesCallout handle={cleanHandle} provider={parsed.provider} />
+        </LiveFeesProvider>
+      </div>
+    );
   }
 
   const creator = creatorResult.creator;
