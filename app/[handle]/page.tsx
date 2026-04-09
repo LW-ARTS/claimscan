@@ -287,34 +287,41 @@ export default async function ProfilePage({ params }: PageProps) {
         </ul>
       </div>
 
-      {/* ZONE 2-4: Heavy content wrapped in Suspense so hero renders immediately */}
-      <Suspense fallback={<BreakdownSkeleton />}>
-        {/* ZONE 2: Breakdown (chain pills + platform tabs + table) */}
-        <h2 className="sr-only">Fee Breakdown by Platform</h2>
-        <LazySection minHeight={200}>
-          <div className="animate-fade-in-up delay-150 px-[2%]">
-            <PlatformBreakdown fees={feeRecords} solPrice={priceResult.sol} ethPrice={priceResult.eth} bnbPrice={priceResult.bnb} wallets={wallets} key={creator.id} />
-          </div>
-        </LazySection>
-
-        {/* ZONE 3: Claim History */}
-        <h2 className="sr-only">Claim History</h2>
-        {creatorResult.claimEvents.length > 0 && (
-          <LazySection minHeight={100}>
-            <div className="animate-fade-in-up delay-200">
-              <ClaimHistory events={creatorResult.claimEvents} />
+      {/* ZONE 2-4: Heavy content wrapped in Suspense so hero renders immediately.
+          When the creator has zero fee records, collapse the breakdown / claim
+          history / scan log into a single EmptyFeesCallout — avoids the visual
+          noise of 9 empty platform tabs and gives the user a clear next action. */}
+      {feeRecords.length === 0 ? (
+        <EmptyFeesCallout handle={cleanHandle} provider={parseSearchQuery(decoded).provider} />
+      ) : (
+        <Suspense fallback={<BreakdownSkeleton />}>
+          {/* ZONE 2: Breakdown (chain pills + platform tabs + table) */}
+          <h2 className="sr-only">Fee Breakdown by Platform</h2>
+          <LazySection minHeight={200}>
+            <div className="animate-fade-in-up delay-150 px-[2%]">
+              <PlatformBreakdown fees={feeRecords} solPrice={priceResult.sol} ethPrice={priceResult.eth} bnbPrice={priceResult.bnb} wallets={wallets} key={creator.id} />
             </div>
           </LazySection>
-        )}
 
-        {/* ZONE 4: Scan Status (minimal footnote) */}
-        <h2 className="sr-only">Scan Status</h2>
-        <LazySection minHeight={80}>
-          <div className="animate-fade-in-up delay-300 px-[2%] py-4 mb-12">
-            <ScanStatusLog fees={feeRecords} resolvedChains={resolvedChains} />
-          </div>
-        </LazySection>
-      </Suspense>
+          {/* ZONE 3: Claim History */}
+          <h2 className="sr-only">Claim History</h2>
+          {creatorResult.claimEvents.length > 0 && (
+            <LazySection minHeight={100}>
+              <div className="animate-fade-in-up delay-200">
+                <ClaimHistory events={creatorResult.claimEvents} />
+              </div>
+            </LazySection>
+          )}
+
+          {/* ZONE 4: Scan Status (minimal footnote) */}
+          <h2 className="sr-only">Scan Status</h2>
+          <LazySection minHeight={80}>
+            <div className="animate-fade-in-up delay-300 px-[2%] py-4 mb-12">
+              <ScanStatusLog fees={feeRecords} resolvedChains={resolvedChains} />
+            </div>
+          </LazySection>
+        </Suspense>
+      )}
       </LiveFeesProvider>
     </div>
   );
