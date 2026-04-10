@@ -1,0 +1,95 @@
+name: Integration Tests
+
+on:
+  # Nightly at 04:00 UTC (outside peak hours to reduce API rate-limit risk)
+  schedule:
+    - cron: '0 4 * * *'
+  # Manual trigger for on-demand runs (e.g. after adding a new adapter)
+  workflow_dispatch:
+
+# Prevent overlapping runs from double-hitting adapter API rate limits.
+# If a new run is triggered while one is in progress, the in-progress run
+# is cancelled and the new one takes over.
+concurrency:
+  group: integration-tests
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Run integration tests against live APIs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # -------------------------------------------------------------------------
+    # IMPORTANT: set secrets via printf, NOT via the GitHub web UI paste form.
+    #
+    # Browser copy-paste frequently appends a literal '\n' that becomes a real
+    # newline after the dotenv parser, causing auth failures (see audit N-01,
+    # 2026-04-07). Use the gh CLI instead:
+    #
+    #   printf '%s' '<your-value>' | gh secret set SOLANA_RPC_URL
+    #   printf '%s' '<your-value>' | gh secret set BASE_RPC_URL
+    #   printf '%s' '<your-value>' | gh secret set ETH_RPC_URL
+    #   printf '%s' '<your-value>' | gh secret set BSC_RPC_URL
+    #   printf '%s' '<your-value>' | gh secret set HELIUS_API_KEY
+    #   printf '%s' '<your-value>' | gh secret set BAGS_API_KEY
+    #   printf '%s' '<your-value>' | gh secret set BAGS_API_KEYS
+    #   printf '%s' '<your-value>' | gh secret set ZORA_API_KEY
+    #   printf '%s' '<your-value>' | gh secret set BANKR_API_KEY
+    #
+    # To verify an existing secret is clean (check bytes at end of value):
+    #   gh secret list   # confirm it exists
+    #   # Then pull locally and inspect: vercel env pull /tmp/.env && grep '^VAR=' /tmp/.env | od -c
+    # -------------------------------------------------------------------------
+    env:
+      SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
+      BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+      ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
+      BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
+      HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
+      BAGS_API_KEY: ${{ secrets.BAGS_API_KEY }}
+      BAGS_API_KEYS: ${{ secrets.BAGS_API_KEYS }}
+      ZORA_API_KEY: ${{ secrets.ZORA_API_KEY }}
+      BANKR_API_KEY: ${{ secrets.BANKR_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate secrets (no trailing newlines)
+        # Checks each required secret for two failure modes:
+        #   1. Empty / not set (secret was never configured in GitHub)
+        #   2. Trailing newline (secret was pasted via web UI, not printf)
+        # Either condition exits non-zero before any adapter call is made.
+        run: |
+          failed=0
+          for var in \
+            SOLANA_RPC_URL \
+            BASE_RPC_URL \
+            ETH_RPC_URL \
+            BSC_RPC_URL \
+            HELIUS_API_KEY \
+            BAGS_API_KEY \
+            BAGS_API_KEYS \
+            ZORA_API_KEY \
+            BANKR_API_KEY; do
+            val="${!var}"
+            if [[ -z "$val" ]]; then
+              echo "::error::Secret $var is empty or not set. Set it with: printf '%s' '<value>' | gh secret set $var"
+              failed=1
+            elif [[ "$val" != "${val%$'\n'}" ]]; then
+              echo "::error::Secret $var contains a trailing newline. Re-set it with: printf '%s' '<value>' | gh secret set $var"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - name: Run integration tests
+        run: npm run test:integration
