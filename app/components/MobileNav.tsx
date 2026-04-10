@@ -10,6 +10,7 @@ export function MobileNav() {
   const pathname = usePathname();
 
   // Close on route change
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- route change handler, intentional
   useEffect(() => setOpen(false), [pathname]);
 
   // Close on outside click

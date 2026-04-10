@@ -342,7 +342,12 @@ export async function POST(request: Request) {
   }
 
   // Update the claim attempt
-  const updateData: Record<string, unknown> = {
+  const updateData: {
+    status: string;
+    updated_at: string;
+    tx_signature?: string;
+    error_reason?: string;
+  } = {
     status: validatedStatus,
     updated_at: new Date().toISOString(),
   };

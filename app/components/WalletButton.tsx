@@ -12,6 +12,7 @@ import { copyToClipboard } from '@/lib/utils';
  */
 export function WalletButton() {
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- mount guard, intentional
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div className="h-10 w-[100px] sm:w-[140px] rounded-[10px] bg-[var(--bg-surface)] animate-pulse" />;
   return <WalletButtonInner />;

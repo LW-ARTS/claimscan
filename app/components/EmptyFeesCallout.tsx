@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { IdentityProvider } from '@/lib/supabase/types';
 
 interface EmptyFeesCalloutProps {
@@ -91,7 +92,7 @@ export function EmptyFeesCallout({ handle, provider }: EmptyFeesCalloutProps) {
         </p>
 
         {/* CTA: browse the leaderboard */}
-        <a
+        <Link
           href="/leaderboard"
           className="pressable hover-glow mt-7 inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--border-accent)] px-4 py-2.5 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-hover)]"
         >
@@ -99,7 +100,7 @@ export function EmptyFeesCallout({ handle, provider }: EmptyFeesCalloutProps) {
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
           </svg>
-        </a>
+        </Link>
       </div>
     </div>
   );
