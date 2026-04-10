@@ -13,7 +13,8 @@
     "test:integration:watch": "vitest --project integration",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "bench": "vitest bench --project bench"
+    "bench": "vitest bench --project bench",
+    "health-check": "tsx --conditions react-server scripts/health-check.ts"
   },
   "dependencies": {
     "@coinbarrel/sdk": "^3.2.7",
@@ -61,6 +62,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "eslint-plugin-security": "^4.0.0",
+    "server-only": "^0.0.1",
     "shadcn": "^3.8.5",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.4.0",

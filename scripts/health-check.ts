@@ -2,10 +2,21 @@
 // scripts/health-check.ts
 
 import 'dotenv/config';
+import pc from 'picocolors';
 import { getAllAdapters } from '@/lib/platforms/index';
 import { getFixture } from '@/lib/__tests__/fixtures/wallets';
 
 type ProbeMethod = 'getCreatorTokens' | 'getHistoricalFees' | 'getLiveUnclaimedFees';
+
+type ErrorCategory =
+  | 'timeout'
+  | 'auth_failure'
+  | 'rate_limit'
+  | 'parse_error'
+  | 'network_error'
+  | 'empty_result';
+
+type ProbeStatus = 'ok' | 'fail' | 'timeout';
 
 interface ProbeResult {
   adapterName: string;
@@ -13,6 +24,112 @@ interface ProbeResult {
   durationMs: number;
   resultCount: number;
   error?: string;
+}
+
+function categorizeError(error: string, resultCount: number): ErrorCategory {
+  const msg = error.toLowerCase();
+  if (msg.includes('timeout') || msg.includes('abort') || msg.includes('etimedout')) {
+    return 'timeout';
+  }
+  if (
+    msg.includes('401') ||
+    msg.includes('403') ||
+    msg.includes('unauthorized') ||
+    msg.includes('forbidden') ||
+    msg.includes('invalid api key') ||
+    msg.includes('invalid key')
+  ) {
+    return 'auth_failure';
+  }
+  if (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')) {
+    return 'rate_limit';
+  }
+  if (
+    msg.includes('json') ||
+    msg.includes('parse') ||
+    msg.includes('unexpected token') ||
+    msg.includes('syntax')
+  ) {
+    return 'parse_error';
+  }
+  if (
+    msg.includes('econnrefused') ||
+    msg.includes('enotfound') ||
+    msg.includes('fetch failed') ||
+    msg.includes('network error')
+  ) {
+    return 'network_error';
+  }
+  if (resultCount === 0) {
+    return 'empty_result';
+  }
+  return 'network_error';
+}
+
+function deriveStatus(result: ProbeResult): ProbeStatus {
+  if (!result.error) return 'ok';
+  const category = categorizeError(result.error, result.resultCount);
+  return category === 'timeout' ? 'timeout' : 'fail';
+}
+
+function deriveErrorDisplay(result: ProbeResult): string {
+  if (!result.error && result.resultCount === 0) return 'empty_result';
+  if (!result.error) return '';
+  return categorizeError(result.error, result.resultCount);
+}
+
+function colorStatus(status: ProbeStatus): string {
+  if (status === 'ok') return pc.green(status);
+  if (status === 'timeout') return pc.yellow(status);
+  return pc.red(status);
+}
+
+function renderTable(results: ProbeResult[]): void {
+  // Column widths (content only, padding added separately)
+  const COL = {
+    adapter: 14,
+    method: 24,
+    status: 9,
+    time: 10,
+    count: 7,
+    error: 20,
+  };
+
+  const pad = (s: string, n: number) => s.padEnd(n);
+  const header =
+    pad('Adapter', COL.adapter) +
+    pad('Method', COL.method) +
+    pad('Status', COL.status) +
+    pad('Time (ms)', COL.time) +
+    pad('Count', COL.count) +
+    'Error';
+  const separator = '-'.repeat(
+    COL.adapter + COL.method + COL.status + COL.time + COL.count + COL.error,
+  );
+
+  console.log('');
+  console.log(pc.bold(header));
+  console.log(separator);
+
+  for (const r of results) {
+    const status = deriveStatus(r);
+    const errorDisplay = deriveErrorDisplay(r);
+    const statusColored = colorStatus(status);
+    // padEnd on the raw status string (not colored) to keep alignment
+    const statusPadded = statusColored + ' '.repeat(Math.max(0, COL.status - status.length));
+
+    const row =
+      pad(r.adapterName, COL.adapter) +
+      pad(r.methodName, COL.method) +
+      statusPadded +
+      pad(String(r.durationMs), COL.time) +
+      pad(String(r.resultCount), COL.count) +
+      errorDisplay;
+
+    console.log(row);
+  }
+
+  console.log(separator);
 }
 
 const PROBE_TIMEOUT_MS = 30_000;
@@ -130,11 +247,18 @@ async function runProbes(): Promise<void> {
     }
   }
 
-  // Raw output — Phase 6 will replace this with a formatted table
-  console.log(JSON.stringify(results, null, 2));
+  renderTable(results);
 
-  const failed = results.filter((r) => r.error);
-  console.log(`\nProbe summary: ${results.length} total, ${failed.length} failed.`);
+  const okCount = results.filter((r) => !r.error).length;
+  const failCount = results.filter((r) => r.error && categorizeError(r.error, r.resultCount) !== 'timeout').length;
+  const timeoutCount = results.filter((r) => r.error && categorizeError(r.error, r.resultCount) === 'timeout').length;
+
+  console.log(
+    `\nSummary: ${results.length} probes — ` +
+    `${pc.green(String(okCount) + ' ok')}, ` +
+    `${pc.red(String(failCount) + ' fail')}, ` +
+    `${pc.yellow(String(timeoutCount) + ' timeout')}`,
+  );
 }
 
 runProbes().catch((err) => {
