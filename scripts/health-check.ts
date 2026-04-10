@@ -1,6 +1,7 @@
 #!/usr/bin/env -S npx tsx --conditions react-server
 // scripts/health-check.ts
 
+import 'dotenv/config';
 import { getAllAdapters } from '@/lib/platforms/index';
 import { getFixture } from '@/lib/__tests__/fixtures/wallets';
 
@@ -14,7 +15,7 @@ interface ProbeResult {
   error?: string;
 }
 
-const PROBE_TIMEOUT_MS = 15_000;
+const PROBE_TIMEOUT_MS = 30_000;
 
 async function probeMethod(
   adapterName: string,
@@ -52,11 +53,15 @@ function validateEnv(): void {
     'SOLANA_RPC_URL',
     'BASE_RPC_URL',
     'ETH_RPC_URL',
-    'BSC_RPC_URL',
     'ZORA_API_KEY',
     'BANKR_API_KEY',
     'HELIUS_API_KEY',
   ];
+
+  // Optional: BSC_RPC_URL (Clanker BSC falls back to public RPC)
+  if (!process.env.BSC_RPC_URL) {
+    console.warn('WARN: BSC_RPC_URL not set, Clanker BSC will use public fallback');
+  }
 
   for (const key of required) {
     if (!process.env[key]) missing.push(key);
