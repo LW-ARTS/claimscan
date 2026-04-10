@@ -6,6 +6,7 @@ export default defineConfig({
     projects: [
       './vitest.unit.config.ts',
       './vitest.integration.config.ts',
+      './vitest.bench.config.ts',
     ],
   },
   resolve: {

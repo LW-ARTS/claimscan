@@ -12,7 +12,8 @@
     "test:integration": "vitest run --project integration",
     "test:integration:watch": "vitest --project integration",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "bench": "vitest bench --project bench"
   },
   "dependencies": {
     "@coinbarrel/sdk": "^3.2.7",
