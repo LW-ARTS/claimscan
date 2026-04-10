@@ -85,3 +85,4 @@ tcpdump_log.txt
 *.pptx
 supabase/.temp/
 security-scan/
+.planning/
