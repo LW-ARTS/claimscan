@@ -45,6 +45,7 @@ interface Props {
  */
 export function CountUpLazy({ value, variant, className }: Props) {
   const [hydrated, setHydrated] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- mount guard, intentional
   useEffect(() => setHydrated(true), []);
   const format = FORMATTERS[variant];
   if (!hydrated) return <span className={className}>{format(value)}</span>;

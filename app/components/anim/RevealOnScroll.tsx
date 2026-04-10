@@ -24,7 +24,7 @@ export function RevealOnScroll({ children, amount = 0.3, className }: RevealOnSc
     if (!el) return;
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setVisible(true);
+      setVisible(true); // eslint-disable-line react-hooks/set-state-in-effect -- a11y guard
       return;
     }
 
