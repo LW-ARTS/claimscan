@@ -343,7 +343,7 @@ export async function POST(request: Request) {
 
   // Update the claim attempt
   const updateData: {
-    status: string;
+    status: ClaimAttemptStatus;
     updated_at: string;
     tx_signature?: string;
     error_reason?: string;

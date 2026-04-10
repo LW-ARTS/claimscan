@@ -263,7 +263,7 @@ export async function GET(request: Request) {
 
               // Update pump fee_records with enrichment data
               if (hasCashback || feeLocked !== null) {
-                const updates: Record<string, unknown> = {};
+                const updates: { fee_locked?: boolean } = {};
                 if (feeLocked !== null) updates.fee_locked = feeLocked;
 
                 if (Object.keys(updates).length > 0) {
