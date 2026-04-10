@@ -12,6 +12,7 @@ node_modules
 
 # testing
 /coverage
+.bench-results.json
 
 # next.js
 /.next/
