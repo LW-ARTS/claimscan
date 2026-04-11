@@ -52,10 +52,13 @@ export async function resolveAndPersistCreator(query: string): Promise<ResolveRe
   if (existing) return existing;
 
   // Distributed lock: prevent multiple serverless instances from resolving the same key.
-  // If lock is held, try cache first; if cache misses, proceed with resolve anyway
-  // (distributed lock is an optimization, not a correctness guarantee).
-  const gotLock = await tryAcquireLock(`resolve:${dedupeKey}`);
-  if (!gotLock) {
+  // TTL = 90s so it strictly exceeds Vercel Hobby maxDuration (60s) and RESOLVE_TIMEOUT_MS (55s),
+  // closing the prior boundary where lock TTL and maxDuration both equalled 60s.
+  // If the lock is held by another instance, try cache first; if cache misses, proceed with
+  // resolve anyway (distributed lock is an optimization, not a correctness guarantee).
+  const resolveLockKey = `resolve:${dedupeKey}`;
+  const resolveLockToken = await tryAcquireLock(resolveLockKey, 90);
+  if (!resolveLockToken) {
     await new Promise((r) => setTimeout(r, 2000));
     const log = createLogger('creator');
     const supabase = createServiceClient();
@@ -89,7 +92,9 @@ export async function resolveAndPersistCreator(query: string): Promise<ResolveRe
     return await promise;
   } finally {
     inFlight.delete(dedupeKey);
-    await releaseLock(`resolve:${dedupeKey}`);
+    // Null-safe: releaseLock noops when resolveLockToken is null (we never held the lock)
+    // or NO_REDIS_TOKEN (fail-open acquisition). Only a UUID triggers the Lua CAS delete.
+    await releaseLock(resolveLockKey, resolveLockToken);
   }
 }
 
@@ -173,13 +178,14 @@ async function freshResolve(
     // the same creator. Lock is fail-open: if Redis is down or held, we
     // proceed anyway (correctness optimization, not requirement).
     const feeSyncLockKey = `fee-sync:${creatorId}`;
-    const gotFeeSyncLock = await tryAcquireLock(feeSyncLockKey, 90);
+    const feeSyncLockToken = await tryAcquireLock(feeSyncLockKey, 90);
     try {
       await log.time('persistFees', () =>
         persistFees(creatorId, aggregated.fees, aggregated.syncedPlatforms, supabase, log)
       );
     } finally {
-      if (gotFeeSyncLock) await releaseLock(feeSyncLockKey);
+      // releaseLock is null-safe: noops when token is null (not acquired) or NO_REDIS_TOKEN
+      await releaseLock(feeSyncLockKey, feeSyncLockToken);
     }
 
     // ── Step 2d: Claim history (fire-and-forget) ──
