@@ -54,9 +54,11 @@ export async function GET(request: Request) {
       // Acquire fee-sync lock to prevent TOCTOU race with /api/search.
       // Both this cron and creator.ts:freshResolve contend on the same key.
       // 90s TTL covers the full per-creator processing budget.
+      // Token-based ownership (UUID / NO_REDIS_TOKEN / null) distinguishes
+      // "Redis down → proceed fail-open" from "another worker owns it → skip".
       const feeSyncLockKey = `fee-sync:${creator.id}`;
-      const gotLock = await tryAcquireLock(feeSyncLockKey, 90);
-      if (!gotLock) {
+      const feeSyncLockToken = await tryAcquireLock(feeSyncLockKey, 90);
+      if (!feeSyncLockToken) {
         log.info('cron skip: fee-sync lock held by another process', { creatorId: creator.id });
         continue;
       }
@@ -295,7 +297,10 @@ export async function GET(request: Request) {
           .eq('id', creator.id);
       }
       } finally {
-        await releaseLock(feeSyncLockKey);
+        // releaseLock is null-safe and ownership-verified via Lua CAS;
+        // passing the token ensures we only delete our own lock, not one
+        // a subsequent worker might hold if our TTL expired.
+        await releaseLock(feeSyncLockKey, feeSyncLockToken);
       }
     }
 
