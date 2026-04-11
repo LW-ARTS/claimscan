@@ -549,13 +549,12 @@ export async function proxy(request: NextRequest) {
   }
 
   // Tarpit AFTER rate limit: only delay requests that weren't already rejected.
-  // M-5: Cap handle route tarpit to 500ms — full 5s reserved for API routes only.
-  // Handle routes are user-facing pages; burning 5s of serverless budget hurts more than it helps.
-  if (pathname.startsWith('/api/') || handleMatch) {
-    let delay = getTarpitDelayMs(request);
-    if (handleMatch && !pathname.startsWith('/api/')) {
-      delay = Math.min(delay, 500);
-    }
+  // Handle routes are tarpitted (and capped at 500ms) earlier, before the fast
+  // path return at :358, so they never reach this point. Only API routes are
+  // left — the legacy `|| handleMatch` branch was provably dead code.
+  // See security-scan/AUDIT-2026-04-11.md I-2.
+  if (pathname.startsWith('/api/')) {
+    const delay = getTarpitDelayMs(request);
     if (delay > 0) {
       await sleep(delay);
     }
