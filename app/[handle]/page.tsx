@@ -46,6 +46,7 @@ export async function generateMetadata({ params }: PageProps) {
   const decoded = decodeURIComponent(handle);
   const cleanHandle = stripHandlePrefix(decoded);
   const safeName = cleanHandle.replace(/[^a-zA-Z0-9_\-\.]/g, '').slice(0, 64);
+  const ogSlug = decoded.replace(/[^a-zA-Z0-9_\-\.:]/g, '').slice(0, 67);
   // Don't prefix wallet addresses with @
   const isWallet = isWalletAddress(safeName);
   const displayName = isWallet ? safeName : `@${safeName}`;
@@ -58,7 +59,7 @@ export async function generateMetadata({ params }: PageProps) {
       description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads on Solana, Base, and BNB Chain.`,
       images: [
         {
-          url: `/${encodeURIComponent(safeName)}/opengraph-image`,
+          url: `/${encodeURIComponent(ogSlug)}/opengraph-image`,
           width: 2400,
           height: 1260,
           alt: `${displayName} creator fee receipt on ClaimScan`,
@@ -73,7 +74,7 @@ export async function generateMetadata({ params }: PageProps) {
       description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads.`,
       images: [
         {
-          url: `/${encodeURIComponent(safeName)}/opengraph-image`,
+          url: `/${encodeURIComponent(ogSlug)}/opengraph-image`,
           alt: `${displayName} creator fee receipt on ClaimScan`,
         },
       ],

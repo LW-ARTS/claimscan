@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     );
   }
 
-  if (!/^[a-zA-Z0-9_\-\.@]{2,64}$/.test(handle.slice(0, 64))) {
+  if (!/^[a-zA-Z0-9_\-\.@:]{2,67}$/.test(handle.slice(0, 67))) {
     return NextResponse.json(
       { error: 'Invalid handle format' },
       { status: 400 }

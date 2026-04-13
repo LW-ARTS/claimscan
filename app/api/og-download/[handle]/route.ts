@@ -7,10 +7,11 @@ export async function GET(
   const { handle } = await params;
   const decoded = decodeURIComponent(handle);
   const safeHandle = decoded.replace(/[^a-zA-Z0-9_\-\.]/g, '').slice(0, 64);
+  const ogSlug = decoded.replace(/[^a-zA-Z0-9_\-\.:]/g, '').slice(0, 67);
 
   // Fetch the OG image from the opengraph-image route
   const origin = request.nextUrl.origin;
-  const ogRes = await fetch(`${origin}/${encodeURIComponent(safeHandle)}/opengraph-image`, {
+  const ogRes = await fetch(`${origin}/${encodeURIComponent(ogSlug)}/opengraph-image`, {
     signal: AbortSignal.timeout(20_000),
   });
 
