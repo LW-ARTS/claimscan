@@ -44,9 +44,10 @@ function stripHandlePrefix(value: string): string {
 export async function generateMetadata({ params }: PageProps) {
   const { handle } = await params;
   const decoded = decodeURIComponent(handle);
-  const cleanHandle = stripHandlePrefix(decoded);
-  const safeName = cleanHandle.replace(/[^a-zA-Z0-9_\-\.]/g, '').slice(0, 64);
-  const ogSlug = decoded.replace(/[^a-zA-Z0-9_\-\.:]/g, '').slice(0, 67);
+  const parsed = parseSearchQuery(decoded);
+  const safeName = parsed.value.replace(/[^a-zA-Z0-9_\-\.]/g, '').slice(0, 64);
+  const ogPrefix = parsed.provider === 'tiktok' ? 'tt:' : parsed.provider === 'github' ? 'gh:' : '';
+  const ogSlug = `${ogPrefix}${safeName}`;
   // Don't prefix wallet addresses with @
   const isWallet = isWalletAddress(safeName);
   const displayName = isWallet ? safeName : `@${safeName}`;
