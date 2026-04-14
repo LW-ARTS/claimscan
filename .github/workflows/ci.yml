@@ -32,6 +32,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     timeout-minutes: 15
+    # Dependabot PRs can't access repo secrets — skip e2e for them.
+    # TODO: add NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY / _SOLANA_RPC_URL as repo
+    # secrets and inject via `env:` here so e2e tests against real Supabase
+    # on human PRs instead of the placeholder values above (which cause any
+    # Supabase-touching spec to fail with 500).
+    if: github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v6
