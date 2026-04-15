@@ -469,8 +469,14 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Prevent caching of API responses (except /api/prices which uses revalidate)
-  if (pathname.startsWith('/api/') && pathname !== '/api/prices') {
+  // Prevent caching of API responses (except routes that explicitly opt in
+  // to long-lived caching). /api/prices revalidates every 5min, /api/avatar
+  // is a static image proxy that benefits from Vercel CDN s-maxage.
+  if (
+    pathname.startsWith('/api/') &&
+    pathname !== '/api/prices' &&
+    pathname !== '/api/avatar'
+  ) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   }
 
@@ -525,8 +531,13 @@ export async function proxy(request: NextRequest) {
 
   // Rate limit BEFORE tarpit (L9): reject over-limit requests immediately
   // instead of wasting 5s of serverless function time tarpitting them first.
+  // /api/avatar is exempt: leaderboard fans out 10+ avatar requests per page
+  // load, and the route is a thin CDN-cached image proxy where rate limiting
+  // would block legitimate users before any real abuse signal surfaces.
   const isRateLimitedPath =
-    (pathname.startsWith('/api/') && !pathname.startsWith('/api/cron')) ||
+    (pathname.startsWith('/api/') &&
+      !pathname.startsWith('/api/cron') &&
+      pathname !== '/api/avatar') ||
     pathname.endsWith('/opengraph-image');
 
   if (isRateLimitedPath) {
