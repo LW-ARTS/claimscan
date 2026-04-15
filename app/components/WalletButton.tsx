@@ -63,6 +63,7 @@ interface ConnectedWalletButtonProps {
 
 function ConnectedWalletButton({ publicKey, onDisconnect }: ConnectedWalletButtonProps) {
   const { connection } = useConnection();
+  const { setVisible } = useWalletModal();
   const [open, setOpen] = useState(false);
   const [openCount, setOpenCount] = useState(0);
   const [solBalance, setSolBalance] = useState<number | null>(null);
@@ -78,7 +79,8 @@ function ConnectedWalletButton({ publicKey, onDisconnect }: ConnectedWalletButto
         const pk = new PublicKey(publicKey);
         const lamports = await connection.getBalance(pk, 'confirmed');
         if (!cancelled) setSolBalance(lamports / 1_000_000_000);
-      } catch {
+      } catch (err) {
+        console.warn('[wallet] balance fetch failed', err);
         if (!cancelled) setSolBalance(0);
       }
     }
@@ -96,8 +98,12 @@ function ConnectedWalletButton({ publicKey, onDisconnect }: ConnectedWalletButto
         const res = await fetch('/api/prices');
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && typeof data?.sol?.price === 'number') {
-          setSolPrice(data.sol.price);
+        // /api/prices returns { sol: number, eth: number, bnb: number, stale: boolean }
+        // (see lib/prices/index.ts getNativeTokenPrices). Earlier code read
+        // data.sol.price which is always undefined, so price stayed at 0 and
+        // every wallet rendered $0.00 even with SOL on chain.
+        if (!cancelled && typeof data?.sol === 'number' && data.sol > 0) {
+          setSolPrice(data.sol);
         }
       } catch {
         // Silent failure, price stays at 0
@@ -154,7 +160,7 @@ function ConnectedWalletButton({ publicKey, onDisconnect }: ConnectedWalletButto
   }, [onDisconnect]);
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className="relative animate-fade-in-up" ref={containerRef}>
       {/* Pill trigger button — matches Pencil xH7vx walletBtn */}
       <button
         onClick={() => {
@@ -195,25 +201,23 @@ function ConnectedWalletButton({ publicKey, onDisconnect }: ConnectedWalletButto
         />
       )}
 
-      {/* Dropdown panel — matches Pencil xH7vx walletDropdown (380px) */}
+      {/* Dropdown panel — matches Pencil xH7vx walletDropdown (380px).
+          Uses bg-popover so the --popover CSS var controls opacity (solid
+          since MODAL-FIX 2026-04-14). The transition class was switched from
+          transition-[opacity,transform] to the plain transition utility
+          because the arbitrary-property variant wasn't producing a visible
+          fade in production. */}
       <div
         role="dialog"
         aria-label="Connected wallets"
         className={`
           fixed inset-x-4 top-20 z-50 mx-auto max-w-[380px]
           sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px]
-          origin-top sm:origin-top-right transition-[opacity,transform] duration-200
+          origin-top sm:origin-top-right transition-[opacity,transform] duration-300 ease-[var(--ease-sharp)]
+          rounded-[16px] border border-[var(--border-default)] bg-popover
+          shadow-[0_8px_32px_#00000060]
           ${open ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'}
         `}
-        style={{
-          transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)',
-          backgroundColor: '#151518CC',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid #FFFFFF18',
-          borderRadius: 16,
-          boxShadow: '0 8px 32px #00000060',
-        }}
       >
         {/* Header: "Connected Wallets" + count badge */}
         <div className="flex items-center justify-between px-5 py-4">
@@ -255,10 +259,13 @@ function ConnectedWalletButton({ publicKey, onDisconnect }: ConnectedWalletButto
         <div className="py-1">
           <button
             onClick={() => {
+              // Close the dropdown first, then open the wallet adapter modal.
+              // The Solana wallet adapter connects one wallet at a time — picking
+              // a new one from the modal replaces the current connection. The
+              // label stays "Add Wallet" to match the Pencil layout for future
+              // multi-wallet support (Reown AppKit migration noted in CLAUDE.md).
               setOpen(false);
-              // Trigger wallet adapter modal to add another wallet
-              // (current adapter only supports one wallet at a time, but
-              // this preserves the Pencil layout for future multi-wallet support)
+              setVisible(true);
             }}
             className="pressable flex w-full cursor-pointer items-center gap-3 px-5 py-3 text-[13px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
           >

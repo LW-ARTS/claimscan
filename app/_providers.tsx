@@ -23,10 +23,11 @@ export function Providers({ children }: { children: ReactNode }) {
     setMounted(true);
   }, []);
 
-  // M-9: Use free public RPC for wallet adapter (client-side only).
-  // No client components call the RPC directly — wallets use their own RPCs for send/confirm.
-  // Paid RPC keys stay server-side only (SOLANA_RPC_URL, without NEXT_PUBLIC_ prefix).
-  const rpcUrl = 'https://api.mainnet-beta.solana.com';
+  // WalletButton reads SOL balance client-side via useConnection().getBalance,
+  // so we need a browser-safe RPC. NEXT_PUBLIC_SOLANA_RPC_URL is the Helius
+  // frontend key (domain-locked to canonical hosts). Public mainnet-beta is the
+  // fallback for local dev and preview deploys where the locked key won't work.
+  const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
   const wallets = useMemo(() => [], []);
 
