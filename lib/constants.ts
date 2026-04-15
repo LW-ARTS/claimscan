@@ -119,6 +119,23 @@ export const RATE_LIMIT_FEES = 5;      // req/min — /api/fees/live*
 export const RATE_LIMIT_AVATAR = 120;  // req/min — /api/avatar
 
 // ═══════════════════════════════════════════════
+// Webhook source IP allowlist (Helius)
+// ═══════════════════════════════════════════════
+
+/**
+ * Source IPs Helius webhook delivery uses (AWS us-east-1 ranges).
+ * Empty by default — fail-open intentionally so production isn't broken
+ * before the real IPs are observed. Populate after capturing 24h of live
+ * webhook traffic (`vercel logs --since 24h | grep "[webhook]"`).
+ *
+ * When non-empty, /api/webhooks/helius rejects requests whose source IP
+ * doesn't match any entry, even if the bearer secret is valid. This caps
+ * blast radius if HELIUS_WEBHOOK_SECRET ever leaks (logs, accidental git
+ * commit, env-var disclosure). Fix #4 from security audit 2026-04-15.
+ */
+export const HELIUS_WEBHOOK_IP_ALLOWLIST: readonly string[] = [];
+
+// ═══════════════════════════════════════════════
 // Claim Flow
 // ═══════════════════════════════════════════════
 
