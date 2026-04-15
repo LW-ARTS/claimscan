@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { pushSSEEvent } from '@/lib/helius/sse-registry';
+import { HELIUS_WEBHOOK_IP_ALLOWLIST } from '@/lib/constants';
 
 // ═══════════════════════════════════════════════
 // Helius Webhook Receiver
@@ -86,6 +87,28 @@ interface HeliusWebhookEvent {
   }>;
 }
 
+/**
+ * Structural validation for events claimed to come from Helius. Filters
+ * out forged payloads where an attacker with the bearer secret tries to
+ * push arbitrary fee-update events (signature must be a real Solana base58
+ * tx hash). Cheaper than verifying the signature exists onchain, but
+ * raises the bar substantially.
+ */
+function isValidHeliusEvent(event: unknown): event is HeliusWebhookEvent {
+  if (!event || typeof event !== 'object') return false;
+  const e = event as Record<string, unknown>;
+  return typeof e.type === 'string'
+    && typeof e.signature === 'string'
+    && /^[1-9A-HJ-NP-Za-km-z]{43,88}$/.test(e.signature)
+    && typeof e.timestamp === 'number';
+}
+
+function getSourceIp(request: Request): string | null {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? request.headers.get('x-real-ip')
+    ?? null;
+}
+
 export async function POST(request: Request) {
   // Verify webhook secret — fail closed if not configured or too short.
   // Min 32 chars matches the CRON_SECRET requirement (lib/supabase/service.ts).
@@ -95,7 +118,24 @@ export async function POST(request: Request) {
   }
   const authHeader = request.headers.get('authorization');
   if (!verifyWebhookSecret(authHeader, WEBHOOK_SECRET)) {
+    console.warn('[webhook] auth failed', {
+      sourceIp: getSourceIp(request),
+      ua: request.headers.get('user-agent')?.slice(0, 200) ?? null,
+      hasAuthHeader: Boolean(authHeader),
+    });
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Optional IP allowlist: rejects requests whose source IP isn't a known
+  // Helius webhook origin. Empty allowlist = no-op (fail-open) so production
+  // isn't broken before live IPs are observed and added to the constant.
+  if (process.env.NODE_ENV === 'production' && HELIUS_WEBHOOK_IP_ALLOWLIST.length > 0) {
+    const sourceIp = getSourceIp(request);
+    const allowed = sourceIp != null && HELIUS_WEBHOOK_IP_ALLOWLIST.includes(sourceIp);
+    if (!allowed) {
+      console.warn('[webhook] auth ok but source IP not in allowlist', { sourceIp });
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
   }
 
   try {
@@ -128,6 +168,9 @@ export async function POST(request: Request) {
 
     for (const event of payload) {
       if (totalAccounts >= MAX_TOTAL_ACCOUNTS) break;
+      // Reject events that don't look like real Helius payloads — base58
+      // signature is the cheapest signal that the body wasn't forged.
+      if (!isValidHeliusEvent(event)) continue;
       // Skip already-processed events (replay protection — Redis-backed)
       if (event.signature && await isReplay(event.signature)) continue;
       const affectedAccounts = new Set<string>();
