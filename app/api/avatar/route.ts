@@ -33,12 +33,24 @@ const CACHE_HEADERS = {
   'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=43200, stale-if-error=604800',
 };
 
-function isUnavatarPlaceholder(res: Response): boolean {
-  const etag = res.headers.get('etag');
-  if (etag === UNAVATAR_PLACEHOLDER_ETAG) return true;
+function isPlaceholderHeaders(res: Response): boolean {
+  // Cheap pre-check on headers — saves the body read when unavatar honors
+  // its own caching contract. Both ETag (Vercel may strip the surrounding
+  // quotes when normalizing) and content-length forms are accepted.
+  const etag = (res.headers.get('etag') ?? '').replace(/^W\//, '');
+  if (etag === UNAVATAR_PLACEHOLDER_ETAG || etag === UNAVATAR_PLACEHOLDER_ETAG.slice(1, -1)) {
+    return true;
+  }
   const cl = res.headers.get('content-length');
   const ct = res.headers.get('content-type') ?? '';
   return cl === String(UNAVATAR_PLACEHOLDER_BYTES) && ct.startsWith('image/jpeg');
+}
+
+function isPlaceholderBody(buf: ArrayBuffer): boolean {
+  // Authoritative fallback: the placeholder is exactly 2137 bytes. If the
+  // header sniff missed (e.g. Vercel transforms ETag/content-length on the
+  // way back) the body byteLength is the ground truth.
+  return buf.byteLength === UNAVATAR_PLACEHOLDER_BYTES;
 }
 
 async function streamImage(url: string, timeoutMs: number): Promise<NextResponse | null> {
@@ -103,13 +115,14 @@ async function fromUnavatar(provider: 'x' | 'tiktok', handle: string): Promise<{
       return { ok: null, isPlaceholder: false };
     }
 
-    if (isUnavatarPlaceholder(res)) return { ok: null, isPlaceholder: true };
+    if (isPlaceholderHeaders(res)) return { ok: null, isPlaceholder: true };
 
     const ct = (res.headers.get('content-type') ?? '').split(';')[0].trim();
     if (!ALLOWED_IMAGE_TYPES.has(ct)) return { ok: null, isPlaceholder: false };
 
     const buf = await res.arrayBuffer();
     if (buf.byteLength > MAX_AVATAR_BYTES) return { ok: null, isPlaceholder: false };
+    if (isPlaceholderBody(buf)) return { ok: null, isPlaceholder: true };
 
     return {
       ok: new NextResponse(buf, {
