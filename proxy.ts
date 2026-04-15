@@ -8,6 +8,7 @@ import {
   RATE_LIMIT_FEES,
   HSTS_HEADER,
 } from '@/lib/constants';
+import { shouldSkipEnumerationCheck } from '@/lib/proxy-helpers';
 
 // Lazy-load Upstash rate limiters to avoid Edge bundling issues
 let _generalLimiter: Awaited<typeof import('@/lib/rate-limit')>['generalLimiter'] | undefined;
@@ -62,8 +63,11 @@ const RATE_LIMIT_MAX = RATE_LIMIT_GENERAL;
  */
 const enumMap = new Map<string, { handles: Set<string>; resetAt: number }>();
 const ENUM_WINDOW_MS = 300_000; // 5-minute window
-const ENUM_MAX_UNIQUE = 20; // max 20 unique handles per 5 min per IP
-const ENUM_MAX_UNIQUE_ANON = 40; // M-1: higher limit for anon fingerprints (collision-prone)
+// Tuned for legitimate browse: leaderboard exposes 50 creators, a curious user
+// clicks ~20-40 in one session. Old 20/5min limit (ENUM-FIX 2026-04-14) tripped
+// on normal navigation and rendered raw JSON 429 to browser nav requests.
+const ENUM_MAX_UNIQUE = 60;
+const ENUM_MAX_UNIQUE_ANON = 100; // higher limit for anon fingerprints (collision-prone)
 
 function isEnumerating(ip: string, handle: string): boolean {
   const now = Date.now();
@@ -292,6 +296,72 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Build a 429 response. Returns HTML for browser navigation (Accept: text/html)
+ * so users see a real page instead of raw JSON when they hit a rate limit on a
+ * page route. Returns JSON for API/programmatic clients.
+ *
+ * Same-origin Referer skip on /{handle} enumeration trades a small
+ * spoofability for legitimate browse UX: the data behind those pages is HTML
+ * (expensive to scrape) and /api/* keeps strict per-IP Upstash limits.
+ */
+function rateLimitResponse(
+  request: NextRequest,
+  nonce: string,
+  retryAfterSeconds: number,
+  extraHeaders: Record<string, string> = {},
+): NextResponse {
+  const accept = request.headers.get('accept') ?? '';
+  const wantsHtml = accept.includes('text/html');
+
+  if (wantsHtml) {
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Slow down — ClaimScan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<style>
+:root { color-scheme: dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: #0a0a0a; color: #e5e5e5; min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; padding: 1.5rem; }
+main { max-width: 28rem; text-align: center; }
+h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 1rem; color: #fff; }
+p { color: #a3a3a3; margin: 0 0 2rem; line-height: 1.55; }
+a { display: inline-block; padding: 0.625rem 1.25rem; background: #fff; color: #000; text-decoration: none; border-radius: 0.5rem; font-weight: 500; transition: opacity 0.15s; }
+a:hover { opacity: 0.85; }
+</style>
+</head>
+<body>
+<main>
+<h1>Slow down</h1>
+<p>You opened a lot of pages quickly. Take a breath and try again in a few minutes.</p>
+<a href="/leaderboard">Back to leaderboard</a>
+</main>
+</body>
+</html>`;
+    return applySecurityHeaders(new NextResponse(html, {
+      status: 429,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Retry-After': String(retryAfterSeconds),
+        ...extraHeaders,
+      },
+    }), nonce);
+  }
+
+  return applySecurityHeaders(NextResponse.json(
+    { error: 'Too many requests. Please try again later.' },
+    {
+      status: 429,
+      headers: {
+        'Retry-After': String(retryAfterSeconds),
+        ...extraHeaders,
+      },
+    }
+  ), nonce);
+}
+
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next();
   const pathname = request.nextUrl.pathname;
@@ -308,8 +378,14 @@ export async function proxy(request: NextRequest) {
   // /{handle} routes are GET requests to non-API paths, so they would otherwise
   // be fast-pathed without any anti-scraping protection. Run scraper UA block,
   // anti-enumeration, and a capped tarpit for handle routes BEFORE the fast
-  // path so the documented "20 handles/5min anti-enumeration" rule actually
-  // fires (audit finding H-02).
+  // path so the anti-enumeration rule actually fires (audit finding H-02).
+  //
+  // ENUM-FIX 2026-04-14: The previous limit (20 unique handles / 5 min) tripped
+  // on legitimate browsing because HANDLE_ROUTE_RE also matches non-handle paths
+  // (/leaderboard, /docs, /favicon.ico, etc). Three changes:
+  //   1) Skip enum check when path is in RESERVED_PAGE_PATHS
+  //   2) Skip enum check when Referer is same-origin (clicking through own site)
+  //   3) Return HTML on 429 for browser navigation (Accept: text/html)
   // ═══════════════════════════════════════════════
   const handleMatchEarly = pathname.match(HANDLE_ROUTE_RE);
   if (handleMatchEarly && request.method === 'GET') {
@@ -327,13 +403,21 @@ export async function proxy(request: NextRequest) {
         { status: 400 }
       ), nonce);
     }
-    const handleIp = getClientIp(request);
-    if (isEnumerating(handleIp, handleMatchEarly[1])) {
-      await sleep(3000);
-      return applySecurityHeaders(NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        { status: 429, headers: { 'Retry-After': '300' } }
-      ), nonce);
+
+    // Only enforce enumeration on paths that could plausibly be creator handles,
+    // and only when navigation isn't from our own site.
+    const skipEnumCheck = shouldSkipEnumerationCheck(
+      pathname,
+      request.headers.get('referer'),
+      APP_ORIGINS,
+    );
+
+    if (!skipEnumCheck) {
+      const handleIp = getClientIp(request);
+      if (isEnumerating(handleIp, handleMatchEarly[1])) {
+        await sleep(3000);
+        return rateLimitResponse(request, nonce, 300);
+      }
     }
     // Tarpit for suspicious requests on handle routes (capped at 500ms — pages are user-facing)
     const handleDelay = Math.min(getTarpitDelayMs(request), 500);
@@ -439,23 +523,6 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Anti-enumeration: detect mass handle lookups (e.g., scraping all creators)
-  const handleMatch = pathname.match(HANDLE_ROUTE_RE);
-  if (handleMatch) {
-    const handle = handleMatch[1];
-    const ip = getClientIp(request);
-
-    // M-1: Apply anti-enumeration to all IPs including anonymous fingerprints
-    // Use a higher limit for anon IPs since fingerprints are collision-prone
-    if (isEnumerating(ip, handle)) {
-      await sleep(3000);
-      return applySecurityHeaders(NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        { status: 429, headers: { 'Retry-After': '300' } }
-      ), nonce);
-    }
-  }
-
   // Rate limit BEFORE tarpit (L9): reject over-limit requests immediately
   // instead of wasting 5s of serverless function time tarpitting them first.
   const isRateLimitedPath =
@@ -490,16 +557,7 @@ export async function proxy(request: NextRequest) {
     if (upstashLimiter) {
       const { success, remaining } = await upstashLimiter.limit(rateLimitKey);
       if (!success) {
-        return applySecurityHeaders(NextResponse.json(
-          { error: 'Too many requests. Please try again later.' },
-          {
-            status: 429,
-            headers: {
-              'Retry-After': '60',
-              'X-RateLimit-Remaining': '0',
-            },
-          }
-        ), nonce);
+        return rateLimitResponse(request, nonce, 60, { 'X-RateLimit-Remaining': '0' });
       }
       response.headers.set('X-RateLimit-Remaining', String(remaining));
     } else {
@@ -519,13 +577,7 @@ export async function proxy(request: NextRequest) {
           ? `fees:${rateLimitKey}`
           : rateLimitKey;
       if (isRateLimited(limitKey, effectiveLimit)) {
-        return applySecurityHeaders(NextResponse.json(
-          { error: 'Too many requests. Please try again later.' },
-          {
-            status: 429,
-            headers: { 'Retry-After': '60' },
-          }
-        ), nonce);
+        return rateLimitResponse(request, nonce, 60);
       }
     }
 
@@ -549,10 +601,10 @@ export async function proxy(request: NextRequest) {
   }
 
   // Tarpit AFTER rate limit: only delay requests that weren't already rejected.
-  // Handle routes are tarpitted (and capped at 500ms) earlier, before the fast
-  // path return at :358, so they never reach this point. Only API routes are
-  // left — the legacy `|| handleMatch` branch was provably dead code.
-  // See security-scan/AUDIT-2026-04-11.md I-2.
+  // Handle routes are tarpitted (and capped at 500ms) earlier in the handle
+  // protection block, then return via the fast path. Only API routes are left.
+  // The duplicate post-fast-path enumeration check was removed as dead code in
+  // ENUM-FIX 2026-04-14.
   if (pathname.startsWith('/api/')) {
     const delay = getTarpitDelayMs(request);
     if (delay > 0) {
