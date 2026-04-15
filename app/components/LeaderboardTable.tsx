@@ -3,34 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 import { formatUsd } from '@/lib/utils';
-
-function CreatorAvatar({ handle, handleType }: { handle: string; handleType: string }) {
-  const [error, setError] = useState(false);
-
-  // unavatar.io supports both /x/{username} and /tiktok/{username}.
-  // GitHub creators fall through to the initials fallback because GitHub
-  // avatars are usually generic and rarely meaningful in this context.
-  const provider = handleType === 'twitter' ? 'x' : handleType === 'tiktok' ? 'tiktok' : null;
-
-  if (!provider || error) {
-    return (
-      <span className="avatar-ring inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[11px] font-bold uppercase text-[var(--text-secondary)]">
-        {handle[0].toUpperCase()}
-      </span>
-    );
-  }
-
-  return (
-    <img
-      src={`https://unavatar.io/${provider}/${handle}`}
-      alt=""
-      className="avatar-ring h-7 w-7 shrink-0 rounded-full object-cover"
-      onError={() => setError(true)}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-    />
-  );
-}
+import { CreatorAvatar } from './CreatorAvatar';
 
 interface LeaderboardEntry {
   handle: string;

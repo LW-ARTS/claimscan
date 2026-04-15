@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { SearchBar } from './components/SearchBar';
+import { CreatorAvatar } from './components/CreatorAvatar';
 import { CountUpLazy } from './components/anim/CountUpLazy';
 import { RevealOnScroll } from './components/anim/RevealOnScroll';
 import { PLATFORM_CONFIG } from '@/lib/constants';
@@ -312,10 +313,8 @@ export default async function Home() {
               const bareHandle = entry.handle.startsWith('gh:') || entry.handle.startsWith('tt:')
                 ? entry.handle.slice(3)
                 : entry.handle;
-              const avatarProvider: 'x' | 'tiktok' | null =
-                entry.handle_type === 'twitter' ? 'x'
-                : entry.handle_type === 'tiktok' ? 'tiktok'
-                : null;
+              // CreatorAvatar accepts handle_type directly and handles
+              // provider routing + placeholder fallback internally.
               return (
               <Link
                 key={entry.handle}
@@ -338,19 +337,7 @@ export default async function Home() {
                   {idx + 1}
                 </span>
                 <span className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                  {avatarProvider ? (
-                    <img
-                      src={`https://unavatar.io/${avatarProvider}/${bareHandle}`}
-                      alt=""
-                      className="avatar-ring h-7 w-7 shrink-0 rounded-full object-cover"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <span className="avatar-ring flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[11px] font-bold uppercase text-[var(--text-secondary)]">
-                      {bareHandle[0]?.toUpperCase()}
-                    </span>
-                  )}
+                  <CreatorAvatar handle={bareHandle} handleType={entry.handle_type} />
                   <span className="truncate text-sm font-semibold text-[var(--text-primary)]">@{bareHandle}</span>
                 </span>
                 <span className="w-auto shrink-0 whitespace-nowrap text-right text-sm font-bold text-[var(--text-primary)] sm:w-32">
