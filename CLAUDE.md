@@ -104,7 +104,7 @@ design-reference/             # PNGs @2x do design (referencia visual)
 - Claim status: claimed | unclaimed | partially_claimed | auto_distributed
 - Cache TTL: 40min normal, 2h pra creators com 500+ records
 - Price waterfall: DexScreener → Jupiter (Solana only). CoinGecko somente para precos nativos (SOL/ETH)
-- Rate limiting: 30 req/min geral, 10 req/min search, 20 handles/5min anti-enumeration
+- Rate limiting: 30 req/min geral, 10 req/min search, 60 handles/5min anti-enumeration (100 para anon fingerprints). Same-origin Referer pula a checagem (browse legítimo do leaderboard). Paths reservados (/leaderboard, /docs, /terms, favicon, manifest, etc.) ficam fora da contagem mesmo matchando HANDLE_ROUTE_RE
 - proxy.ts (~528 linhas): security headers, tarpit, honeypot, CORS, request signing, x402 routing — nao existe middleware.ts. CSP em `buildCspHeader()`. `style-src` allowlista `fonts.googleapis.com` (DM Sans do `@solana/wallet-adapter-react-ui`)
 - Cron endpoints protegidos com CRON_SECRET bearer token
 - Animacoes: usar componentes em `app/components/anim/` + tokens.ts (DURATION/EASE). Sempre respeitar `useReducedMotion`
