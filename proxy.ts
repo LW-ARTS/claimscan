@@ -457,11 +457,14 @@ export async function proxy(request: NextRequest) {
     return new NextResponse(null, { status: 204, headers: response.headers });
   }
 
-  // Protect cron endpoints with constant-time comparison
+  // Protect cron endpoints with constant-time comparison.
+  // Both misconfig and bad auth return 401 to avoid leaking which deploys
+  // have CRON_SECRET unset — server logs the misconfig for ops.
   if (pathname.startsWith('/api/cron')) {
     const secret = process.env.CRON_SECRET;
     if (!secret || secret.length < 32) {
-      return applySecurityHeaders(NextResponse.json({ error: 'Server misconfigured' }, { status: 500 }), nonce);
+      console.error('[middleware] CRON_SECRET not configured or too short — cron requests will fail closed');
+      return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }), nonce);
     }
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !safeCompare(authHeader, `Bearer ${secret}`)) {

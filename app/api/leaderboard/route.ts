@@ -18,8 +18,11 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    const status = message === 'Invalid platform' || message === 'Invalid chain' ? 400 : 500;
+    const isValidationError = message === 'Invalid platform' || message === 'Invalid chain';
     console.error('[leaderboard] error:', message);
-    return NextResponse.json({ error: message }, { status });
+    if (isValidationError) {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
