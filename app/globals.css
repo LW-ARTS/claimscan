@@ -101,16 +101,21 @@
 :root {
   --radius: 0.875rem;
 
-  /* Shadcn mapped → Pencil tokens */
+  /* Shadcn mapped → Pencil tokens.
+     Card/popover/secondary are OPAQUE because their consumers (Radix Dialog,
+     dropdown popovers, ClaimDialog) don't apply backdrop-filter: blur() —
+     without blur the CC/E6 alpha variants read as see-through in production
+     (MODAL-FIX 2026-04-14). Keep overlay tints like --muted/--accent with
+     alpha since they layer on top of these solid surfaces. */
   --background: #0B0B0E;
   --foreground: #F5F5F7;
-  --card: #151518CC;
+  --card: #151518;
   --card-foreground: #F5F5F7;
-  --popover: #131316E6;
+  --popover: #131316;
   --popover-foreground: #F5F5F7;
   --primary: #FFFFFF;
   --primary-foreground: #0A0A0F;
-  --secondary: #131316E6;
+  --secondary: #131316;
   --secondary-foreground: #F5F5F7;
   --muted: #1A1A1D99;
   --muted-foreground: #A1A1AA;
@@ -134,12 +139,14 @@
   --sidebar-border: #FFFFFF10;
   --sidebar-ring: #FFFFFF26;
 
-  /* Extended Pencil tokens */
+  /* Extended Pencil tokens. bg-secondary/bg-card are opaque so elevated
+     surfaces render solid without depending on backdrop-filter. Surface/
+     surface-hover keep alpha since they're tinted overlays on top of solids. */
   --bg-primary: #0B0B0E;
-  --bg-secondary: #131316E6;
+  --bg-secondary: #131316;
   --bg-surface: #1A1A1D99;
   --bg-surface-hover: #202023CC;
-  --bg-card: #151518CC;
+  --bg-card: #151518;
   --bg-input: #101013;
   --text-primary: #F5F5F7;
   --text-secondary: #A1A1AA;
