@@ -65,7 +65,10 @@ async function streamImage(url: string, timeoutMs: number): Promise<NextResponse
     const res = await fetch(url, {
       signal: AbortSignal.timeout(timeoutMs),
       headers: { 'User-Agent': 'ClaimScan/1.0' },
-      redirect: 'follow',
+      // Defense-in-depth: pbs.twimg.com doesn't redirect cross-host today,
+      // but refusing redirects prevents future upstream changes from turning
+      // this into an SSRF relay. fromUnavatar already uses redirect: 'error'.
+      redirect: 'error',
     });
     if (!res.ok) return null;
 
@@ -122,7 +125,10 @@ async function fromUnavatar(provider: 'x' | 'tiktok', handle: string): Promise<{
       return { ok: null, isPlaceholder: false };
     }
 
-    if (isPlaceholderEtag(res)) return { ok: null, isPlaceholder: true };
+    if (isPlaceholderEtag(res)) {
+      console.warn('[avatar] unavatar placeholder detected, falling back to fxtwitter', { provider, handle });
+      return { ok: null, isPlaceholder: true };
+    }
 
     const ct = (res.headers.get('content-type') ?? '').split(';')[0].trim();
     if (!ALLOWED_IMAGE_TYPES.has(ct)) return { ok: null, isPlaceholder: false };
