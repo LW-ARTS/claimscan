@@ -11,9 +11,11 @@ export const maxDuration = 60;
 const handler = async (req: NextRequest): Promise<NextResponse<unknown>> => {
   const walletName = req.nextUrl.searchParams.get('ows_wallet');
 
-  if (!walletName) {
+  // Validate format before reflecting input into any response — prevents
+  // log-poisoning via unconstrained reflection and tightens the API contract.
+  if (!walletName || !/^[a-zA-Z0-9_-]{1,64}$/.test(walletName)) {
     return NextResponse.json(
-      { error: 'ows_wallet parameter required', ows_available: isOWSAvailable() },
+      { error: 'ows_wallet parameter required (1-64 chars, alphanumeric/underscore/hyphen)', ows_available: isOWSAvailable() },
       { status: 400 },
     );
   }
@@ -23,7 +25,7 @@ const handler = async (req: NextRequest): Promise<NextResponse<unknown>> => {
 
     if (!resolved.length) {
       return NextResponse.json(
-        { error: `OWS wallet "${walletName}" not found or has no supported chain addresses`, ows_available: isOWSAvailable() },
+        { error: 'OWS wallet not found or has no supported chain addresses', ows_available: isOWSAvailable() },
         { status: 404 },
       );
     }

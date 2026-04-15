@@ -13,14 +13,17 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const handle = searchParams.get('handle')?.trim();
 
-  if (!handle || handle.length < 2 || handle.length > 256) {
+  // Full-string validation: length AND regex apply to the entire handle.
+  // Previously slice(0, 67) let chars 68-256 bypass the format check even
+  // though the whole string was passed to encodeURIComponent downstream.
+  if (!handle || handle.length < 2 || handle.length > 67) {
     return NextResponse.json(
-      { error: 'handle parameter required (2-256 chars)' },
+      { error: 'handle parameter required (2-67 chars)' },
       { status: 400 }
     );
   }
 
-  if (!/^[a-zA-Z0-9_\-\.@:]{2,67}$/.test(handle.slice(0, 67))) {
+  if (!/^[a-zA-Z0-9_\-\.@:]{2,67}$/.test(handle)) {
     return NextResponse.json(
       { error: 'Invalid handle format' },
       { status: 400 }

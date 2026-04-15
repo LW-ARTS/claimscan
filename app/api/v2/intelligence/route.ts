@@ -86,17 +86,20 @@ const handler = async (req: NextRequest): Promise<NextResponse<unknown>> => {
         transactions = txResult.value;
       } else {
         const msg = txResult.reason instanceof Error ? txResult.reason.message : String(txResult.reason);
-        alliumErrors.push(`transactions: ${msg}`);
+        console.error('[v2/intelligence] Allium transactions error:', msg);
+        alliumErrors.push('transactions_unavailable');
       }
 
       if (pnlResult.status === 'fulfilled') {
         pnl = pnlResult.value;
       } else {
         const msg = pnlResult.reason instanceof Error ? pnlResult.reason.message : String(pnlResult.reason);
-        alliumErrors.push(`pnl: ${msg}`);
+        console.error('[v2/intelligence] Allium pnl error:', msg);
+        alliumErrors.push('pnl_unavailable');
       }
     } catch (e) {
-      alliumErrors.push(e instanceof Error ? e.message : 'Allium request failed');
+      console.error('[v2/intelligence] Allium request failed:', e instanceof Error ? e.message : e);
+      alliumErrors.push('enrichment_unavailable');
     }
   }
 
