@@ -6,6 +6,7 @@ import {
   RATE_LIMIT_GENERAL,
   RATE_LIMIT_SEARCH,
   RATE_LIMIT_FEES,
+  RATE_LIMIT_AVATAR,
   HSTS_HEADER,
 } from '@/lib/constants';
 import { shouldSkipEnumerationCheck } from '@/lib/proxy-helpers';
@@ -14,6 +15,7 @@ import { shouldSkipEnumerationCheck } from '@/lib/proxy-helpers';
 let _generalLimiter: Awaited<typeof import('@/lib/rate-limit')>['generalLimiter'] | undefined;
 let _searchLimiter: Awaited<typeof import('@/lib/rate-limit')>['searchLimiter'] | undefined;
 let _feesLimiter: Awaited<typeof import('@/lib/rate-limit')>['feesLimiter'] | undefined;
+let _avatarLimiter: Awaited<typeof import('@/lib/rate-limit')>['avatarLimiter'] | undefined;
 let _limiterLoaded = false;
 
 async function getRateLimiters() {
@@ -23,13 +25,19 @@ async function getRateLimiters() {
       _generalLimiter = mod.generalLimiter;
       _searchLimiter = mod.searchLimiter;
       _feesLimiter = mod.feesLimiter;
+      _avatarLimiter = mod.avatarLimiter;
       _limiterLoaded = true; // L-1: Only mark loaded on success so we retry on failure
     } catch {
       // Upstash not available in Edge — use in-memory fallback
       // Do NOT set _limiterLoaded — retry import on next request
     }
   }
-  return { generalLimiter: _generalLimiter, searchLimiter: _searchLimiter, feesLimiter: _feesLimiter };
+  return {
+    generalLimiter: _generalLimiter,
+    searchLimiter: _searchLimiter,
+    feesLimiter: _feesLimiter,
+    avatarLimiter: _avatarLimiter,
+  };
 }
 
 async function verifyRequestSignature(sig: string | null, path: string): Promise<boolean> {
@@ -534,31 +542,33 @@ export async function proxy(request: NextRequest) {
 
   // Rate limit BEFORE tarpit (L9): reject over-limit requests immediately
   // instead of wasting 5s of serverless function time tarpitting them first.
-  // /api/avatar is exempt: leaderboard fans out 10+ avatar requests per page
-  // load, and the route is a thin CDN-cached image proxy where rate limiting
-  // would block legitimate users before any real abuse signal surfaces.
+  // /api/avatar uses its own dedicated bucket (120 req/min) — high enough for
+  // leaderboard fan-out (~10 avatars/page) but capped to prevent amplification
+  // via cache-miss enumeration with arbitrary handle values.
   const isRateLimitedPath =
-    (pathname.startsWith('/api/') &&
-      !pathname.startsWith('/api/cron') &&
-      pathname !== '/api/avatar') ||
+    (pathname.startsWith('/api/') && !pathname.startsWith('/api/cron')) ||
     pathname.endsWith('/opengraph-image');
 
   if (isRateLimitedPath) {
     const rateLimitKey = getClientIp(request);
 
-    const { generalLimiter, searchLimiter, feesLimiter } = await getRateLimiters();
+    const { generalLimiter, searchLimiter, feesLimiter, avatarLimiter } = await getRateLimiters();
 
     // Path-specific rate limits:
+    // - /api/avatar: 120 req/min (leaderboard fans out 10/page; amplification cap)
     // - /api/search, /api/resolve: 10 req/min (identity resolution oracle — M1)
     // - /api/fees/live*: 5 req/min (triggers 9 adapters × 10 wallets — M2)
     // - everything else: 30 req/min (general)
+    const isAvatar = pathname === '/api/avatar';
     const isSearchOrResolve = pathname === '/api/search' || pathname === '/api/resolve' || pathname === '/api/balance';
     const isFeesLive = pathname.startsWith('/api/fees/live');
-    const upstashLimiter = isSearchOrResolve
-      ? searchLimiter
-      : isFeesLive
-        ? feesLimiter
-        : generalLimiter;
+    const upstashLimiter = isAvatar
+      ? avatarLimiter
+      : isSearchOrResolve
+        ? searchLimiter
+        : isFeesLive
+          ? feesLimiter
+          : generalLimiter;
 
     if (!upstashLimiter && process.env.NODE_ENV === 'production' && !_warnedMissingUpstash) {
       _warnedMissingUpstash = true;
@@ -580,16 +590,24 @@ export async function proxy(request: NextRequest) {
       const inMemorySearchLimit = process.env.NODE_ENV === 'production' ? 5 : SEARCH_RATE_LIMIT_MAX;
       const inMemoryFeesLimit = process.env.NODE_ENV === 'production' ? 3 : 5;
       const inMemoryGeneralLimit = process.env.NODE_ENV === 'production' ? 15 : RATE_LIMIT_MAX;
-      const effectiveLimit = isSearchOrResolve
-        ? inMemorySearchLimit
-        : isFeesLive
-          ? inMemoryFeesLimit
-          : inMemoryGeneralLimit;
-      const limitKey = isSearchOrResolve
-        ? `search:${rateLimitKey}`
-        : isFeesLive
-          ? `fees:${rateLimitKey}`
-          : rateLimitKey;
+      // Avatar limit is ~half of Upstash's 120 (matching the pattern). Must
+      // stay above the leaderboard fan-out (~10/page) so a single page load
+      // doesn't 429 when Redis is briefly unavailable.
+      const inMemoryAvatarLimit = process.env.NODE_ENV === 'production' ? 60 : RATE_LIMIT_AVATAR;
+      const effectiveLimit = isAvatar
+        ? inMemoryAvatarLimit
+        : isSearchOrResolve
+          ? inMemorySearchLimit
+          : isFeesLive
+            ? inMemoryFeesLimit
+            : inMemoryGeneralLimit;
+      const limitKey = isAvatar
+        ? `avatar:${rateLimitKey}`
+        : isSearchOrResolve
+          ? `search:${rateLimitKey}`
+          : isFeesLive
+            ? `fees:${rateLimitKey}`
+            : rateLimitKey;
       if (isRateLimited(limitKey, effectiveLimit)) {
         return rateLimitResponse(request, nonce, 60);
       }

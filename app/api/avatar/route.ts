@@ -17,11 +17,28 @@ import { NextRequest, NextResponse } from 'next/server';
  * 2137-byte JPEG with a stable ETag — detecting it is what triggers the
  * fxtwitter fallback. Returns 404 only if BOTH sources fail, so the
  * frontend onError handler can render an initials chip.
+ *
+ * Negative cache: 404 results are cached in Upstash for 1h to short-circuit
+ * repeat misses for the same handle. Caps amplification cost from cache-miss
+ * enumeration even when an attacker stays within the 120 req/min rate limit.
  */
 
 const UNAVATAR_PLACEHOLDER_ETAG = '"8e-LeWtyRFMgcxsay6eL9aKuVgFSO8"';
 const UNAVATAR_PLACEHOLDER_BYTES = 2137;
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const NEGATIVE_CACHE_TTL_S = 3600;
+const NEGATIVE_CACHE_PREFIX = 'claimscan:avatar:404:';
+
+let _redis: import('@upstash/redis').Redis | null = null;
+try {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (url && token) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Redis } = require('@upstash/redis') as typeof import('@upstash/redis');
+    _redis = new Redis({ url, token });
+  }
+} catch { /* Redis unavailable — fall through to live fetches */ }
 const ALLOWED_IMAGE_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -138,6 +155,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid handle' }, { status: 400 });
   }
 
+  const cacheKey = `${NEGATIVE_CACHE_PREFIX}${provider}:${handle}`;
+  if (_redis) {
+    const cached = await _redis.get(cacheKey).catch(() => null);
+    if (cached) return new NextResponse(null, { status: 404 });
+  }
+
   const primary = await fromUnavatar(provider, handle);
   if (primary.ok) return primary.ok;
 
@@ -150,5 +173,8 @@ export async function GET(req: NextRequest) {
     if (fx) return fx;
   }
 
+  if (_redis) {
+    await _redis.setex(cacheKey, NEGATIVE_CACHE_TTL_S, '1').catch(() => {});
+  }
   return new NextResponse(null, { status: 404 });
 }

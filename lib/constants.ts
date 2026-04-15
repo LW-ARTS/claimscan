@@ -114,6 +114,9 @@ export const APP_ORIGINS = new Set([
 export const RATE_LIMIT_GENERAL = 30;  // req/min — all API routes
 export const RATE_LIMIT_SEARCH = 10;   // req/min — /api/search, /api/resolve
 export const RATE_LIMIT_FEES = 5;      // req/min — /api/fees/live*
+// Leaderboard fans out 10+ avatar requests per page; 120/min covers ~12 page
+// loads/min from a single IP while still capping amplification on cache misses.
+export const RATE_LIMIT_AVATAR = 120;  // req/min — /api/avatar
 
 // ═══════════════════════════════════════════════
 // Claim Flow
