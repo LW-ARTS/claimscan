@@ -87,9 +87,10 @@ interface HeliusWebhookEvent {
 }
 
 export async function POST(request: Request) {
-  // Verify webhook secret — fail closed if not configured or empty
-  if (!WEBHOOK_SECRET || WEBHOOK_SECRET.trim().length === 0) {
-    console.error('[webhook] HELIUS_WEBHOOK_SECRET is not configured — rejecting request');
+  // Verify webhook secret — fail closed if not configured or too short.
+  // Min 32 chars matches the CRON_SECRET requirement (lib/supabase/service.ts).
+  if (!WEBHOOK_SECRET || WEBHOOK_SECRET.length < 32) {
+    console.error('[webhook] HELIUS_WEBHOOK_SECRET not configured or too short (min 32 chars)');
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
   }
   const authHeader = request.headers.get('authorization');
@@ -99,7 +100,9 @@ export async function POST(request: Request) {
 
   try {
     // Guard against oversized payloads (max 1MB).
-    // Require Content-Length to prevent chunked transfer encoding bypass.
+    // Require Content-Length to prevent chunked transfer encoding bypass,
+    // then verify actual byteLength because Content-Length is advisory and
+    // attackers can lie about it before streaming a larger body.
     const contentLength = request.headers.get('content-length');
     if (!contentLength) {
       return NextResponse.json({ error: 'Content-Length required' }, { status: 411 });
@@ -109,7 +112,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
     }
 
-    const payload = (await request.json()) as HeliusWebhookEvent[];
+    const buf = await request.arrayBuffer();
+    if (buf.byteLength > 1_048_576) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
+    const payload = JSON.parse(new TextDecoder().decode(buf)) as HeliusWebhookEvent[];
 
     if (!Array.isArray(payload) || payload.length > 500) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
