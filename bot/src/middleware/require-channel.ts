@@ -59,6 +59,16 @@ export async function requireChannel(ctx: Context, next: NextFunction): Promise<
   const userId = ctx.from?.id;
   if (!userId) return next();
 
+  // In groups/supergroups, only gate commands and callbacks — plain text bypasses
+  // so random chat doesn't trigger the join prompt. CA-detect runs without gating
+  // in groups (anyone who pastes a CA gets a response).
+  const chatType = ctx.chat?.type;
+  const inGroup = chatType === 'group' || chatType === 'supergroup';
+  const text = ctx.message?.text;
+  const isCommand = text?.startsWith('/') ?? false;
+  const isCallback = !!ctx.callbackQuery;
+  if (inGroup && !isCommand && !isCallback) return next();
+
   const isMember = await checkMembership(userId);
   if (isMember) return next();
 
