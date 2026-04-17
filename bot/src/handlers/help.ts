@@ -74,6 +74,15 @@ Paste any Solana, Base, or BSC token address directly in the chat. I'll identify
 <code>/watch list</code> View active watches in this chat.
 <code>/watch remove @handle</code> Remove a watch.
 
+<b>📰 Daily Digest (groups)</b>
+<code>/digest on [HH]</code> Enable daily summary at hour HH UTC (default 12).
+<code>/digest off</code> Disable.
+<code>/digest status</code> Show current setting.
+
+<b>📱 Mini App</b>
+<code>/app</code> Open ClaimScan inside Telegram.
+<code>/app @handle</code> Open a creator profile as a Mini App.
+
 <b>🔔 Claim Notifications</b>
 When a scanned token has unclaimed fees, I'll automatically watch it and notify this group when the creator claims.`;
 
