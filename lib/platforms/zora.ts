@@ -68,7 +68,12 @@ async function fetchContentCoinEarnings(wallet: string): Promise<{
     clearTimeout(timeout);
 
     if (!res.ok) {
-      log.warn('Zora Coins API failed', { status: res.status });
+      // 404 is expected when a wallet has no Zora profile; quieter log level
+      if (res.status === 404) {
+        log.debug('Zora Coins API 404 (no profile)', { status: res.status });
+      } else {
+        log.warn('Zora Coins API failed', { status: res.status });
+      }
       return null;
     }
 

@@ -16,6 +16,8 @@ import { handleCaDetect } from './handlers/ca-detect';
 import { handleScan } from './handlers/scan';
 import { handleStats } from './handlers/stats';
 import { handleAlert } from './handlers/alert';
+import { handleLeaderboard } from './handlers/leaderboard';
+import { handleWatch } from './handlers/watch';
 import { handleCallbacks } from './handlers/callbacks';
 import { startPolling } from './workers/poll';
 
@@ -30,7 +32,10 @@ bot.command('help', handleHelp);
 bot.command('start', handleStart);
 bot.command('scan', handleScan);
 bot.command('alert', handleAlert);
+bot.command('watch', handleWatch);
 bot.command('stats', handleStats);
+bot.command('leaderboard', handleLeaderboard);
+bot.command('top', handleLeaderboard);
 
 // Register callback query handler (inline buttons)
 bot.on('callback_query:data', handleCallbacks);
@@ -63,7 +68,9 @@ async function main() {
   try {
     await bot.api.setMyCommands([
       { command: 'scan', description: 'Full creator fee report by handle' },
+      { command: 'leaderboard', description: 'Top creators by total fees earned' },
       { command: 'alert', description: 'Set threshold alert for creator fees' },
+      { command: 'watch', description: 'Notify this chat on every claim by a creator' },
       { command: 'stats', description: 'Tracked tokens in this group' },
       { command: 'help', description: 'Command reference' },
     ]);
