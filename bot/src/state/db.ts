@@ -445,6 +445,111 @@ export async function updateAlertLastNotified(ruleId: string): Promise<void> {
 }
 
 // ═══════════════════════════════════════════════
+// Group Settings (per-group digest opt-in + schedule)
+// ═══════════════════════════════════════════════
+
+export interface GroupSettings {
+  groupId: number;
+  digestEnabled: boolean;
+  digestHourUtc: number;
+  lastDigestSentAt: string | null;
+}
+
+export async function getGroupSettings(groupId: number): Promise<GroupSettings | null> {
+  const { data, error } = await supabase
+    .from('group_settings')
+    .select('*')
+    .eq('group_id', groupId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[db] getGroupSettings error:', error.message);
+    return null;
+  }
+  if (!data) return null;
+  return {
+    groupId: data.group_id,
+    digestEnabled: data.digest_enabled,
+    digestHourUtc: data.digest_hour_utc,
+    lastDigestSentAt: data.last_digest_sent_at,
+  };
+}
+
+export async function upsertGroupSettings(
+  groupId: number,
+  params: { digestEnabled?: boolean; digestHourUtc?: number }
+): Promise<void> {
+  const row: Record<string, unknown> = { group_id: groupId, updated_at: new Date().toISOString() };
+  if (params.digestEnabled !== undefined) row.digest_enabled = params.digestEnabled;
+  if (params.digestHourUtc !== undefined) row.digest_hour_utc = params.digestHourUtc;
+
+  const { error } = await supabase
+    .from('group_settings')
+    .upsert(row, { onConflict: 'group_id' });
+
+  if (error) {
+    console.error('[db] upsertGroupSettings error:', error.message);
+  }
+}
+
+export async function getGroupsForDigestHour(hour: number): Promise<number[]> {
+  const { data, error } = await supabase
+    .from('group_settings')
+    .select('group_id, last_digest_sent_at')
+    .eq('digest_enabled', true)
+    .eq('digest_hour_utc', hour);
+
+  if (error) {
+    console.error('[db] getGroupsForDigestHour error:', error.message);
+    return [];
+  }
+  // Filter out groups already sent within last 23h to prevent duplicate on clock drift
+  const cutoff = Date.now() - 23 * 60 * 60 * 1000;
+  return (data ?? [])
+    .filter((r: { last_digest_sent_at: string | null }) => {
+      if (!r.last_digest_sent_at) return true;
+      return new Date(r.last_digest_sent_at).getTime() < cutoff;
+    })
+    .map((r: { group_id: number }) => r.group_id);
+}
+
+export async function markDigestSent(groupId: number): Promise<void> {
+  const { error } = await supabase
+    .from('group_settings')
+    .update({ last_digest_sent_at: new Date().toISOString() })
+    .eq('group_id', groupId);
+
+  if (error) {
+    console.error('[db] markDigestSent error:', error.message);
+  }
+}
+
+export interface DigestStats {
+  claimCount: number;
+  trackedTokens: number;
+}
+
+export async function getDigestStats(groupId: number, sinceMs: number): Promise<DigestStats> {
+  const since = new Date(Date.now() - sinceMs).toISOString();
+  const [claims, tracked] = await Promise.all([
+    supabase
+      .from('notification_log')
+      .select('*', { count: 'exact', head: true })
+      .eq('group_id', groupId)
+      .eq('notification_type', 'claim_detected')
+      .gte('sent_at', since),
+    supabase
+      .from('group_watches')
+      .select('*', { count: 'exact', head: true })
+      .eq('group_id', groupId),
+  ]);
+  return {
+    claimCount: claims.count ?? 0,
+    trackedTokens: tracked.count ?? 0,
+  };
+}
+
+// ═══════════════════════════════════════════════
 // Watch Rules (per-creator claim notifications, no threshold)
 // ═══════════════════════════════════════════════
 

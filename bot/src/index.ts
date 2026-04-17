@@ -18,6 +18,9 @@ import { handleStats } from './handlers/stats';
 import { handleAlert } from './handlers/alert';
 import { handleLeaderboard } from './handlers/leaderboard';
 import { handleWatch } from './handlers/watch';
+import { handleInline } from './handlers/inline';
+import { handleDigest } from './handlers/digest';
+import { handleApp } from './handlers/app';
 import { handleCallbacks } from './handlers/callbacks';
 import { startPolling } from './workers/poll';
 
@@ -33,12 +36,18 @@ bot.command('start', handleStart);
 bot.command('scan', handleScan);
 bot.command('alert', handleAlert);
 bot.command('watch', handleWatch);
+bot.command('digest', handleDigest);
+bot.command('app', handleApp);
 bot.command('stats', handleStats);
 bot.command('leaderboard', handleLeaderboard);
 bot.command('top', handleLeaderboard);
 
 // Register callback query handler (inline buttons)
 bot.on('callback_query:data', handleCallbacks);
+
+// Register inline mode handler (doesn't go through requireChannel middleware —
+// inline queries have no chat context, membership gate doesn't apply)
+bot.on('inline_query', handleInline);
 
 // Register CA auto-detection on all text messages (must be last)
 bot.on('message:text', handleCaDetect);
@@ -71,6 +80,8 @@ async function main() {
       { command: 'leaderboard', description: 'Top creators by total fees earned' },
       { command: 'alert', description: 'Set threshold alert for creator fees' },
       { command: 'watch', description: 'Notify this chat on every claim by a creator' },
+      { command: 'digest', description: 'Toggle daily summary (groups)' },
+      { command: 'app', description: 'Open ClaimScan as a Mini App' },
       { command: 'stats', description: 'Tracked tokens in this group' },
       { command: 'help', description: 'Command reference' },
     ]);

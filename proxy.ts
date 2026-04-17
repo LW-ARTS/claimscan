@@ -273,7 +273,7 @@ function buildCspHeader(nonce: string): string {
   const devEval = isDev ? " 'unsafe-eval'" : '';
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${devEval} https://challenges.cloudflare.com`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${devEval} https://challenges.cloudflare.com https://telegram.org`,
     // Google Fonts CDN allowlisted because @solana/wallet-adapter-react-ui's
     // styles.css imports DM Sans from fonts.googleapis.com. The matching .woff2
     // files come from fonts.gstatic.com (already in font-src).
@@ -282,7 +282,9 @@ function buildCspHeader(nonce: string): string {
     "font-src 'self' https://fonts.gstatic.com",
     "connect-src 'self' https://*.supabase.co https://api.coingecko.com https://api.dexscreener.com https://api.jup.ag https://*.ingest.sentry.io https://*.helius-rpc.com wss://*.helius-rpc.com https://api.mainnet-beta.solana.com",
     "frame-src 'self' https://challenges.cloudflare.com",
-    "frame-ancestors 'none'",
+    // 'self' + web.telegram.org so ClaimScan can be embedded as a Telegram Mini App
+    // (mobile Telegram apps use native WebView, no iframe; web.telegram.org uses iframe).
+    "frame-ancestors 'self' https://web.telegram.org",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
