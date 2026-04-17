@@ -13,6 +13,8 @@ Paste any token CA in the chat and I'll show you the fee breakdown, no command n
 
 <b>🎮 Commands</b>
 <code>/scan @handle</code> Full creator fee report
+<code>/leaderboard</code> Top creators by total fees
+<code>/watch @handle</code> Notify on every claim
 <code>/alert @handle $500</code> Fee threshold alerts
 <code>/stats</code> Tracked tokens in this group
 <code>/help</code> Command reference
@@ -50,6 +52,9 @@ const HELP_TEXT = `<b>🎮 Commands</b>
 <code>/scan @handle</code>
 Full creator fee report. Resolves wallets, scans all 9 platforms, shows aggregated fees and top unclaimed tokens.
 
+<code>/leaderboard</code> (or <code>/top</code>)
+Top 10 creators ranked by total fees earned across all platforms. Live from claimscan.tech.
+
 <code>/stats</code>
 Shows how many tokens are being monitored for claim notifications in this group.
 
@@ -63,6 +68,11 @@ Paste any Solana, Base, or BSC token address directly in the chat. I'll identify
 <code>/alert @handle $500</code> Get notified when unclaimed fees exceed your threshold.
 <code>/alert list</code> View active alerts in this chat.
 <code>/alert remove @handle</code> Remove an alert.
+
+<b>👀 Creator Watches</b>
+<code>/watch @handle</code> Notify this chat on EVERY claim by that creator, regardless of amount.
+<code>/watch list</code> View active watches in this chat.
+<code>/watch remove @handle</code> Remove a watch.
 
 <b>🔔 Claim Notifications</b>
 When a scanned token has unclaimed fees, I'll automatically watch it and notify this group when the creator claims.`;
