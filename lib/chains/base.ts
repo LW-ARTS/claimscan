@@ -182,7 +182,8 @@ export async function getZoraWithdrawLogs(
       scan(),
       new Promise<bigint>((resolve) =>
         setTimeout(() => {
-          console.warn(`[base] getZoraWithdrawLogs: timed out after ${CLAIM_LOGS_TIMEOUT_MS}ms`);
+          // Timeouts are frequent (RPC log scans are slow); demoted to debug to reduce noise
+          console.debug(`[base] getZoraWithdrawLogs: timed out after ${CLAIM_LOGS_TIMEOUT_MS}ms`);
           resolve(0n);
         }, CLAIM_LOGS_TIMEOUT_MS)
       ),

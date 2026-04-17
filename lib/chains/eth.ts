@@ -150,7 +150,8 @@ export async function getZoraWithdrawLogsEth(
       scan(),
       new Promise<bigint>((resolve) =>
         setTimeout(() => {
-          console.warn(`[eth] getZoraWithdrawLogsEth: timed out after ${ETH_CLAIM_LOGS_TIMEOUT_MS}ms`);
+          // Timeouts are frequent (RPC log scans are slow); demoted to debug to reduce noise
+          console.debug(`[eth] getZoraWithdrawLogsEth: timed out after ${ETH_CLAIM_LOGS_TIMEOUT_MS}ms`);
           resolve(0n);
         }, ETH_CLAIM_LOGS_TIMEOUT_MS)
       ),
