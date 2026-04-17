@@ -20,6 +20,9 @@ import {
   getCreatorUnclaimedUsd,
   updateAlertLastNotified,
   getWatchChatsForCreator,
+  getGroupsForDigestHour,
+  getDigestStats,
+  markDigestSent,
 } from '../state/db';
 import { formatClaimNotification } from '../services/format';
 import type { WatchedToken } from '../state/db';
@@ -113,6 +116,54 @@ async function checkAlertRules(): Promise<void> {
 
 // Counter to run alert checks every 3rd cycle (15 min instead of 5 min)
 let alertCycleCounter = 0;
+// Track last hour digest was attempted to fire once per UTC hour
+let lastDigestHourUtc = -1;
+
+async function checkDigests(): Promise<void> {
+  const now = new Date();
+  const currentHour = now.getUTCHours();
+  if (currentHour === lastDigestHourUtc) return; // already fired this hour
+
+  const groupIds = await getGroupsForDigestHour(currentHour);
+  if (groupIds.length === 0) {
+    lastDigestHourUtc = currentHour;
+    return;
+  }
+
+  console.log(`[poll] Sending daily digest to ${groupIds.length} group(s) at ${currentHour}:00 UTC`);
+  const windowMs = 24 * 60 * 60 * 1000;
+  let sent = 0;
+
+  for (const groupId of groupIds) {
+    try {
+      const stats = await getDigestStats(groupId, windowMs);
+      const headline = stats.claimCount > 0
+        ? `📊 <b>Last 24h:</b> ${stats.claimCount} claim${stats.claimCount !== 1 ? 's' : ''} detected`
+        : `📊 <b>Last 24h:</b> no claims detected`;
+      const footer = stats.trackedTokens > 0
+        ? `Tracking ${stats.trackedTokens} token${stats.trackedTokens !== 1 ? 's' : ''} in this chat.`
+        : `No tokens tracked yet. Paste a CA to start.`;
+
+      const msg = `${headline}\n${footer}\n\n<a href="https://claimscan.tech/leaderboard">View leaderboard →</a>`;
+
+      await bot.api.sendMessage(groupId, msg, {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
+      });
+      await markDigestSent(groupId);
+      sent++;
+    } catch (err) {
+      if (err instanceof GrammyError && err.error_code === 403) {
+        console.warn(`[poll] digest: bot removed from chat ${groupId}`);
+      } else {
+        console.warn(`[poll] digest failed for group ${groupId}:`, err instanceof Error ? err.message : err);
+      }
+    }
+  }
+
+  lastDigestHourUtc = currentHour;
+  if (sent > 0) console.log(`[poll] Sent ${sent} digest(s)`);
+}
 
 export function startPolling(): PollHandle {
   let running = true;
@@ -140,6 +191,9 @@ export function startPolling(): PollHandle {
         alertCycleCounter = 0;
         await checkAlertRules();
       }
+
+      // Check digests every cycle; the hour-guard inside ensures it only fires once per UTC hour
+      await checkDigests();
 
       const removed = await cleanupStaleWatches(STALE_THRESHOLD_MS);
       if (removed > 0) {
