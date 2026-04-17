@@ -459,7 +459,12 @@ export async function getTokenFees(tokenAddress: string, externalSignal?: AbortS
       signal: combinedSignal,
     });
     clearTimeout(timeout);
-    if (!res.ok) { log.warn(`getTokenFees returned HTTP ${res.status} for ${tokenAddress}`); return null; }
+    if (!res.ok) {
+      // 404 is expected when Bankr has no fees for this token; quieter log level
+      if (res.status === 404) log.debug(`getTokenFees 404 (no Bankr fees) for ${tokenAddress}`);
+      else log.warn(`getTokenFees returned HTTP ${res.status} for ${tokenAddress}`);
+      return null;
+    }
     const data = (await res.json()) as BankrTokenFeeResponse;
     dopplerCacheSet(tokenAddress, data);
     return data;

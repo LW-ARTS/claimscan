@@ -444,6 +444,97 @@ export async function updateAlertLastNotified(ruleId: string): Promise<void> {
   }
 }
 
+// ═══════════════════════════════════════════════
+// Watch Rules (per-creator claim notifications, no threshold)
+// ═══════════════════════════════════════════════
+
+export interface WatchRule {
+  id: string;
+  chatId: number;
+  userId: number;
+  creatorId: string;
+  lastNotifiedAt: string | null;
+  active: boolean;
+}
+
+export async function upsertWatchRule(params: {
+  chatId: number;
+  userId: number;
+  creatorId: string;
+}): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('watch_rules')
+    .upsert(
+      {
+        chat_id: params.chatId,
+        user_id: params.userId,
+        creator_id: params.creatorId,
+        active: true,
+      },
+      { onConflict: 'chat_id,creator_id' }
+    )
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('[db] upsertWatchRule error:', error.message);
+    return null;
+  }
+  return data?.id ?? null;
+}
+
+export async function getWatchRulesForChat(chatId: number): Promise<WatchRule[]> {
+  const { data, error } = await supabase
+    .from('watch_rules')
+    .select('*')
+    .eq('chat_id', chatId)
+    .eq('active', true)
+    .limit(50);
+
+  if (error) {
+    console.error('[db] getWatchRulesForChat error:', error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    chatId: row.chat_id as number,
+    userId: row.user_id as number,
+    creatorId: row.creator_id as string,
+    lastNotifiedAt: row.last_notified_at as string | null,
+    active: row.active as boolean,
+  }));
+}
+
+export async function deleteWatchRule(chatId: number, creatorId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('watch_rules')
+    .delete()
+    .eq('chat_id', chatId)
+    .eq('creator_id', creatorId)
+    .select('id');
+
+  if (error) {
+    console.error('[db] deleteWatchRule error:', error.message);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
+}
+
+/** Return chat_ids watching the given creator (for poll worker claim notifications) */
+export async function getWatchChatsForCreator(creatorId: string): Promise<number[]> {
+  const { data, error } = await supabase
+    .from('watch_rules')
+    .select('chat_id')
+    .eq('creator_id', creatorId)
+    .eq('active', true);
+
+  if (error) {
+    throw new Error(`[db] getWatchChatsForCreator failed for creator ${creatorId}: ${error.message}`);
+  }
+  return (data ?? []).map((row: { chat_id: number }) => row.chat_id);
+}
+
 export async function getCreatorUnclaimedUsd(
   creatorId: string,
   prices: { sol: number; eth: number; bnb: number }

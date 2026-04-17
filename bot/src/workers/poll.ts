@@ -19,6 +19,7 @@ import {
   getActiveAlertRules,
   getCreatorUnclaimedUsd,
   updateAlertLastNotified,
+  getWatchChatsForCreator,
 } from '../state/db';
 import { formatClaimNotification } from '../services/format';
 import type { WatchedToken } from '../state/db';
@@ -287,7 +288,24 @@ async function notifyGroups(
   remainingUnclaimed: string,
   prices: Prices
 ): Promise<boolean> {
-  const groups = await getGroupsForToken(token.id);
+  const groupsFromWatches = await getGroupsForToken(token.id);
+
+  // Also notify chats that watch this creator specifically (watch_rules)
+  let watchChats: number[] = [];
+  if (token.creatorId) {
+    try {
+      watchChats = await getWatchChatsForCreator(token.creatorId);
+    } catch (err) {
+      console.warn(`[poll] getWatchChatsForCreator failed for ${token.creatorId}:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  // Union + dedupe: per-token watches carry messageId (for reply), per-creator watches don't
+  const groupMap = new Map<number, number | null>();
+  for (const g of groupsFromWatches) groupMap.set(g.groupId, g.messageId);
+  for (const chatId of watchChats) if (!groupMap.has(chatId)) groupMap.set(chatId, null);
+
+  const groups = Array.from(groupMap, ([groupId, messageId]) => ({ groupId, messageId }));
   if (groups.length === 0) return true; // No groups to notify = success
 
   const chainConf = CHAIN_CONFIG[token.chain];
