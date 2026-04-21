@@ -115,8 +115,11 @@ export interface PlatformAdapter {
 
   /**
    * Get historical fee data for each token (cached-friendly).
+   * @param signal - Optional AbortSignal so callers sharing a wallclock budget
+   *                 with live-fee streams can cancel in-flight requests.
+   *                 Adapters that cannot propagate cancellation may ignore it.
    */
-  getHistoricalFees(wallet: string): Promise<TokenFee[]>;
+  getHistoricalFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]>;
 
   /**
    * Get live unclaimed fees (real-time onchain query).

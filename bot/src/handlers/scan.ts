@@ -50,7 +50,7 @@ export async function handleScan(ctx: Context): Promise<void> {
   if (!inGroup) {
     const label = isWallet ? `<code>${query.slice(0, 6)}...${query.slice(-4)}</code>` : `<b>@${escapeHtml(query)}</b>`;
     const scanning = await ctx.reply(
-      `🔍 Scanning ${label}...\n\nResolving identity and checking 9 platforms. This may take up to 30s.`,
+      `🔍 Scanning ${label}...\n\nResolving identity and checking 10 platforms. This may take up to 30s.`,
       { parse_mode: 'HTML' }
     );
     scanningMsgId = scanning.message_id;

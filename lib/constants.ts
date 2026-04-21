@@ -78,7 +78,17 @@ export const PLATFORM_CONFIG = {
   revshare: { name: 'RevShare', chain: 'sol' as const, color: '#4CAF50' },
   coinbarrel: { name: 'Coinbarrel', chain: 'sol' as const, color: '#FF8C00' },
   raydium: { name: 'Raydium', chain: 'sol' as const, color: '#6C5CE7' },
+  flaunch: { name: 'Flaunch', chain: 'base' as const, color: '#7C3AED' },
+  flap: { name: 'Flap', chain: 'bsc' as const, color: '#F59E0B' },
 } as const;
+
+// Launchpads shown in user-facing copy (hero subtitle, stats strip, etc).
+// Excludes 'flap' — Phase 12 stakes out the type/DB enum/UI display branch but no
+// adapter yet. Drop the filter when flapAdapter lands in Phase 12.
+const PRE_SHIPPED_LAUNCHPADS: ReadonlySet<string> = new Set(['flap']);
+export const SHIPPED_LAUNCHPAD_COUNT = Object.keys(PLATFORM_CONFIG).filter(
+  (key) => !PRE_SHIPPED_LAUNCHPADS.has(key),
+).length;
 
 /** All EVM-compatible chain keys. Used for cross-chain matching and normalization checks. */
 export const EVM_CHAINS: ReadonlySet<string> = new Set(['base', 'eth', 'bsc']);

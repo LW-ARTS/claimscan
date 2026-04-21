@@ -12,6 +12,9 @@ export default defineConfig({
   use: {
     baseURL: isCI ? 'http://localhost:3000' : 'http://localhost:3001',
     trace: 'on-first-retry',
+    // Override default HeadlessChrome UA — proxy.ts blocks it as a scraper.
+    userAgent:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
   },
   projects: [
     {

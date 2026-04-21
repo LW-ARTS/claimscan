@@ -41,6 +41,17 @@ function tokenDisplay(fee: FeeRecord): { label: string; badge: string } {
   return { label: short, badge: '?' };
 }
 
+/**
+ * For display-only adapters (no in-app claim), return the external claim URL.
+ * Flaunch and Flap v1 link out to their native apps for user-driven claims.
+ * Reown AppKit migration will unlock in-app claims in a future milestone.
+ */
+function externalClaimUrl(platform: string): string | null {
+  if (platform === 'flaunch') return 'https://flaunch.gg';
+  if (platform === 'flap') return 'https://flap.sh';
+  return null;
+}
+
 export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, connectedWallet, onClaimToken }: TokenFeeTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -167,6 +178,28 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
             <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
               <PlatformIcon platform={fee.platform} className="h-3.5 w-3.5" aria-hidden />
               <span>{platformConfig?.name ?? fee.platform}</span>
+              {fee.platform === 'flaunch' && (
+                <a
+                  href="https://flaunch.gg"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80 hover:text-foreground"
+                  aria-label="View on flaunch.gg"
+                >
+                  View on flaunch.gg &rarr;
+                </a>
+              )}
+              {fee.platform === 'flap' && (
+                <a
+                  href="https://flap.sh"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80 hover:text-foreground"
+                  aria-label="View on flap.sh"
+                >
+                  View on flap.sh &rarr;
+                </a>
+              )}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
               <div>
@@ -276,7 +309,31 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                   </div>
                 </td>
                 <td className="py-3.5 text-[13px] text-foreground">
-                  {platformConfig?.name ?? fee.platform}
+                  <div className="flex flex-col gap-0.5">
+                    <span>{platformConfig?.name ?? fee.platform}</span>
+                    {fee.platform === 'flaunch' && (
+                      <a
+                        href="https://flaunch.gg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80 hover:text-foreground"
+                        aria-label="View on flaunch.gg"
+                      >
+                        View on flaunch.gg &rarr;
+                      </a>
+                    )}
+                    {fee.platform === 'flap' && (
+                      <a
+                        href="https://flap.sh"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80 hover:text-foreground"
+                        aria-label="View on flap.sh"
+                      >
+                        View on flap.sh &rarr;
+                      </a>
+                    )}
+                  </div>
                 </td>
                 <td className="py-3.5 text-right text-[13px] tabular-nums text-foreground">
                   {formatTokenAmount(fee.total_earned, decimals)} {chainLabel}
@@ -311,7 +368,9 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                 </td>
                 {connectedWallet && onClaimToken && (
                   <td className="py-3.5 text-center">
-                    {fee.platform === 'bags' && fee.claim_status !== 'claimed' && safeBigInt(fee.total_unclaimed) > 0n && (
+                    {(fee.platform === 'flaunch' || fee.platform === 'flap') ? (
+                      <span className="text-[11px] text-muted-foreground/50" aria-hidden="true">-</span>
+                    ) : fee.platform === 'bags' && fee.claim_status !== 'claimed' && safeBigInt(fee.total_unclaimed) > 0n ? (
                       <button
                         onClick={() => onClaimToken(fee.token_address)}
                         aria-label={`Claim fees for ${fee.token_symbol || fee.token_address.slice(0, 8)}`}
@@ -322,7 +381,7 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                         </svg>
                         CLAIM
                       </button>
-                    )}
+                    ) : null}
                   </td>
                 )}
               </tr>

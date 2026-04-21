@@ -97,6 +97,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
   const { liveRecords } = useLiveFees();
   const [mounted, setMounted] = useState(false);
   const tabPanelRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR hydration guard; wallet context must be client-only to avoid mismatch
   useEffect(() => setMounted(true), []);
   // Only expose wallet after client mount to avoid SSR issues
   const connectedWallet = mounted ? (publicKey?.toBase58() ?? null) : null;

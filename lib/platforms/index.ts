@@ -10,12 +10,18 @@ import { believeAdapter } from './believe';
 import { revshareAdapter } from './revshare';
 import { coinbarrelAdapter } from './coinbarrel';
 import { raydiumAdapter } from './raydium';
+import { flaunchAdapter } from './flaunch';
 
 // ═══════════════════════════════════════════════
 // Platform Registry
 // ═══════════════════════════════════════════════
 
-const adapters: Record<Platform, PlatformAdapter> = {
+// Record<Exclude<Platform, 'flap'>, PlatformAdapter>: compile-time enforcement
+// that every implemented platform has an adapter, while 'flap' is explicitly
+// deferred to Phase 12. Plan 12 will drop the Exclude once flapAdapter lands.
+// `getAdapter()` returns `| null` so callers that ask for 'flap' today get a
+// typed null instead of a runtime-only undefined.
+const adapters: Record<Exclude<Platform, 'flap'>, PlatformAdapter> = {
   bags: bagsAdapter,
   clanker: clankerAdapter,
   pump: pumpAdapter,
@@ -25,12 +31,15 @@ const adapters: Record<Platform, PlatformAdapter> = {
   revshare: revshareAdapter,
   coinbarrel: coinbarrelAdapter,
   raydium: raydiumAdapter,
+  flaunch: flaunchAdapter,
+  // flap: flapAdapter added in Phase 12.
 };
 
 /**
  * Get a specific platform adapter by name.
  */
 export function getAdapter(platform: Platform): PlatformAdapter | null {
+  if (platform === 'flap') return null;
   return adapters[platform] ?? null;
 }
 
@@ -45,20 +54,19 @@ export function getAllAdapters(): PlatformAdapter[] {
  * Get adapters that can resolve social identities to wallets.
  */
 export function getIdentityResolvers(): PlatformAdapter[] {
-  return Object.values(adapters).filter((a) => a.supportsIdentityResolution);
+  return getAllAdapters().filter((a) => a.supportsIdentityResolution);
 }
 
 /**
  * Get adapters that support live unclaimed fee queries.
  */
 export function getLiveFeeAdapters(): PlatformAdapter[] {
-  return Object.values(adapters).filter((a) => a.supportsLiveFees);
+  return getAllAdapters().filter((a) => a.supportsLiveFees);
 }
 
 /**
  * Get adapters that support handle-based fee queries.
  */
 export function getHandleFeeAdapters(): PlatformAdapter[] {
-  return Object.values(adapters).filter((a) => a.supportsHandleBasedFees);
+  return getAllAdapters().filter((a) => a.supportsHandleBasedFees);
 }
-

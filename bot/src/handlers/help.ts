@@ -50,7 +50,7 @@ export async function handleStart(ctx: Context): Promise<void> {
 const HELP_TEXT = `<b>🎮 Commands</b>
 
 <code>/scan @handle</code>
-Full creator fee report. Resolves wallets, scans all 9 platforms, shows aggregated fees and top unclaimed tokens.
+Full creator fee report. Resolves wallets, scans all 10 platforms, shows aggregated fees and top unclaimed tokens.
 
 <code>/leaderboard</code> (or <code>/top</code>)
 Top 10 creators ranked by total fees earned across all platforms. Live from claimscan.tech.

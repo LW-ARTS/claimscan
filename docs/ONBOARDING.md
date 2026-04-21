@@ -1,7 +1,7 @@
 # ClaimScan — Developer Onboarding Guide
 
 > Cross-chain fee tracking and claiming platform for token creators.
-> Supports 9 launchpads across Solana, Base, and Ethereum.
+> Supports 10 launchpads across Solana, Base, and Ethereum.
 
 ---
 

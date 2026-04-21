@@ -1,7 +1,7 @@
 # ClaimScan — Architecture Documentation
 
 > Cross-chain token fee tracking and claiming platform.
-> Aggregates creator earnings from 9 launchpads across Solana, Base, and Ethereum.
+> Aggregates creator earnings from 10 launchpads across Solana, Base, and Ethereum.
 
 ---
 

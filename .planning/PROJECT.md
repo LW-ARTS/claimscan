@@ -8,6 +8,15 @@ Plataforma de rastreamento e claim de fees de tokens cross-chain (Solana, Base, 
 
 Mostrar aos creators de tokens quanto dinheiro eles tem parado em fees nao-claimadas, de forma precisa e em tempo real, cobrindo todos os launchpads relevantes.
 
+## Current Milestone: v1.1 Launchpad Expansion
+
+**Goal:** Expandir cobertura de 9 para 11 launchpads adicionando Flaunch.gg (Base) e Flap.sh (BSC), em modo display-only (sem botão de claim em v1).
+
+**Target features:**
+- Adapter Flaunch.gg lendo REST `dev-api.flayerlabs.xyz` + `RevenueManager.balances()` on-chain, emitindo synthetic token ID `BASE:flaunch-revenue`
+- Adapter Flap.sh via indexer próprio em Supabase (tabela `flap_tokens` + cron incremental), com vault handler registry polimórfico (VaultBase, VaultBaseV2, unknown fallback)
+- UI display-only: tabs novos em `PlatformBreakdown`, link externo em vez de CTA de claim nas rows
+
 ## Requirements
 
 ### Validated
@@ -25,45 +34,57 @@ Mostrar aos creators de tokens quanto dinheiro eles tem parado em fees nao-claim
 
 ### Active
 
-- [ ] Adapter health check script (all 9 adapters, known wallets, status/response time/results)
-- [ ] Vitest integration test suite for all adapter methods
-- [ ] Adapter benchmark suite (p50/p95 latency, error rates, timeout frequency)
-- [ ] CI pipeline (GitHub Actions) running adapter tests on push/PR
-- [ ] Error handling hardening (circuit breakers, structured error types)
-- [ ] Cron job reliability improvements (retry logic, failure reporting)
+- [ ] **Flaunch.gg adapter (Base)** — discovery via REST + claimable via `RevenueManager.balances`, synthetic token ID, display-only
+- [ ] **Flap.sh adapter (BSC)** — indexer próprio + vault handler registry polimórfico, display-only
+- [ ] **Shared enum migration** — estender `platform_type` no Supabase com `'flaunch'` e `'flap'`
+- [ ] **Shared UI** — branch display-only em `TokenFeeTable` + ícones em `PlatformIcon`
+- [ ] **Branded types EVM** — `BaseAddress` / `BscAddress` pra segurança cross-chain
 
-### Out of Scope
+### Parked (Backlog)
 
-- Dashboard de status publico -- desnecessario agora, pode ser v2 do quality milestone
-- Alertas Telegram/Discord -- skip por agora, CI coverage primeiro
-- Novas features de usuario -- foco exclusivo em quality/testing/hardening
-- Novos launchpads -- estabilizar os 9 existentes antes de adicionar mais
-- Claims EVM (Clanker/Zora/Bankr) -- requer migracao Reown AppKit, milestone separado
+Requirements do milestone Quality & Testing v1 ficaram archived em `.planning/backlog/milestones/quality-testing-v1/`. Continuam válidos e devem ser promovidos depois de Launchpad Expansion fechar. Inclui CI unit wiring, adapter health check, integration tests, benchmark suite, fixtures hardcoded.
+
+### Out of Scope (Launchpad Expansion v1.1)
+
+- **Claim button em Flaunch/Flap** -- depende de migração Reown AppKit (TODO arquitetural documentado), fica pra v2 do milestone
+- **Flaunch Groups (staking rewards)** -- cobrir Memestream owner revenue primeiro, groups viram futura expansão se houver demanda
+- **Flap vaults customizados** -- v1 suporta só VaultBase e VaultBaseV2 oficiais, custom vaults caem no handler `unknown` (balance display only)
+- **Per-coin breakdown do Flaunch** -- `balances()` é agregado por wallet; per-coin exige scan de eventos `TotalFeesReceived`, fica pra v2
+- **Historical claim events** -- `Claimed` event scan em BSC window 250K blocos é insuficiente, confia em `claim_events` indo pra frente
+
+### Out of Scope (permanente)
+
+- **Bitquery API paga como dep primária** -- trial tier não é sustentável, híbrido com backfill one-shot fica como idea parqueada
+- **Adapter tests em PR gates** -- muito lento, só nightly via Q&T quando esse milestone entrar
 
 ## Context
 
 ClaimScan V2.5 shipped em 2026-04-07 com visual redesign, real-time fees, leaderboard, e hardening sweep. Metricas: $1.7M+ fees tracked, 397+ wallets scanned, ~40% unclaimed. FINN (founder Bags) deu endorsement publico.
 
-O codebase tem 9 adapters com interfaces padronizadas (PlatformAdapter), mas zero testes de integracao nos adapters em si. Os testes existentes cobrem utils/fee-math/hmac, nao os adapters. O gap principal e: se um adapter quebrar silenciosamente (API mudou, rate limit, timeout), so descobre quando um usuario reclama.
+**Pivot 2026-04-20:** Decisão original do v1 era estabilizar os 9 adapters antes de adicionar mais (via milestone Quality & Testing). Override acionado após pesquisa de feasibility mostrar que Flaunch.gg tem REST pública (`dev-api.flayerlabs.xyz`) + SDK com addresses confirmados, viabilizando integração de 1 a 2 dias com zero API key e synthetic token ID pattern já usado pra Pump.fun. Flap.sh é 3 a 5 dias de trabalho por causa do indexer próprio e vault polimórfico, mas zero deps externas pagas.
 
-Os adapters usam Promise.allSettled pra tolerancia a falhas, mas nao tem circuit breakers nem metricas de saude. Cada adapter tem caracteristicas diferentes: Pump faz leitura onchain, Bags tem multi-key rotation, Clanker e multi-chain, Bankr tem Agent API fallback lento.
+**Hoje:** 9 adapters padronizados em `PlatformAdapter` interface. Clanker é o template canônico pra novos EVM adapters (REST + viem multicall). Pump tem precedent pro synthetic token ID pattern (`SOL:pump`). Cron `index-fees` ja faz loop em todos adapters do registry, então novos adapters entram grátis.
 
 ## Constraints
 
 - **Infra**: Vercel Hobby (maxDuration=60s, SSE 10s cap)
-- **APIs externas**: Rate limits variam por plataforma, some APIs sem SLA
+- **APIs externas**: Flaunch tem rate limit sugerido de 100-200ms entre requests; BSC RPC scan window é 250K blocos (~8.7 dias)
 - **Wallets de teste**: Usar wallets publicas de creators conhecidos (hardcoded)
 - **CI budget**: GitHub Actions free tier (2000 min/mes)
-- **Sem DB em testes**: Adapter tests chamam APIs reais, nao mocam Supabase
+- **Claim signing**: zero em v1 para ambos (display-only); evita depender de Reown AppKit migration
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Foco em quality/hardening antes de features | V2.5 ta live e estavel, precisa de safety net antes de crescer | -- Pending |
-| Wallets hardcoded por adapter | Evita dependencia do DB em testes, wallets publicas de creators conhecidos | -- Pending |
-| CI via GitHub Actions | Ja tem repo no GitHub, free tier suficiente, roda em PR | -- Pending |
-| Testes contra APIs reais (nao mocks) | Adapters dependem de APIs externas, mock nao pega mudancas de contrato | -- Pending |
+| Override "Novos launchpads out of scope" | Oportunidade de mercado + viability confirmada em research 2026-04-20 | -- Pending |
+| Flaunch via REST pública, não @flaunch/sdk | SDK traz Uniswap V4 writes que não precisamos; REST + viem read bate com padrão Clanker | -- Pending |
+| Flaunch synthetic token ID `BASE:flaunch-revenue` | `balances()` é agregado por wallet; per-coin breakdown fica pra v2 | -- Pending |
+| Flap indexer próprio, sem Bitquery | Free tier não renova mensalmente, Commercial tier sem preço público | -- Pending |
+| Display-only em ambos, sem Claim button | Evita forçar migração Reown AppKit que é escopo muito maior | -- Pending |
+| Branded types BaseAddress/BscAddress | Checksum EIP-55 não diferencia chain, branded type previne cross-chain mix | -- Pending |
+| Vault handler registry polimórfico pra Flap | Flap vaults têm 2 ABIs oficiais + custom; fallback `unknown` é seguro (balance only) | -- Pending |
+| Q&T milestone parkeado (não descartado) | Quality ainda é prioridade, mas Launchpad Expansion tem janela curta | -- Pending |
 
 ## Evolution
 
@@ -83,4 +104,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-10 after initialization*
+*Last updated: 2026-04-20 -- pivoted from Quality & Testing to Launchpad Expansion v1.1*

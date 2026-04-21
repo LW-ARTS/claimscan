@@ -95,8 +95,14 @@ export async function aggregateFees(
  * Bags has its own vanish-detection (`detectDisappearedTokens`) that marks
  * disappeared tokens as fully claimed instead of deleting them — Bags' API
  * only returns unclaimed > 0 entries, so a vanish means "they got claimed",
- * not "they were misattributed". Pruning would lose claim history. */
-const PRUNE_EXEMPT_PLATFORMS = new Set<string>(['bags']);
+ * not "they were misattributed". Pruning would lose claim history.
+ *
+ * Flaunch emits exactly ONE synthetic TokenFee per wallet (`BASE:flaunch-revenue`)
+ * aggregated from `RevenueManager.balances(wallet)`. The adapter swallows every
+ * error path (rate_limited, schema_drift, network_error, RPC failure) to `[]`
+ * while `fetchAllFees` still marks flaunch as synced. Without this exemption,
+ * a transient blip during cron silently deletes the single fee_records row. */
+const PRUNE_EXEMPT_PLATFORMS = new Set<string>(['bags', 'flaunch']);
 
 /** Pure helper: identify rows that should be deleted from `fee_records`
  * because they exist in the DB but were not returned by the latest sync.

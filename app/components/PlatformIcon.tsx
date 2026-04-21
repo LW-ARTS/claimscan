@@ -11,6 +11,8 @@ const logoMap: Record<string, string> = {
   believe: '/logos/believe.svg',
   coinbarrel: '/logos/coinbarrel.svg',
   raydium: '/logos/raydium.svg',
+  flaunch: '/logos/flaunch.svg',
+  flap: '/logos/flap.svg',
 };
 
 /* ─── RevShare fallback (generic concept, no brand logo) ─── */
@@ -36,6 +38,8 @@ const nameMap: Record<string, string> = {
   revshare: 'RevShare',
   coinbarrel: 'Coinbarrel',
   raydium: 'Raydium',
+  flaunch: 'Flaunch',
+  flap: 'Flap',
 };
 
 interface PlatformIconProps {

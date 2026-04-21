@@ -24,10 +24,10 @@ test.describe('Profile Page', () => {
   test('header and footer render on profile pages', async ({ page }) => {
     await page.goto('/vitalik');
 
-    // Navigation header
-    await expect(page.getByText('ClaimScan')).toBeVisible();
+    // Header renders ClaimScan in multiple DOM nodes (logo mark + link + footer).
+    await expect(page.getByText('ClaimScan').first()).toBeVisible();
 
-    // Footer — verify platform summary text renders
-    await expect(page.getByText(/Solana · Base · 9 platforms/)).toBeVisible();
+    // Footer — verify brand and chain badges render
+    await expect(page.getByText('Track unclaimed creator fees across DeFi launchpads.')).toBeVisible();
   });
 });

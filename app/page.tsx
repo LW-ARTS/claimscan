@@ -4,7 +4,7 @@ import { SearchBar } from './components/SearchBar';
 import { CreatorAvatar } from './components/CreatorAvatar';
 import { CountUpLazy } from './components/anim/CountUpLazy';
 import { RevealOnScroll } from './components/anim/RevealOnScroll';
-import { PLATFORM_CONFIG } from '@/lib/constants';
+import { PLATFORM_CONFIG, SHIPPED_LAUNCHPAD_COUNT } from '@/lib/constants';
 import { fetchLeaderboard } from '@/lib/services/leaderboard';
 import { getStats } from '@/lib/services/stats';
 import { formatUsd } from '@/lib/utils';
@@ -18,8 +18,6 @@ const MoneyFaceEmoji = dynamic(() => import('./components/MoneyFaceEmoji'), {
 
 
 export default async function Home() {
-  const platformEntries = Object.entries(PLATFORM_CONFIG);
-
   // Fetch stats and leaderboard preview in parallel (direct DB calls, no self-fetch)
   let stats = { totalFeesUsd: 0, walletsScanned: 0, unclaimedPercent: 0 };
   let leaderboardPreview: Array<{
@@ -50,6 +48,7 @@ export default async function Home() {
     { name: 'Clanker', src: '/logos/clanker.png' },
     { name: 'Zora', src: '/logos/zora-zorb.png' },
     { name: 'Bankr', src: '/logos/bankr-favicon.svg' },
+    { name: 'Flaunch', src: '/logos/flaunch.svg' },
     { name: 'Coinbarrel', src: '/logos/coinbarrel.svg' },
     { name: 'RevShare', src: '/logos/revshare.png' },
     { name: 'Dexscreener', src: '/logos/dexscreener.png' },
@@ -81,7 +80,7 @@ export default async function Home() {
     {
       step: 1,
       title: 'PASTE A HANDLE',
-      desc: `Enter any creator @handle, wallet address, or ENS name. ClaimScan will instantly scan all ${Object.keys(PLATFORM_CONFIG).length} launchpads across Solana, Base, Ethereum and BSC.`,
+      desc: `Enter any creator @handle, wallet address, or ENS name. ClaimScan will instantly scan all ${SHIPPED_LAUNCHPAD_COUNT} launchpads across Solana, Base, Ethereum and BSC.`,
       icon: (
         <svg className="h-7 w-7 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -135,7 +134,7 @@ export default async function Home() {
         </div>
 
         {/* Main heading — 2 lines per Pencil: "TRACK YOUR ■" / "「CREATOR」 REVENUE" */}
-        <h1 className="sr-only">Find unclaimed creator fees across {platformEntries.length} launchpads on Solana and Base</h1>
+        <h1 className="sr-only">Find unclaimed creator fees across {SHIPPED_LAUNCHPAD_COUNT} launchpads on Solana and Base</h1>
         <div aria-hidden="true" className="animate-fade-in-up delay-100 flex flex-col items-center gap-1">
           <div className="flex items-center justify-center gap-2 sm:gap-3">
             <span className="text-3xl font-black uppercase tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">Track your</span>
@@ -149,7 +148,7 @@ export default async function Home() {
 
         {/* Subtitle */}
         <p className="animate-fade-in-up delay-200 mx-auto mt-5 max-w-[620px] text-base leading-relaxed text-[var(--text-tertiary)] sm:mt-6 sm:text-lg">
-          Paste any @handle or wallet. See what you&apos;ve earned, claimed, and left on the table across {platformEntries.length} launchpads.{' '}
+          Paste any @handle or wallet. See what you&apos;ve earned, claimed, and left on the table across {SHIPPED_LAUNCHPAD_COUNT} launchpads.{' '}
           <Link href="/docs" className="text-link text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
             Learn how it works
           </Link>
