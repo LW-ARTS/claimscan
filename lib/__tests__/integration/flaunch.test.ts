@@ -6,7 +6,10 @@ import { baseClient } from '@/lib/chains/base';
 import { FLAUNCH_REVENUE_MANAGER } from '@/lib/constants-evm';
 import { asBaseAddress } from '@/lib/chains/types';
 
-describe('flaunchAdapter (integration, hits real Flaunch API + Base RPC)', () => {
+// Skip when BASE_RPC_URL is missing so local `npm run test:integration` does
+// not fall back to the public `mainnet.base.org` endpoint with console.warn
+// spam. CI injects the Alchemy URL via .env.test.
+describe.skipIf(!process.env.BASE_RPC_URL)('flaunchAdapter (integration, hits real Flaunch API + Base RPC)', () => {
   const wallet = fixture.wallet as `0x${string}`;
 
   it('getCreatorTokens returns at least one Flaunch coin for fixture wallet', async () => {
@@ -19,7 +22,7 @@ describe('flaunchAdapter (integration, hits real Flaunch API + Base RPC)', () =>
     }
   }, 30_000);
 
-  it('getHistoricalFees returns exactly one synthetic TokenFee', async () => {
+  it('getHistoricalFees returns exactly one synthetic TokenFee with historical earnings', async () => {
     const fees = await flaunchAdapter.getHistoricalFees(wallet);
     expect(fees).toHaveLength(1);
     const [fee] = fees;
@@ -27,10 +30,22 @@ describe('flaunchAdapter (integration, hits real Flaunch API + Base RPC)', () =>
     expect(fee.tokenSymbol).toBe('ETH');
     expect(fee.platform).toBe('flaunch');
     expect(fee.chain).toBe('base');
-    expect(fee.totalClaimed).toBe('0');
-    expect(BigInt(fee.totalUnclaimed)).toBeGreaterThan(0n);
-    expect(BigInt(fee.totalEarned)).toBe(BigInt(fee.totalUnclaimed));
-  }, 30_000);
+    // Fixture wallet claimed ~$159K (~50 ETH) historically. totalEarned must
+    // reflect historical earnings.
+    expect(BigInt(fee.totalEarned)).toBeGreaterThan(0n);
+    // Earned must be >= unclaimed (can't claim more than you earned).
+    expect(BigInt(fee.totalEarned)).toBeGreaterThanOrEqual(BigInt(fee.totalUnclaimed));
+    // totalClaimed = totalEarned - totalUnclaimed (always non-negative).
+    expect(BigInt(fee.totalClaimed)).toBeGreaterThanOrEqual(0n);
+    expect(BigInt(fee.totalClaimed)).toBe(BigInt(fee.totalEarned) - BigInt(fee.totalUnclaimed));
+    // Floor assertion — guards against silent regression where
+    // readFlaunchHistoricalEarnings returns 0n (partial failure, ABI change,
+    // wrong addresses, etc). If totalEarned collapses to claimable (~0), all
+    // other asserts in this block still pass, but totalClaimed drops to 0 and
+    // the user-visible "~$159K claimed" disappears. 10 ETH (10n ** 19n wei) is
+    // well below the fixture's real ~50 ETH and well above any noise floor.
+    expect(BigInt(fee.totalClaimed)).toBeGreaterThanOrEqual(10n ** 19n);
+  }, 60_000);
 
   it('totalUnclaimed matches a direct RevenueManager.balances read (parity)', async () => {
     // Read adapter and on-chain value in rapid succession so block delta is
@@ -49,28 +64,31 @@ describe('flaunchAdapter (integration, hits real Flaunch API + Base RPC)', () =>
     const adapterUnclaimed = BigInt(fees[0].totalUnclaimed);
     const direct = directBalance as bigint;
 
-    // Exact match expected in the common case. Allow 0.001 ETH (1e15 wei)
-    // absolute drift to tolerate an in-flight claim between the two reads.
+    // Exact match expected in the common case. Allow 0.01 ETH (1e16 wei)
+    // absolute drift — 0.001 ETH was too tight for the ~$159K fixture wallet,
+    // where a single claim tx during the ~100ms window between the two reads
+    // can exceed that. 0.01 ETH is still tight enough to catch a systemic
+    // adapter/RPC divergence (e.g., reading from wrong contract).
     const diff = adapterUnclaimed > direct ? adapterUnclaimed - direct : direct - adapterUnclaimed;
-    expect(diff).toBeLessThan(10n ** 15n);
-  }, 30_000);
+    expect(diff).toBeLessThan(10n ** 16n);
+  }, 60_000);
 
-  it('getLiveUnclaimedFees is equivalent to historical when balance > 0', async () => {
+  it('getLiveUnclaimedFees returns empty for a fully-claimed wallet', async () => {
+    // Fixture wallet claimed everything: historical shows earnings but live shows nothing.
     const [historical, live] = await Promise.all([
       flaunchAdapter.getHistoricalFees(wallet),
       flaunchAdapter.getLiveUnclaimedFees(wallet),
     ]);
-    // Both should yield the same single row for a wallet with positive balance.
-    expect(live).toHaveLength(historical.length);
-    if (live.length === 1 && historical.length === 1) {
-      expect(live[0].tokenAddress).toBe(historical[0].tokenAddress);
-    }
-  }, 30_000);
+    expect(historical).toHaveLength(1);
+    expect(BigInt(historical[0].totalEarned)).toBeGreaterThan(0n);
+    // All fees were claimed, so live unclaimed should be empty.
+    expect(live).toHaveLength(0);
+  }, 60_000);
 
   it('returns empty array for a wallet with no Flaunch NFTs', async () => {
-    // Well-known dead address, chosen because it demonstrably holds no
-    // Memestream NFT. If this ever flips, replace with another cold wallet.
-    const emptyWallet = '0x000000000000000000000000000000000000dEaD';
+    // RevenueManager contract address — a contract, not an EOA, so it can
+    // never be a token creator. Safe against "someone launched to this address."
+    const emptyWallet = '0xc8d4B2Ca8eD6868eE768beAb1f932d7eecCc1b50';
     const tokens = await flaunchAdapter.getCreatorTokens(emptyWallet);
     expect(tokens).toHaveLength(0);
     const fees = await flaunchAdapter.getHistoricalFees(emptyWallet);

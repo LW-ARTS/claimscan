@@ -1,5 +1,5 @@
 {
-  "wallet": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
-  "note": "Public Base wallet (vitalik.eth) holding 20+ Memestream NFTs on Flaunch. RevenueManager.balances(wallet) drifts with claims and inflows; test does a live parity check against a same-run on-chain read rather than hardcoding a number. If the wallet's balances() drops to 0 permanently, replace with another Flaunch creator holding at least 1 Memestream NFT with balances > 0.",
-  "source": "Discovered 2026-04-20 via GET https://dev-api.flayerlabs.xyz/v1/base/tokens?ownerAddress=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 which returned 20+ coins. See .planning/phases/11-flaunch-adapter-base/11-05-SUMMARY.md for discovery context and parity-check fallback guidance."
+  "wallet": "0x22c738cA7b87933949dedf66DC0D51F3F52f1bd6",
+  "note": "Takeover.fun creator wallet with 130+ coins on the new Flaunch PM (0x23321f...). Wallet claimed ~$159K in historical ETH fees; RevenueManager.balances() returns 0. Used to test the historical-earnings path: totalEarned should be > 0 even though totalUnclaimed = 0. If this wallet's coins are deleted or the API stops returning them, replace with another Takeover.fun creator that has new PM coins and provable historical claims.",
+  "source": "Discovered 2026-04-21 via investigation of ClaimScan Phase 12. Flaunch.gg UI for this wallet shows '$159,180.51 Earnings over time, $0 claimable'. See context window history for FTC/TAKEOVER pool cross-validation (FeeEscrow.totalFeesAllocated confirmed)."
 }

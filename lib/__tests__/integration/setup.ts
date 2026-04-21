@@ -17,4 +17,6 @@ vi.mock('@/lib/logger', () => ({
 
 // Load integration-specific env (API keys etc.) if the file exists.
 // CI injects secrets via environment; local dev uses .env.test.
+// Fall back to .env.local for local runs that don't have a separate .env.test.
 config({ path: '.env.test' });
+config({ path: '.env.local', override: false });
