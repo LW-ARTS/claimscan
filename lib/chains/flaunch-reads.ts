@@ -94,27 +94,41 @@ async function chunkedMulticall<T, R>(
 }
 
 /**
+ * Per-coin historical earnings keyed by lowercase 0x token address.
+ * The adapter uses this to emit one TokenFee row per coin instead of an
+ * aggregated synthetic row.
+ */
+export type FlaunchPerCoinEarnings = Map<string, bigint>;
+
+/**
  * Discriminated result for historical earnings reads so the adapter can bail
  * gracefully on partial RPC failure. `degraded` means enough round-3 calls
- * failed that the returned `total` is likely under-counted; callers should
- * prefer the previously-cached row over emitting a flap.
+ * failed that the returned `perCoin` map is likely under-counted; callers
+ * should prefer the previously-cached rows over emitting a flap.
+ *
+ * `total` is the sum of `perCoin` values, retained as a convenience so callers
+ * that only need the aggregate (e.g., legacy fallback paths) don't have to
+ * recompute it.
  */
 export type FlaunchEarningsResult =
-  | { kind: 'ok'; total: bigint }
-  | { kind: 'degraded'; total: bigint; successRatio: number }
+  | { kind: 'ok'; perCoin: FlaunchPerCoinEarnings; total: bigint }
+  | { kind: 'degraded'; perCoin: FlaunchPerCoinEarnings; total: bigint; successRatio: number }
   | { kind: 'error' };
 
 /**
- * Sum of totalFeesAllocated across all given Takeover.fun token addresses.
+ * Per-pool totalFeesAllocated for all given Takeover.fun token addresses.
  * Three multicall round-trips: tokenAddress → tokenId → poolId → totalFeesAllocated.
  * Each round is chunked at MULTICALL_BATCH_SIZE. The signal is checked between
  * rounds (viem 2.47 does not support per-call AbortSignal).
+ *
+ * The result preserves the per-pool breakdown so the adapter can emit
+ * one row per coin. The summed `total` is provided for convenience.
  */
 export async function readFlaunchHistoricalEarnings(
   tokenAddresses: BaseAddress[],
   signal?: AbortSignal,
 ): Promise<FlaunchEarningsResult> {
-  if (tokenAddresses.length === 0) return { kind: 'ok', total: 0n };
+  if (tokenAddresses.length === 0) return { kind: 'ok', perCoin: new Map(), total: 0n };
   if (signal?.aborted) return { kind: 'error' };
   try {
     // Round 1: tokenId per address
@@ -142,7 +156,7 @@ export async function readFlaunchHistoricalEarnings(
         x.tid !== null && x.tid !== 0n,
       );
 
-    if (validByTokenId.length === 0) return { kind: 'ok', total: 0n };
+    if (validByTokenId.length === 0) return { kind: 'ok', perCoin: new Map(), total: 0n };
 
     // Round 2: poolId per tokenId
     const round2 = await chunkedMulticall<{ tid: bigint; addr: BaseAddress }, `0x${string}`>(
@@ -165,7 +179,7 @@ export async function readFlaunchHistoricalEarnings(
       .map((pid, i) => ({ pid, ...validByTokenId[i] }))
       .filter((x): x is { pid: `0x${string}`; tid: bigint; addr: BaseAddress } => x.pid !== null);
 
-    if (validByPoolId.length === 0) return { kind: 'ok', total: 0n };
+    if (validByPoolId.length === 0) return { kind: 'ok', perCoin: new Map(), total: 0n };
 
     // Round 3: totalFeesAllocated per poolId
     const round3 = await chunkedMulticall<{ pid: `0x${string}`; tid: bigint; addr: BaseAddress }, bigint>(
@@ -178,18 +192,30 @@ export async function readFlaunchHistoricalEarnings(
       }),
     );
 
-    const total = round3.reduce((sum, r) => {
-      return r.status === 'success' ? sum + (r.result as bigint) : sum;
-    }, 0n);
-
-    const round3Success = round3.filter((r) => r.status === 'success').length;
-    const successRatio = round3Success / validByPoolId.length;
-
-    if (successRatio < MIN_SUCCESS_RATIO) {
-      return { kind: 'degraded', total, successRatio };
+    // Build per-coin map keyed by lowercase token address. Failed reads are
+    // dropped silently — they're factored into the success ratio below.
+    const perCoin: FlaunchPerCoinEarnings = new Map();
+    let total = 0n;
+    let successCount = 0;
+    for (let i = 0; i < round3.length; i++) {
+      const r = round3[i];
+      if (r.status === 'success') {
+        const value = r.result as bigint;
+        if (value > 0n) {
+          perCoin.set(validByPoolId[i].addr.toLowerCase(), value);
+        }
+        total += value;
+        successCount++;
+      }
     }
 
-    return { kind: 'ok', total };
+    const successRatio = successCount / validByPoolId.length;
+
+    if (successRatio < MIN_SUCCESS_RATIO) {
+      return { kind: 'degraded', perCoin, total, successRatio };
+    }
+
+    return { kind: 'ok', perCoin, total };
   } catch (err) {
     log.warn('readFlaunchHistoricalEarnings_failed', {
       count: tokenAddresses.length,

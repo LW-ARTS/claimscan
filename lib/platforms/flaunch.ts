@@ -16,15 +16,21 @@ import { createLogger } from '@/lib/logger';
 const log = createLogger('flaunch');
 
 // ═══════════════════════════════════════════════
-// Synthetic Token ID
-// RevenueManager.balances(wallet) returns ETH wei AGGREGATED across all coins.
-// Per CLAUDE.md (Pump.fun pattern): when a platform exposes a single pooled
-// balance rather than per-coin accruals, we emit ONE synthetic TokenFee with
-// a composite-key-safe ID. TokenFeeTable.tokenDisplay() strips the 'BASE:' prefix
-// pattern (mirrors how 'SOL:pump' renders as "$SOL").
+// Token ID conventions
+//
+// Takeover.fun (new PM) coins emit one TokenFee per coin keyed by the real
+// 0x token address. For each coin we know the historical earned (from
+// FeeEscrow.totalFeesAllocated) and assume it has been fully claimed —
+// see the long comment in getHistoricalFees for why claimable cannot be
+// split per coin.
+//
+// `BASE:flaunch-legacy` is a synthetic catch-all row that holds the
+// wallet-wide claimable from RevenueManager.balances. It is emitted only
+// when the wallet has either old-PM coins (no per-pool data available) OR
+// any non-zero claimable that cannot be attributed to a specific coin.
 // ═══════════════════════════════════════════════
 
-const SYNTHETIC_TOKEN_ID = 'BASE:flaunch-revenue';
+const LEGACY_TOKEN_ID = 'BASE:flaunch-legacy';
 
 const TAKEOVER_PM = FLAUNCH_TAKEOVER_POSITION_MANAGER.toLowerCase();
 
@@ -88,21 +94,28 @@ export const flaunchAdapter: PlatformAdapter = {
 
     // Split tokens by PM version. Only Takeover.fun (new PM) exposes
     // FeeEscrow.totalFeesAllocated for historical earned tracking.
-    const newPmAddresses = list.data
-      .filter((t) => t.positionManager?.toLowerCase() === TAKEOVER_PM)
-      .map((t) => asBaseAddress(t.tokenAddress as `0x${string}`));
+    const newPmCoins = list.data.filter(
+      (t) => t.positionManager?.toLowerCase() === TAKEOVER_PM,
+    );
+    const oldPmCoins = list.data.filter(
+      (t) => t.positionManager?.toLowerCase() !== TAKEOVER_PM,
+    );
+
+    const newPmAddresses = newPmCoins.map((t) =>
+      asBaseAddress(t.tokenAddress as `0x${string}`),
+    );
 
     // Parallelize: claimable read + historical earnings read (if new PM tokens exist)
     const [claimable, earningsResult] = await Promise.all([
       readFlaunchBalances(recipient, signal),
       newPmAddresses.length > 0
         ? readFlaunchHistoricalEarnings(newPmAddresses, signal)
-        : Promise.resolve({ kind: 'ok' as const, total: 0n }),
+        : Promise.resolve({ kind: 'ok' as const, perCoin: new Map<string, bigint>(), total: 0n }),
     ]);
 
     // Bail on degraded or errored historical reads. fee-sync.ts has 'flaunch'
     // in PRUNE_EXEMPT_PLATFORMS, so returning [] keeps the previously-cached
-    // row in the DB instead of flapping the user-visible value down.
+    // rows in the DB instead of flapping the user-visible values down.
     if (earningsResult.kind === 'error' || earningsResult.kind === 'degraded') {
       log.warn('historical_earnings_skipped', {
         kind: earningsResult.kind,
@@ -114,41 +127,64 @@ export const flaunchAdapter: PlatformAdapter = {
       return [];
     }
 
-    const totalEarnedFromEscrow = earningsResult.total;
+    const fees: TokenFee[] = [];
+    const perCoin = earningsResult.perCoin;
 
-    let totalEarned: bigint;
-    if (newPmAddresses.length > 0) {
-      // Floor totalEarned at claimable. Load-bearing for two cases:
-      //   1. A late-block skew where claimable was read one block after the
-      //      escrow sum, so claimable can briefly exceed totalEarnedFromEscrow.
-      //   2. Mixed-PM wallets: claimable is wallet-wide (includes old PM coins),
-      //      while totalEarnedFromEscrow only covers Takeover.fun pools. Without
-      //      this floor, totalClaimed = totalEarned - claimable could go negative
-      //      and produce an absurd "claimed more than earned" stat.
-      totalEarned = totalEarnedFromEscrow > claimable ? totalEarnedFromEscrow : claimable;
-    } else {
-      // Old PM only: FeeEscrow historical reads not available. Fall back to showing
-      // just the current claimable amount (totalClaimed cannot be computed).
-      if (claimable === 0n) return [];
-      totalEarned = claimable;
+    // Per-coin rows for new-PM (Takeover.fun) coins.
+    //
+    // Why totalClaimed === totalEarned and totalUnclaimed === 0 per coin:
+    // RevenueManager.balances(wallet) returns the wallet-wide claimable
+    // aggregate. There is no on-chain primitive to split that aggregate per
+    // coin without scanning RevenueManager.Claimed events for the entire
+    // wallet history. We attribute ALL current claimable to the legacy row
+    // below, which keeps the per-coin earned numbers honest (matches what
+    // the FeeEscrow contract reports for each pool) at the cost of showing
+    // claimable as a single bucket rather than per coin.
+    for (const coin of newPmCoins) {
+      const key = coin.tokenAddress.toLowerCase();
+      const earned = perCoin.get(key) ?? 0n;
+      if (earned === 0n) continue;
+
+      fees.push({
+        tokenAddress: key,
+        tokenSymbol: coin.symbol,
+        chain: 'base',
+        platform: 'flaunch',
+        totalEarned: earned.toString(),
+        totalClaimed: earned.toString(),
+        totalUnclaimed: '0',
+        totalEarnedUsd: null,
+        royaltyBps: null,
+      });
     }
 
-    if (totalEarned === 0n) return [];
+    // Legacy row: holds the wallet-wide current claimable.
+    //
+    // Emitted when:
+    //   - The wallet has any claimable balance (could be from old or new PM).
+    //   - OR the wallet has old-PM coins but no per-coin breakdown is available
+    //     (compatibility with the pre-2026-04-21 single-row UX).
+    //
+    // The earned value here is the claimable amount itself: from the user's
+    // perspective the legacy row represents "money currently sitting in the
+    // RevenueManager waiting to be claimed", so earned == unclaimed and
+    // claimed == 0 for that bucket. The per-coin rows above already
+    // accounted for what was historically claimed.
+    if (claimable > 0n || (oldPmCoins.length > 0 && fees.length === 0)) {
+      fees.push({
+        tokenAddress: LEGACY_TOKEN_ID,
+        tokenSymbol: 'ETH',
+        chain: 'base',
+        platform: 'flaunch',
+        totalEarned: claimable.toString(),
+        totalClaimed: '0',
+        totalUnclaimed: claimable.toString(),
+        totalEarnedUsd: null,
+        royaltyBps: null,
+      });
+    }
 
-    const totalClaimed = totalEarned - claimable;
-
-    const fee: TokenFee = {
-      tokenAddress: SYNTHETIC_TOKEN_ID,
-      tokenSymbol: 'ETH',
-      chain: 'base',
-      platform: 'flaunch',
-      totalEarned: totalEarned.toString(),
-      totalClaimed: totalClaimed.toString(),
-      totalUnclaimed: claimable.toString(),
-      totalEarnedUsd: null,
-      royaltyBps: null,
-    };
-    return [fee];
+    return fees;
   },
 
   async getLiveUnclaimedFees(wallet: string, signal?: AbortSignal): Promise<TokenFee[]> {
