@@ -56,7 +56,10 @@ function emit(entry: LogEntry): void {
     else console.log(prefix, msg, rest);
   }
 
-  // Send errors and warnings to Sentry as breadcrumbs
+  // Send errors and warnings to Sentry as breadcrumbs so any later exception
+  // in the request captures context. Breadcrumbs alone vanish if nothing
+  // throws — for level==='error' also emit an event so the error is visible
+  // in Sentry even without a paired exception.
   if (level === 'error' || level === 'warn') {
     Sentry.addBreadcrumb({
       category: module,
@@ -64,6 +67,22 @@ function emit(entry: LogEntry): void {
       level: level === 'error' ? 'error' : 'warning',
       data: rest,
     });
+  }
+
+  if (level === 'error') {
+    const err = rest.err;
+    if (err instanceof Error) {
+      Sentry.captureException(err, {
+        tags: { module },
+        contexts: { log: { msg, ...rest } },
+      });
+    } else {
+      Sentry.captureMessage(msg, {
+        level: 'error',
+        tags: { module },
+        contexts: { log: rest },
+      });
+    }
   }
 }
 
