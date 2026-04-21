@@ -1,4 +1,4 @@
-export type Platform = 'bags' | 'clanker' | 'pump' | 'zora' | 'bankr' | 'believe' | 'revshare' | 'coinbarrel' | 'raydium';
+export type Platform = 'bags' | 'clanker' | 'pump' | 'zora' | 'bankr' | 'believe' | 'revshare' | 'coinbarrel' | 'raydium' | 'flaunch' | 'flap';
 export type Chain = 'sol' | 'base' | 'eth' | 'bsc';
 export type IdentityProvider = 'twitter' | 'github' | 'farcaster' | 'tiktok' | 'wallet';
 export type ClaimStatus = 'claimed' | 'unclaimed' | 'partially_claimed' | 'auto_distributed';

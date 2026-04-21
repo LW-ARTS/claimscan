@@ -1,0 +1,5 @@
+{
+  "wallet": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+  "note": "Public Base wallet (vitalik.eth) holding 20+ Memestream NFTs on Flaunch. RevenueManager.balances(wallet) drifts with claims and inflows; test does a live parity check against a same-run on-chain read rather than hardcoding a number. If the wallet's balances() drops to 0 permanently, replace with another Flaunch creator holding at least 1 Memestream NFT with balances > 0.",
+  "source": "Discovered 2026-04-20 via GET https://dev-api.flayerlabs.xyz/v1/base/tokens?ownerAddress=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 which returned 20+ coins. See .planning/phases/11-flaunch-adapter-base/11-05-SUMMARY.md for discovery context and parity-check fallback guidance."
+}

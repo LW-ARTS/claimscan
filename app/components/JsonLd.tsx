@@ -36,7 +36,7 @@ export function JsonLd() {
         name: 'ClaimScan',
         url: 'https://claimscan.tech',
         description:
-          'ClaimScan is a free cross-chain DeFi fee tracker that helps crypto creators find and claim uncollected earnings across 9 launchpads on Solana, Base, Ethereum, and BNB Chain. Approximately 40% of creator fees go unclaimed.',
+          'ClaimScan is a free cross-chain DeFi fee tracker that helps crypto creators find and claim uncollected earnings across 10 launchpads on Solana, Base, Ethereum, and BNB Chain. Approximately 40% of creator fees go unclaimed.',
         applicationCategory: 'FinanceApplication',
         operatingSystem: 'All',
         featureList: [

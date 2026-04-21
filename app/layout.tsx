@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     siteName: 'ClaimScan',
     title: 'ClaimScan | Track Unclaimed Creator Fees Across DeFi',
     description:
-      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 9 launchpads on Solana, Base, and BNB Chain.',
+      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 10 launchpads on Solana, Base, and BNB Chain.',
     images: [
       {
         url: '/opengraph-image.png',
@@ -78,7 +78,7 @@ export const metadata: Metadata = {
     creator: '@lwartss',
     title: 'ClaimScan | Track Unclaimed Creator Fees Across DeFi',
     description:
-      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 9 launchpads.',
+      'Paste any @handle or wallet. See what you earned, claimed, and left on the table across 10 launchpads.',
     images: [
       {
         url: '/opengraph-image.png',

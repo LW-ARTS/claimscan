@@ -2,7 +2,7 @@
 
 Cross-chain creator fee scanner + claimer + paid intelligence API for DeFi launchpads on **Solana, Base, Ethereum, and BNB Chain**.
 
-Paste any Twitter handle, GitHub username, Farcaster name, or wallet address — ClaimScan resolves the identity, aggregates earned fees from 9 launchpads (Pump.fun, Bags.fm, Clanker on Base+BSC, Zora on Base+ETH, Bankr, Believe, RevShare, Coinbarrel, Raydium), and lets you claim them directly from the UI.
+Paste any Twitter handle, GitHub username, Farcaster name, or wallet address — ClaimScan resolves the identity, aggregates earned fees from 10 launchpads (Pump.fun, Bags.fm, Clanker on Base+BSC, Zora on Base+ETH, Bankr, Believe, RevShare, Coinbarrel, Raydium, Flaunch on Base), and lets you claim them directly from the UI.
 
 **Live:** [claimscan.tech](https://claimscan.tech) · **Showcase:** [github.com/LW-ARTS/claimscan](https://github.com/LW-ARTS/claimscan)
 

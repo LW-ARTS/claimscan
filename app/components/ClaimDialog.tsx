@@ -54,6 +54,7 @@ export function ClaimDialog({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const mql = window.matchMedia('(max-width: 767px)');
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reading external media-query state on mount; useSyncExternalStore refactor deferred
     setIsMobile(mql.matches);
     function onChange(e: MediaQueryListEvent) { setIsMobile(e.matches); }
     mql.addEventListener('change', onChange);
@@ -99,6 +100,7 @@ export function ClaimDialog({
   useEffect(() => {
     if (!open || !connectedWallet) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting error state before triggering the fetch request; moving into .finally() would break dependency order
     setBalanceError(false);
     // Use server-side RPC (has Helius key) instead of client-side public RPC
     fetch(`/api/balance?wallet=${encodeURIComponent(connectedWallet)}`)

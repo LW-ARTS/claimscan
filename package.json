@@ -48,7 +48,8 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.5.0",
-    "viem": "^2.47.0"
+    "viem": "^2.47.0",
+    "zod": "^4.3.6"
   },
   "overrides": {
     "bigint-buffer": "file:./patches/bigint-buffer"
