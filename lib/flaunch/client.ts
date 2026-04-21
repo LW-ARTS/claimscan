@@ -22,6 +22,7 @@ const TokenListItemSchema = z.object({
   name: z.string(),
   marketCapETH: z.string(),
   createdAt: z.number(),
+  positionManager: z.string().regex(HEX40).optional(),
 });
 
 const TokenListSchema = z.object({

@@ -321,6 +321,36 @@ describe('computeFeeUsd', () => {
     expect(result).toBeCloseTo(600, 0);
     expect(result).not.toBeCloseTo(3000, 0);
   });
+
+  // ─── Flaunch (Base, native ETH via RevenueManager + FeeEscrow) ───
+
+  it('computes USD for Flaunch rows on Base using ETH price', () => {
+    // 0.2 ETH earned, 18 decimals, ETH price $3000 → $600
+    const fee = {
+      total_earned_usd: null,
+      total_unclaimed: '0',
+      total_earned: '200000000000000000', // 0.2 ETH in wei
+      chain: 'base',
+      platform: 'flaunch',
+      token_address: 'BASE:flaunch-revenue',
+    };
+    const result = computeFeeUsd(fee, solPrice, ethPrice);
+    expect(result).toBeCloseTo(600, 0);
+  });
+
+  it('falls back to totalUnclaimed when totalEarned is 0 for Flaunch', () => {
+    // Old-PM-only wallet path: totalEarned undefined/0 but unclaimed populated
+    const fee = {
+      total_earned_usd: null,
+      total_unclaimed: '100000000000000000', // 0.1 ETH
+      total_earned: '0',
+      chain: 'base',
+      platform: 'flaunch',
+      token_address: 'BASE:flaunch-revenue',
+    };
+    const result = computeFeeUsd(fee, solPrice, ethPrice);
+    expect(result).toBeCloseTo(300, 0); // 0.1 * 3000
+  });
 });
 
 // ─── toUsdValue ─────────────────────────────────────────

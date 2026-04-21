@@ -8,8 +8,9 @@ import type {
 import type { IdentityProvider } from '@/lib/supabase/types';
 import { asBaseAddress } from '@/lib/chains/types';
 import { isValidEvmAddress, normalizeEvmAddress } from '@/lib/chains/base';
-import { readFlaunchBalances } from '@/lib/chains/flaunch-reads';
+import { readFlaunchBalances, readFlaunchHistoricalEarnings } from '@/lib/chains/flaunch-reads';
 import { fetchCoinsByCreator } from '@/lib/flaunch/client';
+import { FLAUNCH_TAKEOVER_POSITION_MANAGER } from '@/lib/constants-evm';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('flaunch');
@@ -24,6 +25,8 @@ const log = createLogger('flaunch');
 // ═══════════════════════════════════════════════
 
 const SYNTHETIC_TOKEN_ID = 'BASE:flaunch-revenue';
+
+const TAKEOVER_PM = FLAUNCH_TAKEOVER_POSITION_MANAGER.toLowerCase();
 
 function isEvmAddress(s: string): s is `0x${string}` {
   return /^0x[a-fA-F0-9]{40}$/.test(s);
@@ -75,10 +78,6 @@ export const flaunchAdapter: PlatformAdapter = {
     if (!isEvmAddress(normalized)) return [];
     const recipient = asBaseAddress(normalized);
 
-    // Two-step: confirm the wallet holds at least one Flaunch coin, then
-    // read the aggregated ETH claimable. Skipping on zero coins saves an
-    // unnecessary RPC call. Signal only threads into the REST path; viem 2.x
-    // readContract does not expose a per-call AbortSignal.
     const list = await fetchCoinsByCreator(recipient, signal);
     if ('kind' in list) {
       log.warn('list_failed', { kind: list.kind, wallet: wallet.slice(0, 10) });
@@ -87,20 +86,66 @@ export const flaunchAdapter: PlatformAdapter = {
     if (list.data.length === 0) return [];
     if (signal?.aborted) return [];
 
-    const claimable = await readFlaunchBalances(recipient);
-    if (claimable === 0n) return [];
+    // Split tokens by PM version. Only Takeover.fun (new PM) exposes
+    // FeeEscrow.totalFeesAllocated for historical earned tracking.
+    const newPmAddresses = list.data
+      .filter((t) => t.positionManager?.toLowerCase() === TAKEOVER_PM)
+      .map((t) => asBaseAddress(t.tokenAddress as `0x${string}`));
+
+    // Parallelize: claimable read + historical earnings read (if new PM tokens exist)
+    const [claimable, earningsResult] = await Promise.all([
+      readFlaunchBalances(recipient, signal),
+      newPmAddresses.length > 0
+        ? readFlaunchHistoricalEarnings(newPmAddresses, signal)
+        : Promise.resolve({ kind: 'ok' as const, total: 0n }),
+    ]);
+
+    // Bail on degraded or errored historical reads. fee-sync.ts has 'flaunch'
+    // in PRUNE_EXEMPT_PLATFORMS, so returning [] keeps the previously-cached
+    // row in the DB instead of flapping the user-visible value down.
+    if (earningsResult.kind === 'error' || earningsResult.kind === 'degraded') {
+      log.warn('historical_earnings_skipped', {
+        kind: earningsResult.kind,
+        wallet: wallet.slice(0, 10),
+        successRatio:
+          earningsResult.kind === 'degraded' ? earningsResult.successRatio : null,
+        newPmTokenCount: newPmAddresses.length,
+      });
+      return [];
+    }
+
+    const totalEarnedFromEscrow = earningsResult.total;
+
+    let totalEarned: bigint;
+    if (newPmAddresses.length > 0) {
+      // Floor totalEarned at claimable. Load-bearing for two cases:
+      //   1. A late-block skew where claimable was read one block after the
+      //      escrow sum, so claimable can briefly exceed totalEarnedFromEscrow.
+      //   2. Mixed-PM wallets: claimable is wallet-wide (includes old PM coins),
+      //      while totalEarnedFromEscrow only covers Takeover.fun pools. Without
+      //      this floor, totalClaimed = totalEarned - claimable could go negative
+      //      and produce an absurd "claimed more than earned" stat.
+      totalEarned = totalEarnedFromEscrow > claimable ? totalEarnedFromEscrow : claimable;
+    } else {
+      // Old PM only: FeeEscrow historical reads not available. Fall back to showing
+      // just the current claimable amount (totalClaimed cannot be computed).
+      if (claimable === 0n) return [];
+      totalEarned = claimable;
+    }
+
+    if (totalEarned === 0n) return [];
+
+    const totalClaimed = totalEarned - claimable;
 
     const fee: TokenFee = {
       tokenAddress: SYNTHETIC_TOKEN_ID,
       tokenSymbol: 'ETH',
       chain: 'base',
       platform: 'flaunch',
-      // v1: totalClaimed is not tracked (requires event scan on RevenueManager.Claimed).
-      // balances() = cumulative unclaimed-since-last-claim, so totalEarned === totalUnclaimed.
-      totalEarned: claimable.toString(),
-      totalClaimed: '0',
+      totalEarned: totalEarned.toString(),
+      totalClaimed: totalClaimed.toString(),
       totalUnclaimed: claimable.toString(),
-      totalEarnedUsd: null,    // price waterfall resolves ETH price downstream
+      totalEarnedUsd: null,
       royaltyBps: null,
     };
     return [fee];

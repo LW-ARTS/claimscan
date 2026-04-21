@@ -18,6 +18,7 @@ export interface FlaunchTokenListItem {
   name: string;
   marketCapETH: string;
   createdAt: number;
+  positionManager?: string;
 }
 
 export interface FlaunchTokenListResponse {

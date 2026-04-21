@@ -195,6 +195,7 @@ const NATIVE_TOKEN_FEE_PLATFORMS = new Set([
   'coinbarrel', // SOL from Meteora DAMM pools
   'bags',       // SOL (lamports) from claimable-positions
   'bankr',      // WETH (wei) from Uniswap V3 pool fees (WETH ≈ ETH)
+  'flaunch',    // ETH (wei) from RevenueManager + FeeEscrow (Base)
 ]);
 
 /**
