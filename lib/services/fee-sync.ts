@@ -97,11 +97,12 @@ export async function aggregateFees(
  * only returns unclaimed > 0 entries, so a vanish means "they got claimed",
  * not "they were misattributed". Pruning would lose claim history.
  *
- * Flaunch emits exactly ONE synthetic TokenFee per wallet (`BASE:flaunch-revenue`)
- * aggregated from `RevenueManager.balances(wallet)`. The adapter swallows every
- * error path (rate_limited, schema_drift, network_error, RPC failure) to `[]`
- * while `fetchAllFees` still marks flaunch as synced. Without this exemption,
- * a transient blip during cron silently deletes the single fee_records row. */
+ * Flaunch emits N per-coin TokenFees (one per Takeover.fun coin keyed by the
+ * real 0x token address) plus optionally one `BASE:flaunch-legacy` aggregate
+ * row holding wallet-wide claimable. The adapter swallows every error path
+ * (rate_limited, schema_drift, network_error, RPC failure, degraded multicall)
+ * to `[]` while `fetchAllFees` still marks flaunch as synced. Without this
+ * exemption, a transient blip during cron silently deletes all per-coin rows. */
 const PRUNE_EXEMPT_PLATFORMS = new Set<string>(['bags', 'flaunch']);
 
 /** Pure helper: identify rows that should be deleted from `fee_records`

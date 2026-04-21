@@ -31,6 +31,11 @@ interface TokenFeeTableProps {
  * delimited token so the label stays a clean coin symbol.
  */
 function tokenDisplay(fee: FeeRecord): { label: string; badge: string } {
+  // Synthetic Flaunch row holding wallet-wide claimable not attributable to a
+  // specific coin (mixed-PM wallets, or fees from old PositionManager).
+  if (fee.token_address === 'BASE:flaunch-legacy') {
+    return { label: 'Flaunch (claimable)', badge: 'F' };
+  }
   const cleaned = (fee.token_symbol || '').replace(/[^\w\s\-\.]/g, '').trim();
   const symbol = cleaned.split(/\s+/)[0]?.slice(0, 20) ?? '';
   if (symbol) {
