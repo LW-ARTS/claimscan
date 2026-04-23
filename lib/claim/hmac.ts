@@ -2,6 +2,18 @@ import 'server-only';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { CLAIM_HMAC_MAX_AGE_MINUTES } from '@/lib/constants';
 
+/**
+ * Scope prefix for fee-log tokens. Applied to the `claimAttemptId` input of
+ * generateConfirmToken / verifyConfirmToken so a status-transition token
+ * cannot be replayed against the feeTx branch (and vice versa). Both sides
+ * must agree on the prefix — don't hand-type `'fee:'` at call sites.
+ */
+export const FEE_TOKEN_SCOPE_PREFIX = 'fee:';
+
+export function feeScopedAttemptId(attemptId: string): string {
+  return `${FEE_TOKEN_SCOPE_PREFIX}${attemptId}`;
+}
+
 function getSecret(): string {
   const secret = process.env.CLAIM_HMAC_SECRET
     || (process.env.NODE_ENV !== 'production' ? (() => {

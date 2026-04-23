@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { resolveSafeHost, resolveInternalProtocol } from '@/lib/internal-fetch';
 
 export const maxDuration = 60;
 
@@ -34,22 +35,15 @@ export async function GET(request: Request) {
   const safeHandle = handle.replace(/[^a-zA-Z0-9_\-\.]/g, '_').slice(0, 64);
 
   try {
-    // Build the absolute URL to the OG image route
-    // H-1: Validate host against allowlist to prevent SSRF via env var misconfiguration
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://claimscan.tech';
-    const host = process.env.VERCEL_URL ?? new URL(appUrl).host;
-    // L-01: tightened regex requires hyphen separator after "claimscan" so we
-    // don't match attacker-owned projects like claimscanevil.vercel.app.
-    if (
-      host !== 'claimscan.tech' &&
-      host !== 'www.claimscan.tech' &&
-      !(/^claimscan(-[a-z0-9-]+)?\.vercel\.app$/.test(host))
-    ) {
-      console.error(`[flex] SSRF blocked: resolved host "${host}" is not in allowlist`);
+    // Build the absolute URL to the OG image route.
+    // H-1/L-01: host allowlist lives in lib/internal-fetch.ts and is shared
+    // with /api/og-download so both routes stay in lockstep.
+    const host = resolveSafeHost();
+    if (!host) {
+      console.error('[flex] SSRF blocked: resolved host is not in allowlist');
       return NextResponse.json({ error: 'Internal error' }, { status: 500 });
     }
-    const ogUrl = `${protocol}://${host}/${encodeURIComponent(handle)}/opengraph-image`;
+    const ogUrl = `${resolveInternalProtocol()}://${host}/${encodeURIComponent(handle)}/opengraph-image`;
 
     const response = await fetch(ogUrl, {
       signal: AbortSignal.timeout(15000),
