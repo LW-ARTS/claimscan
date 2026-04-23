@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveSafeHost, resolveInternalProtocol } from '@/lib/internal-fetch';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ handle: string }> }
 ) {
   const { handle } = await params;
@@ -16,9 +17,15 @@ export async function GET(
     : ghMatch ? `gh:${ghMatch[1]}`
     : decoded.replace(/[^a-zA-Z0-9_\-\.:]/g, '').slice(0, 67);
 
-  // Fetch the OG image from the opengraph-image route
-  const origin = request.nextUrl.origin;
-  const ogRes = await fetch(`${origin}/${encodeURIComponent(ogSlug)}/opengraph-image`, {
+  // H-1 parity with /api/flex: resolve host from env allowlist, never from
+  // the untrusted request origin (which can be influenced by X-Forwarded-Host
+  // on misconfigured proxies).
+  const host = resolveSafeHost();
+  if (!host) {
+    console.error('[og-download] SSRF blocked: resolved host not in allowlist');
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+  const ogRes = await fetch(`${resolveInternalProtocol()}://${host}/${encodeURIComponent(ogSlug)}/opengraph-image`, {
     signal: AbortSignal.timeout(20_000),
   });
 

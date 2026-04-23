@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/nextjs';
 import { isValidSolanaAddress, withRpcFallback } from '@/lib/chains/solana';
 import { createServiceClient } from '@/lib/supabase/service';
 import { invalidatePositionsCache } from '@/lib/platforms/bags-api';
-import { verifyConfirmToken } from '@/lib/claim/hmac';
+import { feeScopedAttemptId, verifyConfirmToken } from '@/lib/claim/hmac';
 import { CLAIMSCAN_FEE_WALLET, CLAIM_RECOVERY_WINDOW_MS, CLAIM_HMAC_MAX_AGE_MINUTES, SOLANA_FINALIZATION_WAIT_MS } from '@/lib/constants';
 import type { ClaimAttemptStatus } from '@/lib/supabase/types';
 import { trackClaimEvent, trackFeeCollection } from '@/lib/monitoring';
@@ -169,10 +169,30 @@ export async function POST(request: Request) {
       console.warn('[claim/confirm] Fee tx rejected: missing HMAC fields', { hasFeeConfirmToken: !!feeConfirmToken, hasFeeAttemptId: !!feeAttemptId });
       return NextResponse.json({ ok: true });
     }
-    if (!verifyConfirmToken(feeConfirmToken, feeAttemptId, feeWallet)) {
+    // Fix-4: fee tokens use the `fee:` scope so a per-attempt status token
+    // cannot be replayed here and vice versa.
+    if (!verifyConfirmToken(feeConfirmToken, feeScopedAttemptId(feeAttemptId), feeWallet)) {
       console.warn('[claim/confirm] Fee tx rejected: HMAC verification failed', { feeAttemptId, feeWallet });
       return NextResponse.json({ ok: true });
     }
+
+    // Fix-2: verify the confirmToken was minted for a claim attempt OWNED by
+    // `feeWallet`. Without this, an attacker with a valid fee token for their
+    // own attempt could submit someone else's tx_signature and credit
+    // themselves with the victim's on-chain fee payment.
+    {
+      const supabase = createServiceClient();
+      const { data: attempt, error: attemptErr } = await supabase
+        .from('claim_attempts')
+        .select('wallet_address')
+        .eq('id', feeAttemptId)
+        .maybeSingle();
+      if (attemptErr || !attempt || attempt.wallet_address !== feeWallet) {
+        console.warn('[claim/confirm] Fee tx rejected: attempt wallet mismatch or missing', { feeAttemptId, feeWallet });
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     let feeLamports: string = rawFeeLamports;
     const parsedFee = BigInt(feeLamports);
     if (parsedFee <= 0n) {
@@ -192,6 +212,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true }); // Tx doesn't exist or failed on-chain
       }
       const accountKeys = tx.transaction.message.getAccountKeys();
+      // Fix-2: the fee payer (first static account key) MUST be the caller's
+      // wallet. Otherwise an attacker could submit any tx_signature where
+      // CLAIMSCAN_FEE_WALLET is a recipient (e.g. someone else's legit fee)
+      // and be credited with that payment in claim_fees.
+      if (accountKeys.staticAccountKeys[0]?.toBase58() !== feeWallet) {
+        console.warn('[claim/confirm] Fee tx rejected: payer is not feeWallet', { feeAttemptId, feeWallet });
+        return NextResponse.json({ ok: true });
+      }
       const feeWalletIdx = accountKeys.staticAccountKeys.findIndex(
         (key) => key.toBase58() === CLAIMSCAN_FEE_WALLET
       );
@@ -221,10 +249,13 @@ export async function POST(request: Request) {
           tx_signature: feeSig,
           fee_lamports: '0',
           verified: false,
+          claim_attempt_id: feeAttemptId, // Fix-2: populate FK added in migration 014
         });
       } catch (insertErr) {
         console.error('[claim/confirm] Failed to insert unverified fee record:', insertErr instanceof Error ? insertErr.message : insertErr);
       }
+      // Intentionally DO NOT consume the HMAC token on RPC failure — the user
+      // should be able to retry once the cron reconciler catches up.
       return NextResponse.json({ ok: true, pendingVerification: true });
     }
 
@@ -233,12 +264,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    // Fix-2: single-use token consumption — prevents replay of a valid fee
+    // token to insert duplicate rows or attribute multiple on-chain payments
+    // to the same token. Only applied on the verified success path so RPC
+    // outages don't lock the user out of retrying.
+    const feeTokenResult = await consumeHmacToken(feeConfirmToken);
+    if (feeTokenResult === 'redis_outage') {
+      return NextResponse.json({ error: 'Service temporarily unavailable, please retry' }, { status: 503 });
+    }
+    if (feeTokenResult === 'replay') {
+      return NextResponse.json({ ok: true }); // silent — already logged
+    }
+
     const supabase = createServiceClient();
     const { error: insertError } = await supabase.from('claim_fees').insert({
       wallet_address: feeWallet,
       tx_signature: feeSig,
       fee_lamports: feeLamports,
       verified,
+      claim_attempt_id: feeAttemptId, // Fix-2: populate FK added in migration 014
     });
     if (insertError && insertError.code !== '23505') {
       console.error('[claim/confirm] Fee log insert FAILED (revenue loss):', insertError.message, { sig: feeSig, wallet: feeWallet });
@@ -285,14 +329,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid confirm token' }, { status: 403 });
   }
 
-  // Single-use enforcement (SS-004): prevent HMAC token replay within 15-min window
-  const tokenResult = await consumeHmacToken(confirmToken);
-  if (tokenResult === 'redis_outage') {
-    return NextResponse.json({ error: 'Service temporarily unavailable, please retry' }, { status: 503 });
-  }
-  if (tokenResult === 'replay') {
-    return NextResponse.json({ error: 'Token already used' }, { status: 409 });
-  }
+  // Single-use is only enforced on TERMINAL transitions (confirmed / finalized)
+  // now — see below. Non-terminal transitions (signing / submitted) are
+  // idempotent so the client can reuse one confirmToken across the flow
+  // without tripping replay protection. The remaining guards still hold:
+  //   • verifyConfirmToken (HMAC + wallet binding + 15-min age)
+  //   • Fix-1 SIWS ownership gate in /api/claim/bags
+  //   • VALID_TRANSITIONS forward-only state machine
+  //   • Optimistic lock on current status (eq status, attempt.status)
 
   const supabase = createServiceClient();
 
@@ -338,6 +382,22 @@ export async function POST(request: Request) {
         { error: 'Recovery window expired — start a new claim' },
         { status: 410 }
       );
+    }
+  }
+
+  // Single-use enforcement on TERMINAL transitions only. The client reuses
+  // the same confirmToken across signing → submitted → confirmed, so the
+  // previous universal consume silently broke the 2nd/3rd calls. But
+  // transitions INTO `confirmed`/`finalized` are terminal and naturally
+  // one-shot, so consuming there still protects against an attacker with
+  // a leaked token racing a confirmed update with a junk txSignature.
+  if (validatedStatus === 'confirmed' || validatedStatus === 'finalized') {
+    const tokenResult = await consumeHmacToken(confirmToken);
+    if (tokenResult === 'redis_outage') {
+      return NextResponse.json({ error: 'Service temporarily unavailable, please retry' }, { status: 503 });
+    }
+    if (tokenResult === 'replay') {
+      return NextResponse.json({ error: 'Token already used' }, { status: 409 });
     }
   }
 

@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { isValidSolanaAddress } from '@/lib/chains/solana';
 import { createServiceClient } from '@/lib/supabase/service';
 import { generateBatchClaimTransactions } from '@/lib/platforms/bags-claim';
-import { generateConfirmToken } from '@/lib/claim/hmac';
+import { feeScopedAttemptId, generateConfirmToken } from '@/lib/claim/hmac';
+import { verifyWalletProof } from '@/lib/claim/wallet-proof';
+import { computeMintsHashPrefix } from '@/lib/claim/wallet-proof-msg';
 import {
   CLAIMSCAN_FEE_BPS,
   MIN_FEE_LAMPORTS,
@@ -28,7 +30,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
   }
 
-  let body: { wallet?: string; tokenMints?: string[]; cfTurnstileToken?: string };
+  let body: {
+    wallet?: string;
+    tokenMints?: string[];
+    fullTokenMints?: string[];
+    cfTurnstileToken?: string;
+    walletProofMessage?: string;
+    walletProofSignature?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -66,6 +75,54 @@ export async function POST(request: Request) {
   const turnstile = await verifyTurnstile(body.cfTurnstileToken ?? null, ip);
   if (!turnstile.success) {
     return NextResponse.json({ error: turnstile.error ?? 'Captcha verification failed' }, { status: 403 });
+  }
+
+  // P1 fix: require the caller to prove control of `wallet` via signMessage.
+  // Without this, anyone who passes Turnstile could open claim_attempts for a
+  // third-party wallet and hold the victim's MAX_ACTIVE_CLAIMS_PER_WALLET
+  // budget or lock specific mints with "Claim already in progress".
+  const { walletProofMessage, walletProofSignature, fullTokenMints } = body;
+  if (
+    !walletProofMessage || typeof walletProofMessage !== 'string' || walletProofMessage.length > 500 ||
+    !walletProofSignature || typeof walletProofSignature !== 'string' || walletProofSignature.length > 200
+  ) {
+    return NextResponse.json({ error: 'Wallet ownership proof is required' }, { status: 403 });
+  }
+  // The proof covers the FULL mint set the user selected, so we must verify
+  // against that set — not against a single chunk. Sanity-bound the array
+  // (creators with pathological fanout shouldn't force unbounded hashing)
+  // and require the current chunk to be a subset.
+  if (
+    !Array.isArray(fullTokenMints) ||
+    fullTokenMints.length === 0 ||
+    fullTokenMints.length > 200 ||
+    fullTokenMints.length < tokenMints.length
+  ) {
+    return NextResponse.json({ error: 'Invalid wallet ownership proof' }, { status: 403 });
+  }
+  const fullSet = new Set<string>();
+  for (const mint of fullTokenMints) {
+    if (typeof mint !== 'string' || !isValidSolanaAddress(mint)) {
+      return NextResponse.json({ error: 'Invalid wallet ownership proof' }, { status: 403 });
+    }
+    fullSet.add(mint);
+  }
+  for (const mint of tokenMints) {
+    if (!fullSet.has(mint)) {
+      return NextResponse.json({ error: 'Invalid wallet ownership proof' }, { status: 403 });
+    }
+  }
+  const expectedMintsHashPrefix = await computeMintsHashPrefix(fullTokenMints);
+  const proofErr = await verifyWalletProof({
+    message: walletProofMessage,
+    signature: walletProofSignature,
+    wallet,
+    expectedMintsHashPrefix,
+  });
+  if (proofErr) {
+    // Log the reason server-side but return a generic error to avoid oracle-style probing.
+    console.warn(`[claim/bags] Wallet proof rejected: ${proofErr} (wallet=${wallet.slice(0, 6)}...${wallet.slice(-4)})`);
+    return NextResponse.json({ error: 'Invalid wallet ownership proof' }, { status: 403 });
   }
 
   const supabase = createServiceClient();
@@ -321,9 +378,21 @@ export async function POST(request: Request) {
     trackClaimEvent('fee_skipped', { wallet, platform: 'bags', mintCount: transactions.length });
   }
 
+  // P2/Fix-4: mint a dedicated HMAC token for the single feeTx POST so the
+  // fee path doesn't collide with the per-attempt confirmToken (which the
+  // client reuses across status transitions). The `fee:` scope prefix on
+  // the HMAC input means a status-transition token cannot be replayed as a
+  // fee token and vice versa — the server verifies with the same prefix.
+  const feeAttemptIdForAuth = transactions[0]?.claimAttemptId;
+  const feeConfirmToken = feeAttemptIdForAuth
+    ? generateConfirmToken(feeScopedAttemptId(feeAttemptIdForAuth), wallet)
+    : null;
+
   return NextResponse.json({
     transactions,
     feeLamports,
+    feeConfirmToken,
+    feeAttemptIdForAuth,
     failedMints: [
       ...skippedMints,
       ...results

@@ -318,6 +318,7 @@ export interface Database {
           fee_lamports: string;
           verified: boolean;
           created_at: string;
+          claim_attempt_id: string | null;
         };
         Insert: {
           id?: string;
@@ -326,6 +327,7 @@ export interface Database {
           fee_lamports: string;
           verified?: boolean;
           created_at?: string;
+          claim_attempt_id?: string | null;
         };
         Update: {
           id?: string;
@@ -334,6 +336,7 @@ export interface Database {
           fee_lamports?: string;
           verified?: boolean;
           created_at?: string;
+          claim_attempt_id?: string | null;
         };
         Relationships: [];
       };

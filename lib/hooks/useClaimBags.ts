@@ -15,6 +15,7 @@ import {
   CLAIMSCAN_FEE_WALLET,
   MIN_FEE_LAMPORTS,
 } from '@/lib/constants';
+import { buildProofMessage, computeMintsHashPrefix } from '@/lib/claim/wallet-proof-msg';
 
 /**
  * Deserialize a Bags API transaction string into a VersionedTransaction.
@@ -175,7 +176,7 @@ async function failEntries(entries: TxEntry[], wallet: string, reason: string): 
 
 export function useClaimBags(): UseClaimBagsReturn {
   const { connection } = useConnection();
-  const { publicKey, signAllTransactions } = useWallet();
+  const { publicKey, signAllTransactions, signMessage } = useWallet();
   const [phase, setPhase] = useState<ClaimPhase>('idle');
   const [progress, setProgress] = useState({ completed: 0, failed: 0, total: 0 });
   const [results, setResults] = useState<ClaimResult[]>([]);
@@ -207,7 +208,7 @@ export function useClaimBags(): UseClaimBagsReturn {
   }, []);
 
   const execute = useCallback(async (tokenMints: string[], cfTurnstileToken?: string) => {
-    if (!publicKey || !signAllTransactions) {
+    if (!publicKey || !signAllTransactions || !signMessage) {
       setError('Wallet not connected');
       return;
     }
@@ -224,6 +225,29 @@ export function useClaimBags(): UseClaimBagsReturn {
     activeEntriesRef.current = [];
 
     try {
+      // P1 fix: prove control of the wallet BEFORE the server opens any
+      // claim_attempts. One signMessage popup up front — subsequent chunks
+      // within this batch reuse the same proof, which is bound to the full
+      // mint set via the sha256 prefix.
+      let walletProofMessage: string;
+      let walletProofSignature: string;
+      try {
+        const mintsHashPrefix = await computeMintsHashPrefix(tokenMints);
+        walletProofMessage = buildProofMessage({
+          wallet: walletAddress,
+          mintsHashPrefix,
+          issuedAt: new Date(),
+        });
+        const sigBytes = await signMessage(new TextEncoder().encode(walletProofMessage));
+        walletProofSignature = btoa(String.fromCharCode(...sigBytes));
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : 'Wallet signing rejected';
+        const isAbort = reason.includes('reject') || reason.includes('denied') || reason.includes('cancel');
+        setError(isAbort ? 'Wallet signature required to claim' : reason);
+        setPhase('complete');
+        return;
+      }
+
       // 1. Fetch claim transactions from backend — chunk into API_BATCH_SIZE
       //    to fit each request within Vercel Hobby's 10s serverless limit.
       const allTransactions: Array<{
@@ -234,6 +258,10 @@ export function useClaimBags(): UseClaimBagsReturn {
       }> = [];
       const allFailedMints: Array<{ tokenMint: string; error: string }> = [];
       let serverFeeLamports = 0n; // Accumulated from server responses
+      // Fix-4: dedicated fee token, minted server-side per response. We take
+      // the first chunk's token — it's only used for the single feeTx POST.
+      let batchFeeConfirmToken: string | null = null;
+      let batchFeeAttemptIdForAuth: string | null = null;
 
       for (let ci = 0; ci < tokenMints.length; ci += API_BATCH_SIZE) {
         if (controller.signal.aborted) return;
@@ -242,7 +270,18 @@ export function useClaimBags(): UseClaimBagsReturn {
         const res = await signedFetch('/api/claim/bags', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wallet: walletAddress, tokenMints: chunk, ...(cfTurnstileToken ? { cfTurnstileToken } : {}) }),
+          body: JSON.stringify({
+            wallet: walletAddress,
+            tokenMints: chunk,
+            // The SIWS proof is bound to a hash of the FULL mint set that the
+            // user selected. Each chunk re-sends the full set so the server
+            // can rebuild the same hash and verify the same signature against
+            // it — while still restricting attempt creation to the chunk.
+            fullTokenMints: tokenMints,
+            walletProofMessage,
+            walletProofSignature,
+            ...(cfTurnstileToken ? { cfTurnstileToken } : {}),
+          }),
           signal: controller.signal,
         });
 
@@ -258,12 +297,20 @@ export function useClaimBags(): UseClaimBagsReturn {
         const batchData = await res.json() as {
           transactions: typeof allTransactions;
           feeLamports: string;
+          feeConfirmToken: string | null;
+          feeAttemptIdForAuth: string | null;
           failedMints: typeof allFailedMints;
         };
         allTransactions.push(...batchData.transactions);
         allFailedMints.push(...batchData.failedMints);
         if (batchData.feeLamports && /^\d+$/.test(batchData.feeLamports)) {
           serverFeeLamports += BigInt(batchData.feeLamports);
+        }
+        // Keep the first non-null pair we see — the fee tx is a single
+        // on-chain transfer regardless of how many chunks we fetched.
+        if (!batchFeeConfirmToken && batchData.feeConfirmToken && batchData.feeAttemptIdForAuth) {
+          batchFeeConfirmToken = batchData.feeConfirmToken;
+          batchFeeAttemptIdForAuth = batchData.feeAttemptIdForAuth;
         }
       }
 
@@ -688,27 +735,32 @@ export function useClaimBags(): UseClaimBagsReturn {
           const solFrac = (feeLamports % 1_000_000_000n).toString().padStart(9, '0').replace(/0+$/, '') || '0';
           console.info(`[useClaimBags] Fee tx sent: ${feeSig} (${solWhole}.${solFrac} SOL)`);
 
-          // Use the first confirmed claim's HMAC token to authenticate the fee log.
-          // This prevents unauthorized fee injection from on-chain observers.
-          const authEntry = allTransactions[0];
-          signedFetch('/api/claim/confirm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              feeTx: true,
-              txSignature: feeSig,
-              wallet: walletAddress,
-              feeLamports: feeLamports.toString(),
-              claimAttemptId: authEntry?.claimAttemptId,
-              confirmToken: authEntry?.confirmToken,
-            }),
-          })
-            .then((res) => {
-              if (!res.ok) console.warn(`[useClaimBags] Fee log failed: HTTP ${res.status} (sig: ${feeSig})`);
+          // Fix-4: dedicated fee token (scope 'fee:<attemptId>'), separate
+          // from the status-transition confirmTokens which are reused across
+          // signing → submitted → confirmed. The server verifies + consumes
+          // this single-use token in the feeTx branch.
+          if (!batchFeeConfirmToken || !batchFeeAttemptIdForAuth) {
+            console.warn('[useClaimBags] Fee log skipped: server did not return a fee token (sig:', feeSig, ')');
+          } else {
+            signedFetch('/api/claim/confirm', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                feeTx: true,
+                txSignature: feeSig,
+                wallet: walletAddress,
+                feeLamports: feeLamports.toString(),
+                claimAttemptId: batchFeeAttemptIdForAuth,
+                confirmToken: batchFeeConfirmToken,
+              }),
             })
-            .catch((err) => {
-              console.warn('[useClaimBags] Fee log network error (sig:', feeSig, '):', err instanceof Error ? err.message : err);
-            });
+              .then((res) => {
+                if (!res.ok) console.warn(`[useClaimBags] Fee log failed: HTTP ${res.status} (sig: ${feeSig})`);
+              })
+              .catch((err) => {
+                console.warn('[useClaimBags] Fee log network error (sig:', feeSig, '):', err instanceof Error ? err.message : err);
+              });
+          }
 
           connection.confirmTransaction(
             { signature: feeSig, ...activeFeeBlockhash },
@@ -736,7 +788,7 @@ export function useClaimBags(): UseClaimBagsReturn {
       activeEntriesRef.current = [];
       walletRef.current = '';
     }
-  }, [publicKey, signAllTransactions, connection, safeSetProgress, safeSetResults]);
+  }, [publicKey, signAllTransactions, signMessage, connection, safeSetProgress, safeSetResults]);
 
   // Abort in-flight operations on unmount to prevent post-unmount state updates
   useEffect(() => {
