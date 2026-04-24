@@ -1,0 +1,112 @@
+import 'server-only';
+import { bscClient } from '@/lib/chains/bsc';
+import type { BscAddress } from '@/lib/chains/types';
+import {
+  VAULT_PORTAL_ABI,
+  V2_PROBE_ABI,
+  VAULT_CATEGORY_MAP,
+  type FlapVaultKind,
+  type FlapVaultHandler,
+} from './types';
+import { baseV1Handler } from './base-v1';
+import { baseV2Handler } from './base-v2';
+import { unknownHandler } from './unknown';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('flap-vaults:registry');
+
+// ═══════════════════════════════════════════════
+// Dispatch by vault_type string (cached in flap_tokens.vault_type)
+// ═══════════════════════════════════════════════
+
+const HANDLERS: Record<FlapVaultKind, FlapVaultHandler> = {
+  'base-v1': baseV1Handler,
+  'base-v2': baseV2Handler,
+  'unknown': unknownHandler,
+};
+
+export function resolveHandler(vaultType: string): FlapVaultHandler {
+  return HANDLERS[vaultType as FlapVaultKind] ?? unknownHandler;
+}
+
+// ═══════════════════════════════════════════════
+// resolveVaultKind — primary classification via VaultPortal.getVaultCategory
+//                    + method-probe fallback
+//
+// Called ONCE per (taxToken, vault) pair at first probe. Result is persisted
+// in flap_tokens.vault_type, so subsequent cron runs hit resolveHandler()
+// directly and skip this.
+//
+// The `vaultPortal` address is a parameter (not a module-level default) so
+// Plan 04's cron and Plan 05's adapter can inject `FLAP_VAULT_PORTAL`
+// explicitly, and tests can inject a mock portal without monkey-patching
+// the constant. This also lets this module stay decoupled from the Plan 02
+// constants export (which lands in a parallel plan).
+// ═══════════════════════════════════════════════
+
+export async function resolveVaultKind(
+  vaultPortal: BscAddress,
+  taxToken: BscAddress,
+  vaultAddress: BscAddress,
+): Promise<FlapVaultKind> {
+  // 1. Primary: factory-category lookup.
+  try {
+    const category = await bscClient.readContract({
+      address: vaultPortal as `0x${string}`,
+      abi: VAULT_PORTAL_ABI,
+      functionName: 'getVaultCategory',
+      args: [taxToken],
+    });
+    const categoryNum = Number(category);
+    const mapped = VAULT_CATEGORY_MAP[categoryNum];
+    if (mapped && mapped !== 'unknown') {
+      log.child({ taxToken: taxToken.slice(0, 10), category: categoryNum }).info('primary');
+      return mapped;
+    }
+    // Fall through to method-probe for 'unknown' / unmapped values.
+  } catch (err) {
+    log.child({ taxToken: taxToken.slice(0, 10) }).warn('getVaultCategory_reverted', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // 2. Fallback A: probe V2 marker (vaultUISchema).
+  try {
+    await bscClient.readContract({
+      address: vaultAddress as `0x${string}`,
+      abi: V2_PROBE_ABI,
+      functionName: 'vaultUISchema',
+    });
+    log.child({ vault: vaultAddress.slice(0, 10) }).info('probe_v2_hit');
+    return 'base-v2';
+  } catch {
+    // Continue to V1 probe.
+  }
+
+  // 3. Fallback B: probe V1 claimable(0x0).
+  try {
+    await bscClient.readContract({
+      address: vaultAddress as `0x${string}`,
+      abi: [
+        {
+          type: 'function',
+          name: 'claimable',
+          stateMutability: 'view',
+          inputs: [{ name: 'user', type: 'address' }],
+          outputs: [{ type: 'uint256' }],
+        },
+      ] as const,
+      functionName: 'claimable',
+      args: ['0x0000000000000000000000000000000000000000'],
+    });
+    log.child({ vault: vaultAddress.slice(0, 10) }).info('probe_v1_hit');
+    return 'base-v1';
+  } catch {
+    // All probes failed → unknown.
+  }
+
+  log
+    .child({ vault: vaultAddress.slice(0, 10), taxToken: taxToken.slice(0, 10) })
+    .warn('unknown_vault');
+  return 'unknown';
+}
