@@ -36,6 +36,7 @@ export interface LiveFeeRecord {
   feeType?: string;
   feeLocked?: boolean;
   claimRightLost?: boolean;
+  vaultType?: 'base-v1' | 'base-v2' | 'unknown';
 }
 
 interface WalletForLive {
@@ -155,6 +156,7 @@ export function LiveFeesProvider({ walletsForLive, children }: LiveFeesProviderP
                     feeType: f.feeType == null ? undefined : String(f.feeType),
                     feeLocked: typeof f.feeLocked === 'boolean' ? f.feeLocked : undefined,
                     claimRightLost: typeof f.claimRightLost === 'boolean' ? f.claimRightLost : undefined,
+                    vaultType: f.vaultType === 'base-v1' || f.vaultType === 'base-v2' || f.vaultType === 'unknown' ? f.vaultType : undefined,
                   }));
                   streamedByPlatform.set(String(data.platform), normalized);
                   flushStreamedFees();

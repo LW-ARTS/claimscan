@@ -83,12 +83,10 @@ export const PLATFORM_CONFIG = {
 } as const;
 
 // Launchpads shown in user-facing copy (hero subtitle, stats strip, etc).
-// Excludes 'flap' — Phase 12 stakes out the type/DB enum/UI display branch but no
-// adapter yet. Drop the filter when flapAdapter lands in Phase 12.
-const PRE_SHIPPED_LAUNCHPADS: ReadonlySet<string> = new Set(['flap']);
-export const SHIPPED_LAUNCHPAD_COUNT = Object.keys(PLATFORM_CONFIG).filter(
-  (key) => !PRE_SHIPPED_LAUNCHPADS.has(key),
-).length;
+// All platforms in PLATFORM_CONFIG are shipped as of Phase 12 (flapAdapter landed).
+// Add a filter here again if a future platform stakes out the type/DB enum/UI
+// before the adapter is ready.
+export const SHIPPED_LAUNCHPAD_COUNT = Object.keys(PLATFORM_CONFIG).length;
 
 /** All EVM-compatible chain keys. Used for cross-chain matching and normalization checks. */
 export const EVM_CHAINS: ReadonlySet<string> = new Set(['base', 'eth', 'bsc']);
