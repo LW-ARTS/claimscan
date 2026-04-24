@@ -367,6 +367,59 @@ export interface Database {
         };
         Relationships: [];
       };
+      // ═══════════════════════════════════════════════
+      // Phase 12 (migration 034_add_flap_tokens.sql): Flap.sh per-token
+      // metadata cache + cron cursor. Anon read on flap_tokens; flap_indexer_state
+      // is service-role only.
+      // ═══════════════════════════════════════════════
+      flap_tokens: {
+        Row: {
+          token_address: string;
+          creator: string;
+          vault_address: string | null;
+          vault_type: 'base-v1' | 'base-v2' | 'unknown';
+          decimals: number;
+          source: 'bitquery_backfill' | 'native_indexer';
+          created_block: number;
+          indexed_at: string;
+        };
+        Insert: {
+          token_address: string;
+          creator: string;
+          vault_address?: string | null;
+          vault_type: 'base-v1' | 'base-v2' | 'unknown';
+          decimals?: number;
+          source: 'bitquery_backfill' | 'native_indexer';
+          created_block: number;
+          indexed_at?: string;
+        };
+        Update: {
+          token_address?: string;
+          creator?: string;
+          vault_address?: string | null;
+          vault_type?: 'base-v1' | 'base-v2' | 'unknown';
+          decimals?: number;
+          source?: 'bitquery_backfill' | 'native_indexer';
+          created_block?: number;
+          indexed_at?: string;
+        };
+        Relationships: [];
+      };
+      flap_indexer_state: {
+        Row: {
+          contract_address: string;
+          last_scanned_block: number;
+        };
+        Insert: {
+          contract_address: string;
+          last_scanned_block: number;
+        };
+        Update: {
+          contract_address?: string;
+          last_scanned_block?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       creator_fee_summary: {
