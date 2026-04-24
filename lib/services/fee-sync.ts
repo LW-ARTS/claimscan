@@ -352,6 +352,7 @@ export async function persistFees(
               ? 'claimed' as const
               : 'unclaimed' as const,
       royalty_bps: fee.royaltyBps,
+      vault_type: fee.vaultType ?? null,
       last_synced_at: new Date().toISOString(),
     };
   });

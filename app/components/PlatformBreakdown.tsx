@@ -160,6 +160,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
         claim_status: status,
         fee_type: live.feeType ?? fee.fee_type,
         fee_locked: live.feeLocked ?? fee.fee_locked,
+        vault_type: live.vaultType ?? fee.vault_type,
         token_symbol: live.tokenSymbol ?? fee.token_symbol,
       };
     });
@@ -188,6 +189,7 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
         royalty_bps: null,
         fee_type: live.feeType ?? null,
         fee_locked: live.feeLocked ?? null,
+        vault_type: live.vaultType ?? null,
         last_synced_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
       } as FeeRecord);
