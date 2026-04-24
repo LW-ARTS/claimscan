@@ -370,6 +370,54 @@ export interface Database {
         };
         Relationships: [];
       };
+      flap_tokens: {
+        Row: {
+          token_address: string;
+          creator: string;
+          vault_address: string | null;
+          vault_type: string;
+          decimals: number;
+          source: string;
+          created_block: number;
+          indexed_at: string;
+        };
+        Insert: {
+          token_address: string;
+          creator: string;
+          vault_address?: string | null;
+          vault_type: string;
+          decimals?: number;
+          source: string;
+          created_block: number;
+          indexed_at?: string;
+        };
+        Update: {
+          token_address?: string;
+          creator?: string;
+          vault_address?: string | null;
+          vault_type?: string;
+          decimals?: number;
+          source?: string;
+          created_block?: number;
+          indexed_at?: string;
+        };
+        Relationships: [];
+      };
+      flap_indexer_state: {
+        Row: {
+          contract_address: string;
+          last_scanned_block: number;
+        };
+        Insert: {
+          contract_address: string;
+          last_scanned_block: number;
+        };
+        Update: {
+          contract_address?: string;
+          last_scanned_block?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       creator_fee_summary: {
