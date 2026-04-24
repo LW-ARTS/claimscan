@@ -132,6 +132,7 @@ export interface Database {
           royalty_bps: number | null;
           fee_type: string | null;
           fee_locked: boolean | null;
+          vault_type: string | null;
           last_synced_at: string;
           created_at: string;
         };
@@ -151,6 +152,7 @@ export interface Database {
           royalty_bps?: number | null;
           fee_type?: string | null;
           fee_locked?: boolean | null;
+          vault_type?: string | null;
           last_synced_at: string;
           created_at?: string;
         };
@@ -170,6 +172,7 @@ export interface Database {
           royalty_bps?: number | null;
           fee_type?: string | null;
           fee_locked?: boolean | null;
+          vault_type?: string | null;
           last_synced_at?: string;
           created_at?: string;
         };
