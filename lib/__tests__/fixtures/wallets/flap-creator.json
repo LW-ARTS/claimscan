@@ -1,0 +1,11 @@
+{
+  "wallet": "0x685B23F8f932a6238b45f516c27a43840beC0Ef0",
+  "token": "0x7372bf3b8744e6ee9eeb8c1613c4ac4aa4f67777",
+  "vault": "0x321354e6f01e765f220eb275f315d1d79ee24a33",
+  "factory": "0x5c5f36e3422d6149d769d5bcb8d3121ddda217e9",
+  "expected_vault_type": "base-v2",
+  "observed_block": 94337728,
+  "observed_at_utc": "2026-04-24T04:11:10Z",
+  "caveat": "RESEARCH.md L305-312: at research time this token was 8 minutes old; claimable(creator) is HIGHLY LIKELY 0n. Plan 12-07 MUST re-validate `await bscClient.readContract({address: vault, abi, functionName: 'claimable', args: [wallet]}) > 0n` before committing the integration test. If still 0, substitute a popular creator from the seeded flap_tokens data (e.g. query `SELECT creator, token_address, vault_address FROM flap_tokens WHERE vault_type='base-v2' LIMIT 20` and pick one whose vault.claimable > 0 at current head).",
+  "source": "Live Flap deployment observed 2026-04-24; Portal TokenCreated event emitted on block 94337728; vault deployed atomically via newTokenV6WithVault on VaultPortal (TraitorBountyFactory → TraitorBountyVault → base-v2)."
+}
