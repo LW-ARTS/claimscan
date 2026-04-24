@@ -11,17 +11,17 @@ import { revshareAdapter } from './revshare';
 import { coinbarrelAdapter } from './coinbarrel';
 import { raydiumAdapter } from './raydium';
 import { flaunchAdapter } from './flaunch';
+import { flapAdapter } from './flap';
 
 // ═══════════════════════════════════════════════
 // Platform Registry
 // ═══════════════════════════════════════════════
 
-// Record<Exclude<Platform, 'flap'>, PlatformAdapter>: compile-time enforcement
-// that every implemented platform has an adapter, while 'flap' is explicitly
-// deferred to Phase 12. Plan 12 will drop the Exclude once flapAdapter lands.
-// `getAdapter()` returns `| null` so callers that ask for 'flap' today get a
-// typed null instead of a runtime-only undefined.
-const adapters: Record<Exclude<Platform, 'flap'>, PlatformAdapter> = {
+// Record<Platform, PlatformAdapter>: compile-time enforcement that every
+// Platform value has an adapter. All 11 launchpads are shipped as of Phase 12.
+// Adding a new platform means: extend Platform union (lib/supabase/types.ts)
+// + adjust migration enum + import + register below.
+const adapters: Record<Platform, PlatformAdapter> = {
   bags: bagsAdapter,
   clanker: clankerAdapter,
   pump: pumpAdapter,
@@ -32,14 +32,13 @@ const adapters: Record<Exclude<Platform, 'flap'>, PlatformAdapter> = {
   coinbarrel: coinbarrelAdapter,
   raydium: raydiumAdapter,
   flaunch: flaunchAdapter,
-  // flap: flapAdapter added in Phase 12.
+  flap: flapAdapter,
 };
 
 /**
  * Get a specific platform adapter by name.
  */
 export function getAdapter(platform: Platform): PlatformAdapter | null {
-  if (platform === 'flap') return null;
   return adapters[platform] ?? null;
 }
 
