@@ -1,26 +1,174 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+// server-only is a Next.js build-time marker; mock it so Node's vitest runner
+// can import the adapter without crashing (same pattern used across fee-math,
+// distributed-lock, fee-sync, claim-hmac unit tests).
 vi.mock('server-only', () => ({}));
 
-// Stub for Plan 12-05. Implementation covers:
-//  - getHistoricalFees reads flap_tokens via service client
-//  - Dispatch to handler via resolveHandler(row.vault_type)
-//  - Filters claimable === 0n (D-12)
-//  - Emits TokenFee with vaultType passed through
+// Mock the supabase service client — adapter is the first to read its own
+// primary data from Supabase, so we capture the query chain and inject canned
+// flap_tokens rows without hitting a real DB.
+const mockEq = vi.fn();
+const mockSelect = vi.fn(() => ({ eq: mockEq }));
+const mockFrom = vi.fn(() => ({ select: mockSelect }));
+vi.mock('@/lib/supabase/service', () => ({
+  createServiceClient: () => ({ from: mockFrom }),
+}));
+
+// Mock the vault handler registry — we only need to verify dispatch happens,
+// not that the real handler correctly reads onchain. Each test provides its
+// own readClaimable implementation.
+const mockReadClaimable = vi.fn();
+vi.mock('@/lib/platforms/flap-vaults', () => ({
+  resolveHandler: (vaultType: string) => ({
+    kind: vaultType,
+    readClaimable: mockReadClaimable,
+  }),
+}));
+
+// asBscAddress calls getAddress() via viem which does EIP-55 checksum — we
+// mock to the identity branded-cast so tests don't need full viem init. The
+// adapter only uses the branded address to pass to readClaimable (mocked).
+vi.mock('@/lib/chains/types', () => ({
+  asBscAddress: (addr: string) => addr as `0x${string}`,
+}));
+
+// Silence logger output in tests — still verifies the module loads.
+vi.mock('@/lib/logger', () => ({
+  createLogger: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+    time: async <T,>(_label: string, fn: () => Promise<T>) => fn(),
+  }),
+}));
+
+import { flapAdapter } from '@/lib/platforms/flap';
+
+const WALLET = '0xAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAa';
+const TOKEN_A = '0x1111111111111111111111111111111111111111';
+const TOKEN_B = '0x2222222222222222222222222222222222222222';
+const VAULT_A = '0xaaaa000000000000000000000000000000000001';
+const VAULT_B = '0xbbbb000000000000000000000000000000000002';
+
 describe('FP-06: flap adapter', () => {
-  it('reads flap_tokens filtered by creator (lowercase)', () => {
-    expect.fail('stub — Plan 12-05 implements flapAdapter');
+  beforeEach(() => {
+    mockFrom.mockClear();
+    mockSelect.mockClear();
+    mockEq.mockClear();
+    mockReadClaimable.mockReset();
   });
 
-  it('dispatches to resolveHandler(row.vault_type) per token', () => {
-    expect.fail('stub — Plan 12-05 implements handler dispatch');
+  it('reads flap_tokens filtered by creator (lowercase)', async () => {
+    mockEq.mockResolvedValueOnce({ data: [], error: null });
+    await flapAdapter.getHistoricalFees(WALLET);
+
+    expect(mockFrom).toHaveBeenCalledWith('flap_tokens');
+    expect(mockEq).toHaveBeenCalledWith('creator', WALLET.toLowerCase());
+    // Confirm lowercase normalization (no uppercase chars leaked through).
+    const creatorArg = (mockEq.mock.calls[0]?.[1] ?? '') as string;
+    expect(creatorArg).toBe(creatorArg.toLowerCase());
   });
 
-  it('filters rows where claimable === 0n (D-12)', () => {
-    expect.fail('stub — Plan 12-05 implements zero-balance filter');
+  it('dispatches to resolveHandler(row.vault_type) per token', async () => {
+    mockEq.mockResolvedValueOnce({
+      data: [
+        {
+          token_address: TOKEN_A,
+          creator: WALLET.toLowerCase(),
+          vault_address: VAULT_A,
+          vault_type: 'base-v1',
+          decimals: 18,
+          source: 'native_indexer',
+          created_block: 40_000_000,
+        },
+        {
+          token_address: TOKEN_B,
+          creator: WALLET.toLowerCase(),
+          vault_address: VAULT_B,
+          vault_type: 'base-v2',
+          decimals: 18,
+          source: 'native_indexer',
+          created_block: 40_000_001,
+        },
+      ],
+      error: null,
+    });
+    mockReadClaimable.mockResolvedValue(1_000n);
+
+    const fees = await flapAdapter.getHistoricalFees(WALLET);
+
+    // One call per classified row, receiving the (vault, user) branded pair.
+    expect(mockReadClaimable).toHaveBeenCalledTimes(2);
+    expect(mockReadClaimable.mock.calls[0]?.[0]).toBe(VAULT_A);
+    expect(mockReadClaimable.mock.calls[0]?.[1]).toBe(WALLET);
+    expect(mockReadClaimable.mock.calls[1]?.[0]).toBe(VAULT_B);
+    expect(mockReadClaimable.mock.calls[1]?.[1]).toBe(WALLET);
+    // Two non-zero rows -> two fees emitted.
+    expect(fees).toHaveLength(2);
   });
 
-  it('emits TokenFee with vaultType matching flap_tokens.vault_type', () => {
-    expect.fail('stub — Plan 12-05 implements TokenFee emission');
+  it('filters rows where claimable === 0n (D-12)', async () => {
+    mockEq.mockResolvedValueOnce({
+      data: [
+        {
+          token_address: TOKEN_A,
+          creator: WALLET.toLowerCase(),
+          vault_address: VAULT_A,
+          vault_type: 'base-v1',
+          decimals: 18,
+          source: 'native_indexer',
+          created_block: 40_000_000,
+        },
+        {
+          token_address: TOKEN_B,
+          creator: WALLET.toLowerCase(),
+          vault_address: VAULT_B,
+          vault_type: 'base-v2',
+          decimals: 18,
+          source: 'native_indexer',
+          created_block: 40_000_001,
+        },
+      ],
+      error: null,
+    });
+    // First row = zero balance (skipped), second row = non-zero (emitted).
+    mockReadClaimable.mockResolvedValueOnce(0n).mockResolvedValueOnce(5_000n);
+
+    const fees = await flapAdapter.getHistoricalFees(WALLET);
+
+    expect(fees).toHaveLength(1);
+    expect(fees[0]?.tokenAddress).toBe(TOKEN_B);
+    expect(fees[0]?.totalUnclaimed).toBe('5000');
+  });
+
+  it('emits TokenFee with vaultType matching flap_tokens.vault_type', async () => {
+    mockEq.mockResolvedValueOnce({
+      data: [
+        {
+          token_address: TOKEN_A,
+          creator: WALLET.toLowerCase(),
+          vault_address: VAULT_A,
+          vault_type: 'unknown',
+          decimals: 18,
+          source: 'native_indexer',
+          created_block: 40_000_000,
+        },
+      ],
+      error: null,
+    });
+    mockReadClaimable.mockResolvedValueOnce(42n);
+
+    const fees = await flapAdapter.getHistoricalFees(WALLET);
+
+    expect(fees).toHaveLength(1);
+    expect(fees[0]?.vaultType).toBe('unknown');
+    expect(fees[0]?.platform).toBe('flap');
+    expect(fees[0]?.chain).toBe('bsc');
+    expect(fees[0]?.totalEarnedUsd).toBeNull(); // D-11
+    expect(fees[0]?.totalClaimed).toBe('0');    // v1 scope
   });
 });
+
