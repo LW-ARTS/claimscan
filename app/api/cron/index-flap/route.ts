@@ -29,10 +29,15 @@ export const maxDuration = 60;
 // 55_000ms wallclock leaves 5s headroom under Vercel Hobby 60s hard limit.
 // ═══════════════════════════════════════════════
 
-// 50K caps to BSC public-RPC eth_getLogs limit (bsc-rpc.publicnode.com,
-// bsc-dataseed.binance.org). Alchemy free tier is even tighter (10 blocks).
-// BSC produces ~28K blocks/day so 50K/day cron has ~22K block buffer to catch up.
-const SCAN_WINDOW = 50_000n;
+// 5K matches the safe BSC public-RPC eth_getLogs ceiling (Clanker uses the
+// same in lib/chains/bsc.ts). 50K caused 65s timeouts on public RPCs.
+//
+// Trade-off: BSC mints ~28K blocks/day, so a 5K daily cron LAGS ~23K
+// blocks/day until either (a) we move to chunked parallel getLogs (matches
+// clanker-reads.ts pattern), or (b) we move to a paid archive RPC, or
+// (c) Vercel Pro unlocks finer cron granularity. Until then, missed
+// tokens get filled by backfill scripts when Bitquery quota refills.
+const SCAN_WINDOW = 5_000n;
 const LAG_WARNING_BLOCKS = 500_000n;
 const WALLCLOCK_MS = 55_000;
 const MAX_CLASSIFICATIONS_PER_RUN = 50;
