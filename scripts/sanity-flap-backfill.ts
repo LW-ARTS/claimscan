@@ -91,7 +91,9 @@ async function countBitquery(
   const response = await fetch(BITQUERY_ENDPOINT, {
     method: 'POST',
     headers: {
-      'X-API-KEY': process.env.BITQUERY_API_KEY!,
+      ...(process.env.BITQUERY_API_KEY!.startsWith('ory_at_')
+        ? { Authorization: `Bearer ${process.env.BITQUERY_API_KEY!}` }
+        : { 'X-API-KEY': process.env.BITQUERY_API_KEY! }),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
