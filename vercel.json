@@ -7,13 +7,6 @@
     {
       "path": "/api/cron/index-fees?also=tokens",
       "schedule": "0 6 * * *"
-    },
-    {
-      "_disabled_reason": "Phase 12 cron disabled until paid RPC tier — public BSC RPCs hit 60s timeout on getLogs+classification combined. Route still callable via curl with bearer for manual ops.",
-      "_path_when_enabled": "/api/cron/index-flap",
-      "_schedule_when_enabled": "0 0 * * *",
-      "path": "/api/cron/cleanup",
-      "schedule": "0 5 * * *"
     }
   ]
 }
