@@ -245,7 +245,13 @@ async function fetchWindow(
   const response = await fetch(BITQUERY_ENDPOINT, {
     method: 'POST',
     headers: {
-      'X-API-KEY': process.env.BITQUERY_API_KEY!,
+      // Bitquery v2 (streaming.bitquery.io) accepts both auth methods:
+      // - OAuth bearer token (ory_at_*) — Authorization: Bearer <token>
+      // - Legacy API key — X-API-KEY: <key>
+      // Detect which one was provided and route to the correct header.
+      ...(process.env.BITQUERY_API_KEY!.startsWith('ory_at_')
+        ? { Authorization: `Bearer ${process.env.BITQUERY_API_KEY!}` }
+        : { 'X-API-KEY': process.env.BITQUERY_API_KEY! }),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
