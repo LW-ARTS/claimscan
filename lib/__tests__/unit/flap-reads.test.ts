@@ -9,9 +9,10 @@ const { multicallMock, getLogsMock } = vi.hoisted(() => ({
   getLogsMock: vi.fn(),
 }));
 
+// scanTokenCreated uses bscClient.getLogs (Alchemy supports 250K block ranges).
+// bscLogsClient (public RPCs, 5K-50K range) is no longer used in flap-reads.
 vi.mock('@/lib/chains/bsc', () => ({
-  bscClient: { multicall: multicallMock },
-  bscLogsClient: { getLogs: getLogsMock },
+  bscClient: { multicall: multicallMock, getLogs: getLogsMock },
 }));
 
 // Logger uses Sentry surfaces for warn-level events; mock to silence.
@@ -159,8 +160,7 @@ describe('FP-03: flap-reads event decoder', () => {
       FLAP_PORTAL_DEPLOY_BLOCK: 0n,
     }));
     vi.doMock('@/lib/chains/bsc', () => ({
-      bscClient: { multicall: multicallMock },
-      bscLogsClient: { getLogs: getLogsMock },
+      bscClient: { multicall: multicallMock, getLogs: getLogsMock },
     }));
     vi.doMock('@sentry/nextjs', () => ({
       captureMessage: vi.fn(),
