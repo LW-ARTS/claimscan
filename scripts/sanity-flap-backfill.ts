@@ -13,7 +13,10 @@
 //   0: diff < 1% aggregate, OR 1-5% with warning
 //   1: diff > 5% (HARD FAIL, investigate)
 
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'node:fs';
+if (existsSync('.env.local')) loadEnv({ path: '.env.local' });
+else loadEnv();
 import { createPublicClient, http, fallback, parseAbiItem } from 'viem';
 import { bsc } from 'viem/chains';
 
