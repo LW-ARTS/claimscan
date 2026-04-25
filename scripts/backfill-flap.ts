@@ -13,7 +13,12 @@
 // Run locally: BITQUERY_API_KEY=<key> npx tsx scripts/backfill-flap.ts
 // NOT for production, D-06 locks this to .env local only.
 
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'node:fs';
+// Load .env.local first (project convention), fall back to .env if absent.
+// .env is no longer present (would break Vercel deploy if symlinked).
+if (existsSync('.env.local')) loadEnv({ path: '.env.local' });
+else loadEnv();
 import { createClient } from '@supabase/supabase-js';
 import { createPublicClient, http, fallback } from 'viem';
 import { bsc } from 'viem/chains';
@@ -301,7 +306,13 @@ async function runBackfill(): Promise<void> {
   });
 
   const head = await bscClient.getBlockNumber();
-  let from = FLAP_PORTAL_DEPLOY_BLOCK;
+  // Allow scoping the backfill via env to skip dead historical ranges.
+  // Useful when the current VaultPortal was deployed mid-Portal-lifetime
+  // and earlier tokens won't classify under the new portal anyway.
+  const fromOverride = process.env.BACKFILL_FROM_BLOCK
+    ? BigInt(process.env.BACKFILL_FROM_BLOCK)
+    : null;
+  let from = fromOverride ?? FLAP_PORTAL_DEPLOY_BLOCK;
   let totalEvents = 0;
   let skippedRows = 0;
   let decimalsFallbackCount = 0;
