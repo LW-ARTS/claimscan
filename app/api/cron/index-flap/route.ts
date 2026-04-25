@@ -29,7 +29,10 @@ export const maxDuration = 60;
 // 55_000ms wallclock leaves 5s headroom under Vercel Hobby 60s hard limit.
 // ═══════════════════════════════════════════════
 
-const SCAN_WINDOW = 250_000n;
+// 50K caps to BSC public-RPC eth_getLogs limit (bsc-rpc.publicnode.com,
+// bsc-dataseed.binance.org). Alchemy free tier is even tighter (10 blocks).
+// BSC produces ~28K blocks/day so 50K/day cron has ~22K block buffer to catch up.
+const SCAN_WINDOW = 50_000n;
 const LAG_WARNING_BLOCKS = 500_000n;
 const WALLCLOCK_MS = 55_000;
 const MAX_CLASSIFICATIONS_PER_RUN = 50;

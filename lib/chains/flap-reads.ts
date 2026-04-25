@@ -1,6 +1,6 @@
 import 'server-only';
 import { parseAbiItem } from 'viem';
-import { bscClient } from './bsc';
+import { bscClient, bscLogsClient } from './bsc';
 import type { BscAddress } from './types';
 import { FLAP_PORTAL_DEPLOY_BLOCK as FLAP_PORTAL_DEPLOY_BLOCK_CONST } from '@/lib/constants-evm';
 import { createLogger } from '@/lib/logger';
@@ -83,12 +83,11 @@ export async function scanTokenCreated(args: {
   fromBlock: bigint;
   toBlock: bigint;
 }): Promise<FlapTokenCreatedLog[]> {
-  // Use bscClient (Alchemy via BSC_RPC_URL) instead of bscLogsClient.
-  // bscLogsClient targets public BSC RPCs which cap getLogs to 5K-50K block
-  // ranges. Phase 12 scans 250K-block windows — Alchemy supports the full
-  // range. Falling back to bscLogsClient would force chunking and a 5x
-  // increase in cron runtime (out of 60s Hobby budget).
-  const logs = await bscClient.getLogs({
+  // Uses bscLogsClient (public BSC RPCs, 50K block range cap) over bscClient
+  // (Alchemy free tier caps eth_getLogs at 10 blocks). Caller MUST keep
+  // (toBlock - fromBlock) ≤ 50K. With Vercel Hobby's daily cron + BSC's
+  // ~28K blocks/day, 50K windows give ~22K block headroom.
+  const logs = await bscLogsClient.getLogs({
     address: args.portal,
     event: FLAP_TOKEN_CREATED_EVENT,
     fromBlock: args.fromBlock,
