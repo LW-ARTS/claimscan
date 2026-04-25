@@ -1,7 +1,7 @@
 # ClaimScan
 
 Plataforma de rastreamento e claim de fees de tokens cross-chain (Solana + Base + ETH + BSC).
-Agrega fees de 10 launchpads: Pump.fun, Bags.fm, Clanker (Base+BSC), Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium, Flaunch (Base display-only).
+Agrega fees de 11 launchpads: Pump.fun, Bags.fm, Clanker (Base+BSC), Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium, Flaunch (Base display-only), Flap (BSC display-only).
 API v2 paga via x402 protocol (pay-per-query).
 
 ## Stack
@@ -47,6 +47,7 @@ app/
     v2/resolve/               # GET - OWS wallet resolution (x402)
     v2/[...path]/             # Catch-all x402 routing
     cron/index-fees/          # Vercel Cron - sync fees
+    cron/index-flap/          # Vercel Cron - indexa Flap tokens + classifica vaults (BSC)
     cron/index-tokens/        # Vercel Cron - discover tokens
     cron/refresh-prices/      # Vercel Cron - update prices
     cron/cleanup/             # Vercel Cron - limpar claims expirados
@@ -197,6 +198,7 @@ npm run test:e2e:ui      # Playwright UI mode
 - `app/api/stats` usa ISR 24h — invalidacao automatica, nao precisa cron
 - **Pump.fun synthetic token IDs**: o adapter retorna `tokenAddress: 'SOL:pump'` (`tokenSymbol: 'SOL'`) e `tokenAddress: 'SOL:pumpswap'` (`tokenSymbol: 'SOL (PumpSwap)'`) — vault aggregates, nao mints reais. Cache e live stream usam os mesmos IDs sinteticos. O `(PumpSwap)` é stripado pelo `tokenDisplay()` em TokenFeeTable que pega só o primeiro whitespace token
 - **Flaunch per-coin rows + legacy aggregate** (a partir de 2026-04-21, post-`feat/flaunch-per-coin`): o adapter `lib/platforms/flaunch.ts` emite UMA `TokenFee` por coin Takeover.fun com `totalFeesAllocated > 0` (`tokenAddress: '0x...'` real, `tokenSymbol` do `fetchCoinsByCreator`). Para cada per-coin row: `totalEarned = totalClaimed = valor do FeeEscrow`, `totalUnclaimed = '0'` — porque `RevenueManager.balances(wallet)` retorna claimable wallet-wide e nao pode ser splitado per-coin sem event scan. O wallet-wide claimable vai num row sintetico `BASE:flaunch-legacy` (`tokenSymbol: 'ETH'`) que so aparece quando `claimable > 0` ou quando ha old-PM coins sem per-pool data. `TokenFeeTable.tokenDisplay()` traduz `BASE:flaunch-legacy` pra "Flaunch (claimable)". Display-only em v1: sem botao de claim, link externo pra flaunch.gg. ID antigo `BASE:flaunch-revenue` foi limpo via migration `033_cleanup_flaunch_synthetic.sql`.
+- **Flap indexer (Phase 12)**: cron `/api/cron/index-flap` roda a cada 10 min (`*/10 * * * *` em `vercel.json`), escaneia `TokenCreated` do Portal BSC em janelas de 250K blocos, upserta em `flap_tokens` (PK `token_address`), avança cursor em `flap_indexer_state`. Classifica vaults via `VaultPortal.getVaultCategory` + method-probe fallback, dispatches para handlers em `lib/platforms/flap-vaults/{base-v1,base-v2,unknown}.ts`. Rows com `vault_type='unknown'` renderizam badge "Claim method unknown" + link externo flap.sh em `TokenFeeTable` (D-04). `BITQUERY_API_KEY` é LOCAL-ONLY (`.env`, NÃO Vercel prod) — usado UMA vez via `npx tsx scripts/backfill-flap.ts` para seed histórico (D-01/D-06). Sentry LW-52 alerta em lag > 500K blocos (D-08) e novos unknown vaults com fingerprint dedup por `vault_address` (D-16).
 - **Stat card vs filter invariant** no perfil: o que `Total Unclaimed` mostrar TEM que ser igual à soma USD das rows visíveis no filtro Unclaimed. Se quebrar, é porque alguém reintroduziu um data source diferente entre `displayUnclaimedUsd` (ProfileHero) e `displayFees` (PlatformBreakdown). Ambos lêem do mesmo `useLiveFees().liveRecords` Map
 - **Turbopack file watcher dies on long sessions** (Next.js 16 dev server). Sintoma: source file modificado mas dev server serve código velho. Antes de "re-fixar" qualquer bug que parece não pegar, fazer `curl -s http://localhost:3001/<route> | grep <className-novo>`. Se vier vazio → kill PID e restart com `rm -rf .next/ && npm run dev -- -p 3001`
 - **TODO performance — Helius Enhanced Transactions APIs**: o cron `index-fees` e o `claim/confirm` (verificação de fee tx) atualmente fazem `getSignaturesForAddress` + N × `getTransaction` raw e parseiam preBalances/postBalances no braço. O Helius oferece 2 endpoints já parseados que substituiriam isso com 1 call: `https://api-mainnet.helius-rpc.com/v0/transactions/?api-key=...` (parse N tx signatures) e `https://api-mainnet.helius-rpc.com/v0/addresses/{addr}/transactions/?api-key=...` (parse history paginado por address). Retorna `tokenTransfers[]`, `nativeTransfers[]`, instruction types tipados (`SWAP`, `TRANSFER`, `NFT_SALE`, etc). Reduziria latência do cron + simplificaria os adapters de plataforma. Não está adotado ainda — usar a `SOLANA_RPC_URL` (que tbm é Helius) é o padrão atual
@@ -208,7 +210,7 @@ npm run test:e2e:ui      # Playwright UI mode
 
 **ClaimScan**
 
-Plataforma de rastreamento e claim de fees de tokens cross-chain (Solana, Base, ETH, BSC). Agrega fees de 10 launchpads (Pump.fun, Bags.fm, Clanker, Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium, Flaunch) com live SSE updates, leaderboard publico, e API v2 paga via x402. V2.5 live em producao com endorsement publico do FINN/Bags.
+Plataforma de rastreamento e claim de fees de tokens cross-chain (Solana, Base, ETH, BSC). Agrega fees de 11 launchpads (Pump.fun, Bags.fm, Clanker, Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium, Flaunch, Flap) com live SSE updates, leaderboard publico, e API v2 paga via x402. V2.5 live em producao com endorsement publico do FINN/Bags.
 
 **Core Value:** Mostrar aos creators de tokens quanto dinheiro eles tem parado em fees nao-claimadas, de forma precisa e em tempo real, cobrindo todos os launchpads relevantes.
 
