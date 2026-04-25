@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { track } from '@vercel/analytics';
+import { AlertTriangle } from 'lucide-react';
 import { ClaimStatusBadge } from './ClaimStatusBadge';
 import { PlatformIcon } from './PlatformIcon';
 import { PLATFORM_CONFIG, CHAIN_CONFIG } from '@/lib/constants';
@@ -195,15 +196,27 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                 </a>
               )}
               {fee.platform === 'flap' && (
-                <a
-                  href="https://flap.sh"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80 hover:text-foreground"
-                  aria-label="View on flap.sh"
-                >
-                  View on flap.sh &rarr;
-                </a>
+                <>
+                  {fee.vault_type === 'unknown' && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-400"
+                      aria-label="Claim method unknown"
+                      title="Vault ABI not recognized by ClaimScan. Go to flap.sh to claim"
+                    >
+                      <AlertTriangle className="h-3 w-3" aria-hidden />
+                      Claim method unknown
+                    </span>
+                  )}
+                  <a
+                    href="https://flap.sh"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80 hover:text-foreground"
+                    aria-label="View on flap.sh"
+                  >
+                    View on flap.sh &rarr;
+                  </a>
+                </>
               )}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm">
@@ -328,15 +341,27 @@ export function TokenFeeTable({ fees, solPrice = 0, ethPrice = 0, bnbPrice = 0, 
                       </a>
                     )}
                     {fee.platform === 'flap' && (
-                      <a
-                        href="https://flap.sh"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80 hover:text-foreground"
-                        aria-label="View on flap.sh"
-                      >
-                        View on flap.sh &rarr;
-                      </a>
+                      <>
+                        {fee.vault_type === 'unknown' && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-400"
+                            aria-label="Claim method unknown"
+                            title="Vault ABI not recognized by ClaimScan. Go to flap.sh to claim"
+                          >
+                            <AlertTriangle className="h-3 w-3" aria-hidden />
+                            Claim method unknown
+                          </span>
+                        )}
+                        <a
+                          href="https://flap.sh"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80 hover:text-foreground"
+                          aria-label="View on flap.sh"
+                        >
+                          View on flap.sh &rarr;
+                        </a>
+                      </>
                     )}
                   </div>
                 </td>
