@@ -63,7 +63,7 @@ const bscLogsClient = createPublicClient({
 // ═══════════════════════════════════════════════
 
 const COUNT_QUERY = `
-query FlapTokenCreatedCount($portal: String!, $fromBlock: Int!, $toBlock: Int!) {
+query FlapTokenCreatedCount($portal: String!, $fromBlock: String!, $toBlock: String!) {
   EVM(dataset: combined, network: bsc) {
     Events(
       where: {
@@ -98,7 +98,7 @@ async function countBitquery(
     },
     body: JSON.stringify({
       query: COUNT_QUERY,
-      variables: { portal: FLAP_PORTAL, fromBlock: Number(fromBlock), toBlock: Number(toBlock) },
+      variables: { portal: FLAP_PORTAL, fromBlock: fromBlock.toString(), toBlock: toBlock.toString() },
     }),
     signal,
   });
