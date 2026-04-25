@@ -141,8 +141,10 @@ async function readDecimalsBatch(tokens: string[]): Promise<(number | null)[]> {
 // Bitquery query
 // ═══════════════════════════════════════════════
 
+// NOTE: Bitquery v2 EAP uses String for Block.Number filters (the underlying
+// schema treats large block numbers as strings to preserve precision).
 const BITQUERY_QUERY = `
-query FlapTokenCreatedBackfill($portal: String!, $fromBlock: Int!, $toBlock: Int!) {
+query FlapTokenCreatedBackfill($portal: String!, $fromBlock: String!, $toBlock: String!) {
   EVM(dataset: combined, network: bsc) {
     Events(
       where: {
@@ -156,6 +158,9 @@ query FlapTokenCreatedBackfill($portal: String!, $fromBlock: Int!, $toBlock: Int
       Arguments {
         Name Type
         Value {
+          # uint256 → BigInt (Bitquery v2 schema; .bigInteger is a String scalar)
+          ... on EVM_ABI_BigInt_Value_Arg { bigInteger }
+          # smaller ints (uint8, uint16, …) — kept for forward-compat
           ... on EVM_ABI_Integer_Value_Arg { integer }
           ... on EVM_ABI_String_Value_Arg { string }
           ... on EVM_ABI_Address_Value_Arg { address }
@@ -175,7 +180,8 @@ interface BitqueryArg {
   Name: string;
   Type: string;
   Value: {
-    integer?: string;
+    bigInteger?: string;  // uint256 (ts, nonce) — Bitquery v2 BigInt scalar
+    integer?: string;     // smaller ints (legacy + forward-compat)
     string?: string;
     address?: string;
   };
@@ -212,8 +218,11 @@ function parseArgs(args: BitqueryArg[]): ParsedArgs | null {
 
   const creator = byName.get('creator')?.Value.address?.toLowerCase();
   const tokenAddress = byName.get('token')?.Value.address?.toLowerCase();
-  const ts = byName.get('ts')?.Value.integer;
-  const nonce = byName.get('nonce')?.Value.integer;
+  // uint256 fields land in .bigInteger; fall back to .integer for forward-compat.
+  const tsArg = byName.get('ts')?.Value;
+  const nonceArg = byName.get('nonce')?.Value;
+  const ts = tsArg?.bigInteger ?? tsArg?.integer;
+  const nonce = nonceArg?.bigInteger ?? nonceArg?.integer;
   const name = byName.get('name')?.Value.string ?? '';
   const symbol = byName.get('symbol')?.Value.string ?? '';
   const meta = byName.get('meta')?.Value.string ?? '';
@@ -258,8 +267,8 @@ async function fetchWindow(
       query: BITQUERY_QUERY,
       variables: {
         portal: FLAP_PORTAL,
-        fromBlock: Number(fromBlock),
-        toBlock: Number(toBlock),
+        fromBlock: fromBlock.toString(),
+        toBlock: toBlock.toString(),
       },
     }),
     signal,
