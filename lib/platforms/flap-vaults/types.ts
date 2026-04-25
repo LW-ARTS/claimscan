@@ -40,9 +40,12 @@ export interface FlapVaultHandler {
 // defined in `IVaultPortal.sol` (see VAULT_CATEGORY_MAP below).
 // ═══════════════════════════════════════════════
 
+// NOTE: getVault(address) is intentionally OMITTED — it returns a VaultInfo
+// struct (not a bare address), so viem's strict decoder mis-decodes. Use
+// lookupVaultAddress() in flap-vaults/index.ts instead, which calls
+// tryGetVault(address) and decodes the struct's first field manually.
 export const VAULT_PORTAL_ABI = parseAbi([
   'function getVaultCategory(address taxToken) view returns (uint8)',
-  'function getVault(address taxToken) view returns (address)',
 ]);
 
 // ═══════════════════════════════════════════════

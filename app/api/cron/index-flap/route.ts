@@ -7,8 +7,10 @@ import {
   batchReadDecimals,
   assertDeployBlockNotPlaceholder,
 } from '@/lib/chains/flap-reads';
-import { resolveVaultKind } from '@/lib/platforms/flap-vaults';
-import { VAULT_PORTAL_ABI } from '@/lib/platforms/flap-vaults/types';
+import {
+  resolveVaultKind,
+  lookupVaultAddress,
+} from '@/lib/platforms/flap-vaults';
 import {
   FLAP_PORTAL,
   FLAP_VAULT_PORTAL,
@@ -40,7 +42,11 @@ export const maxDuration = 60;
 const SCAN_WINDOW = 5_000n;
 const LAG_WARNING_BLOCKS = 500_000n;
 const WALLCLOCK_MS = 55_000;
-const MAX_CLASSIFICATIONS_PER_RUN = 50;
+// Set to 5 (was 50): each classification fires 2-3 RPC reads via Alchemy.
+// 50 classifications × 3 reads × free-tier latency (1-3s) = blew the 60s budget.
+// 5/run still drains the unknown-vault queue at ~1825/yr with daily cron;
+// good enough until a paid RPC unlocks bigger batches.
+const MAX_CLASSIFICATIONS_PER_RUN = 5;
 
 export async function GET(request: Request) {
   // 1. Bearer auth (timingSafeEqual)
@@ -230,24 +236,29 @@ export async function GET(request: Request) {
           if (Date.now() - started >= WALLCLOCK_MS) break;
 
           try {
-            // Resolve vault address first via VaultPortal.getVault(taxToken).
-            const vaultAddr = (await bscClient.readContract({
-              address: FLAP_VAULT_PORTAL as `0x${string}`,
-              abi: VAULT_PORTAL_ABI,
-              functionName: 'getVault',
-              args: [row.token_address as `0x${string}`],
-            })) as `0x${string}`;
-
-            // Skip if vault address is zero — token was emitted but no vault
-            // has been created yet (rare but possible at atomic launch path).
-            if (vaultAddr === '0x0000000000000000000000000000000000000000') {
+            // Resolve vault via tryGetVault (struct-aware, fail-soft).
+            // lookupVaultAddress returns null when token isn't registered in
+            // current portal (legacy tokens minted before VaultPortal deploy).
+            const vaultAddr = await lookupVaultAddress(
+              FLAP_VAULT_PORTAL,
+              row.token_address as BscAddress,
+            );
+            if (!vaultAddr) {
+              // Mark with sentinel so we don't retry every run.
+              await supabase
+                .from('flap_tokens')
+                .update({
+                  vault_address: '0x0000000000000000000000000000000000000000',
+                  vault_type: 'unknown',
+                })
+                .eq('token_address', row.token_address);
               continue;
             }
 
             const kind = await resolveVaultKind(
               FLAP_VAULT_PORTAL,
               row.token_address as BscAddress,
-              vaultAddr as BscAddress,
+              vaultAddr,
             );
 
             await supabase
