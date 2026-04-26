@@ -140,21 +140,31 @@ export function PlatformBreakdown({ fees, solPrice = 0, ethPrice = 0, bnbPrice =
       if (!live) return fee;
       seenKeys.add(key);
 
-      const claimed = safeBigInt(live.totalClaimed);
+      // Preserve max(live, db) for total_claimed. Reason: claimed is monotonic
+      // (you can't unclaim), and some adapter/schema combos (e.g. Bags new
+      // custom-fee-vault) don't expose lifetime claimed via API — the live
+      // record arrives with totalClaimed = '0' even after years of claiming.
+      // Without this preservation, the live overlay would erase the historical
+      // claimed value the cron persisted via fee-sync's monotonic guard, and
+      // total_earned would collapse to just the current unclaimed amount.
+      const liveClaimed = safeBigInt(live.totalClaimed);
+      const dbClaimed = safeBigInt(fee.total_claimed);
+      const finalClaimed = liveClaimed > dbClaimed ? liveClaimed : dbClaimed;
       const unclaimed = safeBigInt(live.totalUnclaimed);
+      const finalEarned = finalClaimed + unclaimed;
 
-      // Derive claim_status from the fresh amounts rather than trusting the
+      // Derive claim_status from the merged amounts rather than trusting the
       // cached status. This is the one place live data overrides cache status.
       let status: ClaimStatus = fee.claim_status;
-      if (unclaimed === 0n && claimed > 0n) status = 'claimed';
-      else if (unclaimed > 0n && claimed > 0n) status = 'partially_claimed';
-      else if (unclaimed > 0n && claimed === 0n) status = 'unclaimed';
+      if (unclaimed === 0n && finalClaimed > 0n) status = 'claimed';
+      else if (unclaimed > 0n && finalClaimed > 0n) status = 'partially_claimed';
+      else if (unclaimed > 0n && finalClaimed === 0n) status = 'unclaimed';
       // else keep whatever the cache had (e.g. auto_distributed)
 
       return {
         ...fee,
-        total_earned: live.totalEarned,
-        total_claimed: live.totalClaimed,
+        total_earned: finalEarned.toString(),
+        total_claimed: finalClaimed.toString(),
         total_unclaimed: live.totalUnclaimed,
         total_earned_usd: live.totalEarnedUsd ?? fee.total_earned_usd,
         claim_status: status,
