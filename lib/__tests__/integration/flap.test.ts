@@ -3,6 +3,7 @@ import { parseAbi } from 'viem';
 import fixture from '../fixtures/wallets/flap-creator.json';
 import { flapAdapter } from '@/lib/platforms/flap';
 import { bscClient } from '@/lib/chains/bsc';
+import { createServiceClient } from '@/lib/supabase/service';
 
 // Skip when BSC_RPC_URL is missing so local `npm run test:integration` does
 // not fall back to public RPCs with console.warn spam. CI injects the Alchemy
@@ -70,5 +71,79 @@ describe.skipIf(!process.env.BSC_RPC_URL)('flapAdapter (integration, live BSC)',
     }
   }, 60_000);
 
-  it.todo('SplitVault claimable parity (find-one-at-runtime, skips if no non-zero candidate in 50-row sample)');
+  it('SplitVault claimable parity (find-one-at-runtime, skips if no non-zero candidate in 50-row sample)', async () => {
+    // SplitVault parity test — uses runtime DB query because SplitVault auto-dispatches
+    // to recipients, leaving accumulated == claimed in steady state. Static fixtures
+    // would need re-pinning every dispatch cycle.
+    //
+    // Strategy:
+    //   1. Query flap_tokens for vault_type='split-vault' rows (limit 50).
+    //   2. For each candidate, call userBalances(creator) directly via bscClient.
+    //   3. Find first with accumulated > claimed (non-zero claimable).
+    //   4. Run adapter for that creator wallet, assert parity within 0n diff.
+    //   5. Skip with DESCRIPTIVE console.warn (distinguishes "no candidates" from
+    //      "0/N steady-state") if none found in the sample.
+
+    const supabase = createServiceClient();
+    const { data: candidates, error: queryErr } = await supabase
+      .from('flap_tokens')
+      .select('token_address, creator, vault_address')
+      .eq('vault_type', 'split-vault')
+      .neq('vault_address', '0x0000000000000000000000000000000000000000')
+      .limit(50);
+
+    if (queryErr) {
+      throw new Error(`SplitVault parity test: DB query failed: ${queryErr.message}`);
+    }
+
+    if (!candidates || candidates.length === 0) {
+      // Skip case A: no SplitVault rows in DB yet. Descriptive warn so this is NOT
+      // confused with skip case B (steady-state); also flags an upstream bug if the
+      // migration + classify-flap run hasn't happened yet.
+      console.warn('SplitVault parity test: no vault_type=split-vault candidates in DB, skipping');
+      return;
+    }
+
+    // Find a candidate with non-zero claimable.
+    const SPLITVAULT_ABI = parseAbi([
+      'function userBalances(address user) view returns (uint128 accumulated, uint128 claimed)',
+    ]);
+    let foundCandidate: { creator: string; vault_address: string; claimable: bigint } | null = null;
+    for (const c of candidates) {
+      if (!c.vault_address) continue;
+      try {
+        const result = await bscClient.readContract({
+          address: c.vault_address as `0x${string}`,
+          abi: SPLITVAULT_ABI,
+          functionName: 'userBalances',
+          args: [c.creator as `0x${string}`],
+        });
+        const [accumulated, claimed] = result as readonly [bigint, bigint];
+        if (accumulated > claimed) {
+          foundCandidate = { creator: c.creator, vault_address: c.vault_address, claimable: accumulated - claimed };
+          break;
+        }
+      } catch {
+        // Individual read failure (rate limit / transient RPC error) — skip and continue.
+        continue;
+      }
+    }
+
+    if (!foundCandidate) {
+      // Skip case B: candidates exist but all are at-rest (steady-state, dispatched).
+      // This is the EXPECTED case in production based on RESEARCH session (0/308 sampled
+      // had non-zero claimable). Descriptive warn distinguishes from skip case A.
+      console.warn(
+        `SplitVault parity test: 0/${candidates.length} SplitVaults had non-zero claimable, skipping (steady-state)`,
+      );
+      return;
+    }
+
+    // Adapter parity check.
+    const fees = await flapAdapter.getHistoricalFees(foundCandidate.creator);
+    expect(fees.length).toBeGreaterThanOrEqual(1);
+    const matchingFee = fees.find((f) => BigInt(f.totalUnclaimed) === foundCandidate!.claimable);
+    expect(matchingFee).toBeDefined();
+    expect(matchingFee?.vaultType).toBe('split-vault');
+  }, 90_000);
 });
