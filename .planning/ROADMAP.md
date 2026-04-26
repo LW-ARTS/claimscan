@@ -81,4 +81,4 @@ Plans:
 - [x] 12.1-05-PLAN.md — Wave 3: index.ts probe ladder extension + HANDLERS map entry + drive 2 flap-vaults.test.ts stubs to GREEN (SV-04, SV-05)
 - [x] 12.1-06-PLAN.md — Wave 4: scripts/classify-flap.ts mirror — 7 touchpoints + drift parity grep (SV-06)
 - [x] 12.1-07-PLAN.md — Wave 4: Integration test find-one-at-runtime parity + descriptive skipIf (SV-08)
-- [ ] 12.1-08-PLAN.md — Wave 5 BLOCKING: Apply migration 035 to PRODUCTION + run classify-flap.ts + DB sanity SELECT (SV-07, SV-09) [in progress: classify-flap loop running]
+- [x] 12.1-08-PLAN.md — Wave 5 BLOCKING: Apply migration 035 to PRODUCTION + run classify-flap.ts + DB sanity SELECT (SV-07, SV-09) — Final state: 4001 split-vault, 2478 base-v2, 313 terminal-unknown ✓

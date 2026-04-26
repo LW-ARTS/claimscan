@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-last_updated: "2026-04-26T04:50:00.000Z"
+status: completed
+last_updated: "2026-04-26T06:10:00.000Z"
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 20
-  completed_plans: 19
-  percent: 95
+  completed_plans: 20
+  percent: 100
 ---
 
 # ClaimScan — Project State
@@ -21,18 +21,18 @@ progress:
 
 ## Current Position
 
-Phase: 12.1 (splitvault-handler) — EXECUTING
-Plan: 08 (in progress — classify-flap.ts loop drains remaining ~5769 unknown rows)
+Phase: 12.1 (splitvault-handler) — **COMPLETED ✓**
+Plan: All 8 plans done.
 
 - **Phase:** 12.1
-- **Active Phase:** 12.1
-- **Status:** Plans 01-07 complete (code shipped to local main). Plan 08 task 1 done (migration applied via Supabase MCP). Plan 08 task 2 in progress (classify-flap loop). Plan 08 task 3 pending.
+- **Active Phase:** none (milestone v1.1 complete)
+- **Status:** All 8 Phase 12.1 plans complete. Code 100% (11 commits), DB 100% (migration applied + reclassification done), validation 100% (split-vault count 4001 within target [3500, 4500]). Pending user action: `git push origin main` to deploy 11 unpushed commits via Vercel.
 - **Resume file:** `.planning/phases/12.1-splitvault-handler-implement-third-flap-vault-type-3979-inst/12.1-HANDOFF.md`
 
 ## Last Activity
 
 - **Date:** 2026-04-26
-- **Action:** Phase 12.1 autonomous overnight execution — Migration 035 applied via MCP, executor agent shipped 6 code commits (test stubs, type widening, handler, probe ladder, script mirror, integration test) + migration commit, all 210 tests GREEN, tsc clean. classify-flap batch 1 done (641 split-vault, 310 base-v2, 49 unknown-failed in 1000 rows). Loop running for remaining 5769 unknowns (~70 min). User must `git push origin main` in morning to deploy 9 unpushed commits via Vercel.
+- **Action:** Phase 12.1 autonomous overnight execution COMPLETE. Migration 035 applied via Supabase MCP (single project, no staging). Executor agent shipped 6 code commits + migration commit + summaries commit (11 total). All 210 unit tests GREEN, tsc clean. classify-flap loop drained queue: 4001 split-vault (target [3500, 4500] ✓), 2478 base-v2, 313 terminal-unknown (probes failed for unrecognized impls — Phase 12 D-04 badge handles). Research projection of 3979 SplitVault validated empirically (actual 4001, +0.3 pp). User must `git push origin main` in morning to deploy 11 unpushed commits via Vercel.
 
 ## Accumulated Context
 
