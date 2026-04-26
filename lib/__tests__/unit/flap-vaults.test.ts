@@ -35,6 +35,7 @@ import {
 import { baseV1Handler } from '@/lib/platforms/flap-vaults/base-v1';
 import { baseV2Handler } from '@/lib/platforms/flap-vaults/base-v2';
 import { unknownHandler } from '@/lib/platforms/flap-vaults/unknown';
+import { splitVaultHandler } from '@/lib/platforms/flap-vaults/split-vault';
 
 // Stable test fixtures — addresses from RESEARCH.md §Fixture Wallet but
 // treated as opaque since bscClient is mocked.
@@ -62,7 +63,9 @@ describe('FP-04: resolveHandler — string-lookup dispatch', () => {
     expect(resolveHandler('base-v3')).toBe(unknownHandler);
   });
 
-  it.todo('returns splitVaultHandler for "split-vault"');
+  it('returns splitVaultHandler for "split-vault"', () => {
+    expect(resolveHandler('split-vault')).toBe(splitVaultHandler);
+  });
 });
 
 describe('FP-04: resolveVaultKind — classification strategy', () => {
@@ -134,7 +137,18 @@ describe('FP-04: resolveVaultKind — classification strategy', () => {
     expect(kind).toBe('unknown');
   });
 
-  it.todo('primary reverts, V2 reverts, V1 reverts, SplitVault userBalances(0x0) hits -> split-vault');
+  it('primary reverts, V2 reverts, V1 reverts, SplitVault userBalances(0x0) hits -> split-vault', async () => {
+    readContractMock.mockImplementation(async (args: { functionName: string }) => {
+      if (args.functionName === 'getVaultCategory') throw new Error('primary revert');
+      if (args.functionName === 'vaultUISchema') throw new Error('v2 probe revert');
+      if (args.functionName === 'claimable') throw new Error('v1 probe revert');
+      if (args.functionName === 'userBalances') return [0n, 0n] as readonly [bigint, bigint];
+      throw new Error('unexpected call');
+    });
+
+    const kind = await resolveVaultKind(VAULT_PORTAL, TAX_TOKEN, VAULT_ADDRESS);
+    expect(kind).toBe('split-vault');
+  });
 });
 
 describe('FP-04: unknownHandler — D-16 Sentry warning', () => {
