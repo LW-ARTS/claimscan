@@ -49,7 +49,7 @@ export default async function Home() {
     { name: 'Zora', src: '/logos/zora-zorb.png' },
     { name: 'Bankr', src: '/logos/bankr-favicon.svg' },
     { name: 'Flaunch', src: '/logos/flaunch.svg' },
-    { name: 'Flap', src: '/logos/flap.svg' },
+    { name: 'Flap', src: '/logos/flap.png' },
     { name: 'Coinbarrel', src: '/logos/coinbarrel.svg' },
     { name: 'RevShare', src: '/logos/revshare.png' },
     { name: 'Dexscreener', src: '/logos/dexscreener.png' },
