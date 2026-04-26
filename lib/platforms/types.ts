@@ -53,10 +53,10 @@ export interface TokenFee {
   /** True if claim right has been lost (e.g. Raydium Fee Key NFT transferred/burned) */
   claimRightLost?: boolean;
   /** Flap-specific vault classification used for UI badge routing (D-04).
-   *  'base-v1' and 'base-v2' = known handler, row renders normally.
+   *  'base-v1', 'base-v2', and 'split-vault' = known handler, row renders normally.
    *  'unknown' = vault ABI not recognized, UI renders "Claim method unknown" badge
    *  next to the external link. Absent for non-Flap rows. */
-  vaultType?: 'base-v1' | 'base-v2' | 'unknown';
+  vaultType?: 'base-v1' | 'base-v2' | 'split-vault' | 'unknown';
 }
 
 // ═══════════════════════════════════════════════

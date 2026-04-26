@@ -4,13 +4,16 @@ import { parseAbi } from 'viem';
 // ═══════════════════════════════════════════════
 // FlapVaultKind
 //
-// String union MUST match the CHECK constraint in migration 034:
-//   CHECK (vault_type IN ('base-v1', 'base-v2', 'unknown'))
-// If you add a new kind, update the migration and re-run migration 034 or write
-// migration 035 to relax/extend the constraint.
+// String union MUST match the CHECK constraint applied by migration 035:
+//   CHECK (vault_type IN ('base-v1', 'base-v2', 'split-vault', 'unknown'))
+// (originally introduced by migration 034 with the first three values; extended
+// in 12.1 to include 'split-vault' — the third Flap vault kind, EIP-1167 minimal
+// proxy of impl 0xd6a92acc... which exposes userBalances(address) -> (uint128
+// accumulated, uint128 claimed) instead of claimable(address) -> uint256.)
+// If you add a new kind, write a new migration extending the CHECK constraint.
 // ═══════════════════════════════════════════════
 
-export type FlapVaultKind = 'base-v1' | 'base-v2' | 'unknown';
+export type FlapVaultKind = 'base-v1' | 'base-v2' | 'split-vault' | 'unknown';
 
 // ═══════════════════════════════════════════════
 // FlapVaultHandler
@@ -118,4 +121,22 @@ export const CLAIMABLE_ABI = parseAbi([
 
 export const V2_PROBE_ABI = parseAbi([
   'function vaultUISchema() view returns (string)',
+]);
+
+// ═══════════════════════════════════════════════
+// SPLITVAULT_USERBALANCES_ABI — Phase 12.1 SplitVault detection + read
+//
+// [VERIFIED: BscScan source at impl 0xd6a92acc0a5fd685c1cb3a464d44410dc90c5d25,
+//  Solidity 0.8.24+commit.e11b9ed9.] struct UserBalance { uint128 accumulated;
+//  uint128 claimed; }. Public mapping(address => UserBalance) compiles to:
+//    function userBalances(address) view returns (uint128, uint128);
+//
+// Used as both (1) probe marker in resolveVaultKind() — SplitVault clones respond,
+// V1/V2 vaults revert (mutual exclusion empirically verified, RESEARCH §"Probe
+// Order Mutual Exclusion" L566-588); (2) read ABI in splitVaultHandler for
+// claimable computation: accumulated - claimed (BNB native, 18 decimals).
+// ═══════════════════════════════════════════════
+
+export const SPLITVAULT_USERBALANCES_ABI = parseAbi([
+  'function userBalances(address user) view returns (uint128 accumulated, uint128 claimed)',
 ]);
