@@ -380,7 +380,7 @@ export interface Database {
           token_address: string;
           creator: string;
           vault_address: string | null;
-          vault_type: 'base-v1' | 'base-v2' | 'unknown';
+          vault_type: 'base-v1' | 'base-v2' | 'split-vault' | 'unknown';
           decimals: number;
           source: 'bitquery_backfill' | 'native_indexer';
           created_block: number;
@@ -390,7 +390,7 @@ export interface Database {
           token_address: string;
           creator: string;
           vault_address?: string | null;
-          vault_type: 'base-v1' | 'base-v2' | 'unknown';
+          vault_type: 'base-v1' | 'base-v2' | 'split-vault' | 'unknown';
           decimals?: number;
           source: 'bitquery_backfill' | 'native_indexer';
           created_block: number;
@@ -400,7 +400,7 @@ export interface Database {
           token_address?: string;
           creator?: string;
           vault_address?: string | null;
-          vault_type?: 'base-v1' | 'base-v2' | 'unknown';
+          vault_type?: 'base-v1' | 'base-v2' | 'split-vault' | 'unknown';
           decimals?: number;
           source?: 'bitquery_backfill' | 'native_indexer';
           created_block?: number;
