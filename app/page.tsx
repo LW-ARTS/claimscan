@@ -49,6 +49,7 @@ export default async function Home() {
     { name: 'Zora', src: '/logos/zora-zorb.png' },
     { name: 'Bankr', src: '/logos/bankr-favicon.svg' },
     { name: 'Flaunch', src: '/logos/flaunch.svg' },
+    { name: 'Flap', src: '/logos/flap.svg' },
     { name: 'Coinbarrel', src: '/logos/coinbarrel.svg' },
     { name: 'RevShare', src: '/logos/revshare.png' },
     { name: 'Dexscreener', src: '/logos/dexscreener.png' },
@@ -73,7 +74,7 @@ export default async function Home() {
     { name: 'Solana', launchpads: platformsByChain.sol ?? 0 },
     { name: 'Base', launchpads: platformsByChain.base ?? 0 },
     { name: 'Ethereum', launchpads: 1 }, // Zora extends to ETH L1
-    { name: 'BSC', launchpads: 1 }, // Clanker extends to BSC
+    { name: 'BSC', launchpads: 2 }, // Clanker extends to BSC + Flap primary
   ];
 
   const steps = [

@@ -207,7 +207,7 @@ export default function TermsPage() {
               <div className="space-y-2">
                 {[
                   'Identity resolution from social handles (Twitter/X, Farcaster, GitHub) and OWS wallet names to blockchain wallet addresses across all supported chains',
-                  'Aggregated fee tracking across 9 launchpad platforms (Pump.fun, Bags.fm, Clanker, Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium) on Solana, Base, Ethereum, and BNB Chain',
+                  'Aggregated fee tracking across 11 launchpad platforms (Pump.fun, Bags.fm, Clanker, Zora, Bankr, Believe, RevShare, Coinbarrel, Raydium, Flaunch, Flap) on Solana, Base, Ethereum, and BNB Chain',
                   'Real-time USD conversion of on-chain fee data using third-party price feeds',
                   'Claim facilitation for eligible unclaimed fees through zero-custody transaction construction',
                   'Data export and analytics features for creator fee portfolios',

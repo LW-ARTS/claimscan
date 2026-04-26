@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 const PLATFORMS = [
   'Bags.fm', 'Pump.fun', 'Clanker', 'Zora', 'Bankr',
   'Believe', 'RevShare', 'Coinbarrel', 'Raydium',
+  'Flaunch', 'Flap',
 ];
 
 export default function Loading() {

@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: PageProps) {
     ...(isWallet ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       title: `${displayName}: Earned & Unclaimed Fees | ClaimScan`,
-      description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads on Solana, Base, and BNB Chain.`,
+      description: `Earnings breakdown for ${displayName} across 11 DeFi launchpads on Solana, Base, and BNB Chain.`,
       images: [
         {
           url: `/${encodeURIComponent(ogSlug)}/opengraph-image`,
@@ -72,7 +72,7 @@ export async function generateMetadata({ params }: PageProps) {
       site: '@lwartss',
       creator: '@lwartss',
       title: `${displayName}: Earned & Unclaimed Fees | ClaimScan`,
-      description: `Earnings breakdown for ${displayName} across 9 DeFi launchpads.`,
+      description: `Earnings breakdown for ${displayName} across 11 DeFi launchpads.`,
       images: [
         {
           url: `/${encodeURIComponent(ogSlug)}/opengraph-image`,

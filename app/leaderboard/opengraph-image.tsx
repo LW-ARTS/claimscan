@@ -265,7 +265,7 @@ export default async function LeaderboardOgImage() {
                 marginTop: '4px',
               }}
             >
-              Top earners across 9 DeFi launchpads
+              Top earners across 11 DeFi launchpads
             </span>
           </div>
 

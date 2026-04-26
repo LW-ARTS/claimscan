@@ -1,7 +1,7 @@
 # ClaimScan — Developer Onboarding Guide
 
 > Cross-chain fee tracking and claiming platform for token creators.
-> Supports 10 launchpads across Solana, Base, and Ethereum.
+> Supports 11 launchpads across Solana, Base, Ethereum, and BNB Chain.
 
 ---
 
@@ -88,7 +88,7 @@ claimscan/
 │       ├── webhooks/helius/    # Helius DAS webhooks
 │       └── honeypot/           # Fake data trap for scrapers
 ├── lib/                        # Shared business logic
-│   ├── platforms/              # 9 launchpad adapters
+│   ├── platforms/              # 11 launchpad adapters
 │   ├── chains/                 # Solana, Base, ETH RPC configs
 │   ├── resolve/                # Identity resolution (Twitter/GitHub/Farcaster/wallet)
 │   ├── prices/                 # Price waterfall (DexScreener→Jupiter→CoinGecko)
