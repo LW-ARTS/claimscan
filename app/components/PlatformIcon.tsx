@@ -12,7 +12,7 @@ const logoMap: Record<string, string> = {
   coinbarrel: '/logos/coinbarrel.svg',
   raydium: '/logos/raydium.svg',
   flaunch: '/logos/flaunch.svg',
-  flap: '/logos/flap.svg',
+  flap: '/logos/flap.png',
 };
 
 /* ─── RevShare fallback (generic concept, no brand logo) ─── */
