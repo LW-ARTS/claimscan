@@ -66,7 +66,9 @@ describe.skipIf(!process.env.BSC_RPC_URL)('flapAdapter (integration, live BSC)',
     const fees = await flapAdapter.getHistoricalFees(wallet);
     expect(fees.length).toBeGreaterThanOrEqual(1);
     for (const fee of fees) {
-      expect(['base-v1', 'base-v2', 'unknown']).toContain(fee.vaultType);
+      expect(['base-v1', 'base-v2', 'split-vault', 'unknown']).toContain(fee.vaultType);
     }
   }, 60_000);
+
+  it.todo('SplitVault claimable parity (find-one-at-runtime, skips if no non-zero candidate in 50-row sample)');
 });
