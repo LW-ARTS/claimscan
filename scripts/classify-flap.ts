@@ -181,11 +181,35 @@ async function resolveVaultKind(
 
 // ─── main loop ────────────────────────────────────────────────────
 async function main() {
-  // Pull all rows that need classification.
-  const { data: rows, error } = await supabase
+  const sampleLimit = process.env.SAMPLE_LIMIT
+    ? Number.parseInt(process.env.SAMPLE_LIMIT, 10)
+    : null;
+  if (sampleLimit !== null && (!Number.isFinite(sampleLimit) || sampleLimit <= 0)) {
+    console.error(`Invalid SAMPLE_LIMIT: ${process.env.SAMPLE_LIMIT}`);
+    process.exit(1);
+  }
+
+  const sampleFromBlock = process.env.SAMPLE_FROM_BLOCK
+    ? Number.parseInt(process.env.SAMPLE_FROM_BLOCK, 10)
+    : null;
+  const sampleOrderDesc = process.env.SAMPLE_ORDER_DESC === '1';
+
+  // Pull rows that need classification:
+  //   - vault_type='unknown' AND vault_address NULL → never probed (legacy)
+  //   - vault_type='unknown' AND vault_address set (from VaultPortal backfill)
+  //     → vault address known, just need V1/V2 probe
+  // Exclude rows pre-flagged with the sentinel '0x0' (no-vault) so we don't
+  // hammer the chain re-confirming proven-empty rows.
+  const NO_VAULT_SENTINEL = '0x0000000000000000000000000000000000000000';
+  let query = supabase
     .from('flap_tokens')
-    .select('token_address')
-    .is('vault_address', null);
+    .select('token_address,vault_address,created_block')
+    .eq('vault_type', 'unknown')
+    .neq('vault_address', NO_VAULT_SENTINEL);
+  if (sampleFromBlock !== null) query = query.gte('created_block', sampleFromBlock);
+  if (sampleOrderDesc) query = query.order('created_block', { ascending: false });
+  if (sampleLimit !== null) query = query.limit(sampleLimit);
+  const { data: rows, error } = await query;
 
   if (error) {
     console.error('Failed to query flap_tokens:', error.message);
@@ -208,11 +232,15 @@ async function main() {
   const started = Date.now();
 
   for (let i = 0; i < total; i++) {
-    const token = rows![i].token_address as Address;
+    const row = rows![i];
+    const token = row.token_address as Address;
+    const preknownVault = row.vault_address as Address | null;
     const startedAt = Date.now();
 
     try {
-      const vaultAddress = await getVaultAddress(token);
+      // If the VaultPortal backfill already populated vault_address, trust it
+      // and skip the tryGetVault round-trip. We still need the V1/V2 probe.
+      const vaultAddress = preknownVault ?? (await getVaultAddress(token));
       if (!vaultAddress) {
         // Token has no vault on the portal (rare — abandoned/edge case).
         // Mark it 'unknown' with a sentinel vault_address so we don't re-process.
@@ -230,11 +258,11 @@ async function main() {
         }
         noVault++;
       } else {
-        const kind = await resolveVaultKind(token, vaultAddress);
+        const kind = await resolveVaultKind(token, vaultAddress as Address);
         const { error: upErr } = await supabase
           .from('flap_tokens')
           .update({
-            vault_address: vaultAddress.toLowerCase(),
+            vault_address: (vaultAddress as Address).toLowerCase(),
             vault_type: kind,
           })
           .eq('token_address', token);
