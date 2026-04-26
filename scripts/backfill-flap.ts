@@ -159,7 +159,7 @@ query FlapTokenCreatedBackfill($portal: String!, $fromBlock: String!, $toBlock: 
       }
     ) {
       Block { Number Time }
-      Transaction { Hash }
+      Transaction { Hash From }
       Arguments {
         Name Type
         Value {
@@ -194,7 +194,15 @@ interface BitqueryArg {
 
 interface BitqueryEvent {
   Block: { Number: string; Time: string };
-  Transaction: { Hash: string };
+  /**
+   * Transaction.From is the user EOA that signed the create tx. We use this
+   * as the canonical creator instead of the event arg `creator` — that arg is
+   * the immediate caller-contract (FLAP_VAULT_PORTAL in the standard flow),
+   * not the user. The adapter joins flap_tokens by `creator`, so storing the
+   * caller-contract there orphans every row from the real wallet (audit
+   * 2026-04-26).
+   */
+  Transaction: { Hash: string; From: string };
   Arguments: BitqueryArg[];
   Log: { Signature: { Name: string; Signature: string } };
 }
@@ -349,14 +357,28 @@ async function runBackfill(): Promise<void> {
 
     if (events.length > 0) {
       // Parse defensively first (skip malformed rows without failing the batch).
-      const parsedList: Array<{ parsed: ParsedArgs; block: string }> = [];
+      const parsedList: Array<{
+        parsed: ParsedArgs;
+        block: string;
+        txFrom: string;
+      }> = [];
       for (const ev of events) {
         const parsed = parseArgs(ev.Arguments);
         if (!parsed) {
           skippedRows++;
           continue;
         }
-        parsedList.push({ parsed, block: ev.Block.Number });
+        // Transaction.From is the user EOA that signed the tx (= tx.from).
+        // The event arg `creator` is the immediate caller-contract
+        // (FLAP_VAULT_PORTAL in the standard flow), so we MUST use From
+        // here — the adapter joins flap_tokens by `creator` and would
+        // otherwise orphan every row from the real wallet.
+        const txFrom = ev.Transaction?.From?.toLowerCase();
+        if (!txFrom || !/^0x[a-f0-9]{40}$/.test(txFrom)) {
+          skippedRows++;
+          continue;
+        }
+        parsedList.push({ parsed, block: ev.Block.Number, txFrom });
       }
 
       if (parsedList.length > 0) {
@@ -378,7 +400,7 @@ async function runBackfill(): Promise<void> {
           }
           return {
             token_address: p.parsed.tokenAddress,
-            creator: p.parsed.creator,
+            creator: p.txFrom,
             vault_address: null as string | null,
             vault_type: 'unknown' as const,
             decimals: resolved ?? 18,

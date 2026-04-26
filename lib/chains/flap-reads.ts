@@ -29,7 +29,22 @@ export const FLAP_TOKEN_CREATED_EVENT = parseAbiItem(
 
 export interface FlapTokenCreatedLog {
   ts: bigint;
+  /**
+   * The user EOA that signed the create transaction (= `tx.from`).
+   *
+   * NOT the event arg literally named `creator` — that field on FLAP_PORTAL is
+   * the immediate caller-contract (FLAP_VAULT_PORTAL when users go through the
+   * standard create flow), not the user. Adapter queries `flap_tokens` by
+   * `creator` to surface a creator's tokens, so we MUST store the user EOA
+   * here. tx.from is fetched from the chain alongside getLogs (one
+   * getTransaction call per unique tx hash, deduped to keep RPC budget low).
+   */
   creator: BscAddress;
+  /**
+   * The original event-arg `creator` (= the caller-contract). Kept for
+   * forensics / debugging only. Not used by adapters or DB writes.
+   */
+  eventCreator: BscAddress;
   nonce: bigint;
   tokenAddress: BscAddress;
   name: string;
@@ -103,9 +118,36 @@ export async function scanTokenCreated(args: {
     }
   }
 
+  // Resolve user EOA (= tx.from) for each log. The event arg `creator` is the
+  // immediate caller-contract (VaultPortal in the standard flow), so we MUST
+  // look up tx.from to get the human creator that adapters can join against.
+  // Dedupe by tx hash — multiple TokenCreated events can share one tx.
+  const txHashes = Array.from(
+    new Set(
+      logs
+        .map((l) => l.transactionHash)
+        .filter((h): h is `0x${string}` => Boolean(h)),
+    ),
+  );
+  const txFromCache = new Map<`0x${string}`, BscAddress>();
+  if (txHashes.length > 0) {
+    const txs = await Promise.all(
+      txHashes.map((hash) => bscClient.getTransaction({ hash })),
+    );
+    for (const tx of txs) {
+      txFromCache.set(
+        tx.hash as `0x${string}`,
+        tx.from.toLowerCase() as BscAddress,
+      );
+    }
+  }
+
   return logs.map((logEntry) => ({
     ts: logEntry.args.ts!,
-    creator: logEntry.args.creator! as BscAddress,
+    creator:
+      txFromCache.get(logEntry.transactionHash!) ??
+      (logEntry.args.creator! as BscAddress),
+    eventCreator: logEntry.args.creator! as BscAddress,
     nonce: logEntry.args.nonce!,
     tokenAddress: logEntry.args.token! as BscAddress,
     name: logEntry.args.name ?? '',
