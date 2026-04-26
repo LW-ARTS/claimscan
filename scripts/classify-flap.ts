@@ -83,7 +83,7 @@ const V1_PROBE_ABI = parseAbi([
 // VaultCategory enum from BscScan-verified IVaultPortal.sol — both currently
 // defined values map to 'unknown' (orthogonal axis, see types.ts comments).
 // Probe fallback handles v1/v2 discrimination at runtime.
-const VAULT_CATEGORY_MAP: Record<number, 'base-v1' | 'base-v2' | 'unknown'> = {
+const VAULT_CATEGORY_MAP: Record<number, 'base-v1' | 'base-v2' | 'split-vault' | 'unknown'> = {
   0: 'unknown',
   1: 'unknown',
 };
@@ -136,7 +136,7 @@ async function getVaultAddress(taxToken: Address): Promise<Address | null> {
 async function resolveVaultKind(
   taxToken: Address,
   vaultAddress: Address,
-): Promise<'base-v1' | 'base-v2' | 'unknown'> {
+): Promise<'base-v1' | 'base-v2' | 'split-vault' | 'unknown'> {
   // 1. Primary lookup
   try {
     const cat = await bscClient.readContract({
@@ -172,6 +172,23 @@ async function resolveVaultKind(
       args: ['0x0000000000000000000000000000000000000000'],
     });
     return 'base-v1';
+  } catch {
+    // continue to SplitVault probe
+  }
+
+  // 4. SplitVault probe (Phase 12.1 — mirrors lib/platforms/flap-vaults/index.ts)
+  //    SplitVault clones expose userBalances(address) -> (uint128, uint128).
+  //    Mutual exclusion empirically verified: V1 claimable reverts on SplitVault,
+  //    and SplitVault userBalances reverts on V1/V2 (RESEARCH §"Probe Order
+  //    Mutual Exclusion" L566-588).
+  try {
+    await bscClient.readContract({
+      address: vaultAddress,
+      abi: parseAbi(['function userBalances(address) view returns (uint128 accumulated, uint128 claimed)']),
+      functionName: 'userBalances',
+      args: ['0x0000000000000000000000000000000000000000'],
+    });
+    return 'split-vault';
   } catch {
     // all probes failed
   }
@@ -226,6 +243,7 @@ async function main() {
   let classified = 0;
   let baseV1 = 0;
   let baseV2 = 0;
+  let splitVaultCount = 0;
   let unknownCount = 0;
   let noVault = 0;
   let dbErrors = 0;
@@ -273,6 +291,7 @@ async function main() {
         }
         if (kind === 'base-v1') baseV1++;
         else if (kind === 'base-v2') baseV2++;
+        else if (kind === 'split-vault') splitVaultCount++;
         else unknownCount++;
       }
       classified++;
@@ -288,7 +307,7 @@ async function main() {
       const rate = (i + 1) / elapsed;
       const remaining = ((total - i - 1) / rate).toFixed(0);
       console.log(
-        `[${i + 1}/${total}] v1=${baseV1} v2=${baseV2} unknown=${unknownCount} no-vault=${noVault} | ${rate.toFixed(1)}/s | ETA ${remaining}s`,
+        `[${i + 1}/${total}] v1=${baseV1} v2=${baseV2} splitVault=${splitVaultCount} unknown=${unknownCount} no-vault=${noVault} | ${rate.toFixed(1)}/s | ETA ${remaining}s`,
       );
     }
 
@@ -303,6 +322,7 @@ async function main() {
   console.log(`Classified: ${classified}/${total}`);
   console.log(`  base-v1: ${baseV1}`);
   console.log(`  base-v2: ${baseV2}`);
+  console.log(`  split-vault: ${splitVaultCount}`);
   console.log(`  unknown (probes failed): ${unknownCount}`);
   console.log(`  no-vault (sentinel 0x0): ${noVault}`);
   console.log(`DB errors: ${dbErrors}`);
