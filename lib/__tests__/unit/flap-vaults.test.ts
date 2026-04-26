@@ -61,6 +61,8 @@ describe('FP-04: resolveHandler — string-lookup dispatch', () => {
     expect(resolveHandler('')).toBe(unknownHandler);
     expect(resolveHandler('base-v3')).toBe(unknownHandler);
   });
+
+  it.todo('returns splitVaultHandler for "split-vault"');
 });
 
 describe('FP-04: resolveVaultKind — classification strategy', () => {
@@ -131,6 +133,8 @@ describe('FP-04: resolveVaultKind — classification strategy', () => {
     const kind = await resolveVaultKind(VAULT_PORTAL, TAX_TOKEN, VAULT_ADDRESS);
     expect(kind).toBe('unknown');
   });
+
+  it.todo('primary reverts, V2 reverts, V1 reverts, SplitVault userBalances(0x0) hits -> split-vault');
 });
 
 describe('FP-04: unknownHandler — D-16 Sentry warning', () => {
