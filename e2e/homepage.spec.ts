@@ -29,7 +29,7 @@ test.describe('Homepage', () => {
     await page.goto('/');
 
     // Launchpad count renders in hero subtitle + sr-only h1 (dynamic from SHIPPED_LAUNCHPAD_COUNT)
-    await expect(page.getByText('10 launchpads').first()).toBeVisible();
+    await expect(page.getByText('11 launchpads').first()).toBeVisible();
 
     // Stats strip cards
     await expect(page.getByText('Fees Tracked').first()).toBeVisible();

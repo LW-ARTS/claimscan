@@ -53,7 +53,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" \
 
 **What it does:**
 - Queries creators with `updated_at` older than 1 hour, max 5 per run
-- For each: fetches fees from all 9 platform adapters (Promise.allSettled)
+- For each: fetches fees from all 11 platform adapters (Promise.allSettled)
 - Preserves highest `total_claimed` (prevents regression on rate limits)
 - Recomputes invariant: `total_earned = total_claimed + total_unclaimed`
 - Upserts to `fee_records`

@@ -8,12 +8,12 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: 'Leaderboard | ClaimScan',
     description:
-      'Top creator fee earners across Pump.fun, Bags.fm, Clanker, Zora, and 5 more launchpads on Solana and Base.',
+      'Top creator fee earners across Pump.fun, Bags.fm, Clanker, Zora, Flaunch, Flap and 5 more launchpads on Solana, Base, and BNB Chain.',
     alternates: { canonical: `${APP_URL}/leaderboard` },
     openGraph: {
       title: 'Leaderboard: Top Creator Fee Earners | ClaimScan',
       description:
-        'See who earns the most in creator fees across 9 DeFi launchpads on Solana, Base, and BNB Chain.',
+        'See who earns the most in creator fees across 11 DeFi launchpads on Solana, Base, and BNB Chain.',
       url: `${APP_URL}/leaderboard`,
       siteName: 'ClaimScan',
       type: 'website',
@@ -32,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
       creator: '@lwartss',
       title: 'Leaderboard: Top Creator Fee Earners | ClaimScan',
       description:
-        'See who earns the most in creator fees across 9 DeFi launchpads on Solana, Base, and BNB Chain.',
+        'See who earns the most in creator fees across 11 DeFi launchpads on Solana, Base, and BNB Chain.',
       images: [
         {
           url: '/leaderboard/opengraph-image',

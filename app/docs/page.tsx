@@ -6,11 +6,11 @@ import { RevealMount } from '../components/anim/RevealMount';
 export const metadata: Metadata = {
   title: 'API Reference & Guides | ClaimScan',
   description:
-    'Complete API reference for ClaimScan. Track creator fees across 10 launchpads on Solana, Base, Ethereum, and BNB Chain.',
+    'Complete API reference for ClaimScan. Track creator fees across 11 launchpads on Solana, Base, Ethereum, and BNB Chain.',
   openGraph: {
     title: 'API Reference & Guides | ClaimScan',
     description:
-      'Complete API reference for ClaimScan. Track creator fees across 10 launchpads on Solana, Base, Ethereum, and BNB Chain.',
+      'Complete API reference for ClaimScan. Track creator fees across 11 launchpads on Solana, Base, Ethereum, and BNB Chain.',
     images: [
       {
         url: 'https://claimscan.tech/og-docs.png',
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image' as const,
     title: 'API Reference & Guides | ClaimScan',
     description:
-      'Complete API reference for ClaimScan. Track creator fees across 10 launchpads on Solana, Base, Ethereum, and BNB Chain.',
+      'Complete API reference for ClaimScan. Track creator fees across 11 launchpads on Solana, Base, Ethereum, and BNB Chain.',
     images: [
       {
         url: 'https://claimscan.tech/og-docs.png',
@@ -50,7 +50,7 @@ export default function DocsPage() {
             name: 'How does ClaimScan work?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Paste a social handle or wallet address. ClaimScan resolves it to wallets and scans 10 platforms across Solana, Base, Ethereum, and BNB Chain in parallel, showing earned, claimed, and unclaimed fees in real time.',
+              text: 'Paste a social handle or wallet address. ClaimScan resolves it to wallets and scans 11 platforms across Solana, Base, Ethereum, and BNB Chain in parallel, showing earned, claimed, and unclaimed fees in real time.',
             },
           },
           {
@@ -58,7 +58,7 @@ export default function DocsPage() {
             name: 'What platforms does ClaimScan support?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'ClaimScan supports 10 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana, plus Clanker, Zora, Bankr, and Flaunch on Base/ETH/BSC.',
+              text: 'ClaimScan supports 11 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana, plus Clanker, Zora, Bankr, and Flaunch on Base/ETH, and Flap on BSC.',
             },
           },
           {
@@ -91,13 +91,13 @@ export default function DocsPage() {
         '@type': 'HowTo',
         '@id': 'https://claimscan.tech/docs#howto',
         name: 'How to check unclaimed crypto creator fees',
-        description: 'Use ClaimScan to find and claim uncollected creator fees across 9 DeFi launchpads on Solana, Base, and BNB Chain in under 30 seconds.',
+        description: 'Use ClaimScan to find and claim uncollected creator fees across 11 DeFi launchpads on Solana, Base, and BNB Chain in under 30 seconds.',
         totalTime: 'PT30S',
         tool: { '@type': 'HowToTool', name: 'ClaimScan' },
         step: [
           { '@type': 'HowToStep', position: 1, name: 'Enter a handle', text: 'Enter a Twitter, Farcaster, or GitHub username, or a raw wallet address into ClaimScan.' },
           { '@type': 'HowToStep', position: 2, name: 'Identity resolution', text: 'ClaimScan maps social handles to wallet addresses across all supported chains.' },
-          { '@type': 'HowToStep', position: 3, name: 'Parallel platform scan', text: 'All 10 platforms are queried simultaneously. Results stream in real time as each completes.' },
+          { '@type': 'HowToStep', position: 3, name: 'Parallel platform scan', text: 'All 11 platforms are queried simultaneously. Results stream in real time as each completes.' },
           { '@type': 'HowToStep', position: 4, name: 'Fee aggregation', text: 'Earned, claimed, partially claimed, and unclaimed fees are pulled per token. Duplicates filtered.' },
           { '@type': 'HowToStep', position: 5, name: 'USD conversion', text: 'Live prices fetched from DexScreener and Jupiter. Continuously refreshed.' },
           { '@type': 'HowToStep', position: 6, name: 'Review your dashboard', text: 'View platform breakdown, chain breakdown, and token-level details. Claim uncollected fees directly.' },
@@ -169,7 +169,7 @@ export default function DocsPage() {
               Introduction
             </h2>
             <p className="mt-4 text-[15px] leading-[1.75] text-[var(--text-secondary)]">
-              ClaimScan scans 10 launchpads across 4 chains and shows what creators earned, claimed, and left uncollected.
+              ClaimScan scans 11 launchpads across 4 chains and shows what creators earned, claimed, and left uncollected.
               Paste a handle or wallet. Get a full fee breakdown in seconds.
             </p>
 
@@ -198,9 +198,9 @@ export default function DocsPage() {
                 <tbody>
                   {[
                     { chain: 'Solana', id: 'N/A', decimals: '9', platforms: 'Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, Raydium' },
-                    { chain: 'Base', id: '8453', decimals: '18', platforms: 'Clanker, Zora, Bankr' },
+                    { chain: 'Base', id: '8453', decimals: '18', platforms: 'Clanker, Zora, Bankr, Flaunch' },
                     { chain: 'Ethereum', id: '1', decimals: '18', platforms: 'Zora' },
-                    { chain: 'BSC', id: '56', decimals: '18', platforms: 'Clanker' },
+                    { chain: 'BSC', id: '56', decimals: '18', platforms: 'Clanker, Flap' },
                   ].map((row, i) => (
                     <tr key={row.chain} className={i % 2 === 0 ? 'bg-[var(--bg-input)]' : 'bg-[#FFFFFF04]'}>
                       <td className="px-4 py-3 font-mono text-[13px] font-semibold text-white">{row.chain}</td>
@@ -221,7 +221,7 @@ export default function DocsPage() {
           {/* ═══ SUPPORTED PLATFORMS ═══ */}
           <section id="platforms" data-reveal className="reveal scroll-mt-24 border-t border-[var(--border-subtle)] pt-10 mt-10">
             <h2 className="text-[24px] font-bold text-[var(--text-primary)]">Supported Platforms</h2>
-            <p className="mt-3 text-[15px] text-[var(--text-secondary)]">10 platforms across Solana, Base, and BNB Chain.</p>
+            <p className="mt-3 text-[15px] text-[var(--text-secondary)]">11 platforms across Solana, Base, and BNB Chain.</p>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-[10px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -240,10 +240,10 @@ export default function DocsPage() {
               <div className="rounded-[10px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5">
                 <div className="flex items-center justify-between mb-4">
                   <span className="rounded-[6px] bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-inverse)]">Base / ETH / BSC</span>
-                  <span className="text-[11px] text-[var(--text-tertiary)]">3 platforms</span>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">5 platforms</span>
                 </div>
                 <div className="space-y-0 divide-y divide-[var(--border-subtle)]">
-                  {[['Clanker','Farcaster launcher (Base + BSC)'],['Zora','Protocol rewards (Base + ETH)'],['Bankr','AI trading fee splits (Base)']].map(([n,d])=>(
+                  {[['Clanker','Farcaster launcher (Base + BSC)'],['Zora','Protocol rewards (Base + ETH)'],['Bankr','AI trading fee splits (Base)'],['Flaunch','Takeover.fun coins (Base)'],['Flap','Memecoin Portal (BSC)']].map(([n,d])=>(
                     <div key={n} className="flex items-center justify-between py-2.5">
                       <span className="text-[13px] font-semibold text-[var(--text-primary)]">{n}</span>
                       <span className="text-[11px] text-[var(--text-tertiary)]">{d}</span>
@@ -259,7 +259,7 @@ export default function DocsPage() {
             <h2 className="text-[24px] font-bold text-[var(--text-primary)]">How It Works</h2>
             <p className="mt-3 text-[15px] text-[var(--text-secondary)]">Scan any creator in under 30 seconds. No wallet connection required.</p>
             <ol className="mt-6 space-y-4">
-              {[['Enter a handle','Twitter, Farcaster, GitHub username, or raw wallet address.'],['Identity resolution','Social handles resolved to wallet addresses across all supported chains.'],['Parallel platform scan','All 10 platforms queried simultaneously. Results stream in real time.'],['Fee aggregation','Earned, claimed, and unclaimed fees pulled per token. Duplicates filtered.'],['USD conversion','Live prices via DexScreener, Jupiter, and CoinGecko. Auto-refreshed.'],['Live dashboard','Platform breakdown, chain breakdown, token-level details. Auto-refreshes.']].map(([title,desc],i)=>(
+              {[['Enter a handle','Twitter, Farcaster, GitHub username, or raw wallet address.'],['Identity resolution','Social handles resolved to wallet addresses across all supported chains.'],['Parallel platform scan','All 11 platforms queried simultaneously. Results stream in real time.'],['Fee aggregation','Earned, claimed, and unclaimed fees pulled per token. Duplicates filtered.'],['USD conversion','Live prices via DexScreener, Jupiter, and CoinGecko. Auto-refreshed.'],['Live dashboard','Platform breakdown, chain breakdown, token-level details. Auto-refreshes.']].map(([title,desc],i)=>(
                 <li key={i} className="flex gap-4">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-[var(--text-inverse)]">{i+1}</span>
                   <div>
@@ -388,7 +388,7 @@ curl https://claimscan.tech/api/v2/fees?wallet=0x... \\
               <code className="font-mono text-[16px] font-semibold text-[var(--text-primary)]">/api/search</code>
             </div>
             <p className="text-[15px] leading-[1.75] text-[var(--text-secondary)]">
-              Resolves a social handle (Twitter, GitHub, Farcaster) or wallet address to a creator identity. Returns the creator profile, all linked wallets, and aggregated fee records across all 10 platforms and 4 chains.
+              Resolves a social handle (Twitter, GitHub, Farcaster) or wallet address to a creator identity. Returns the creator profile, all linked wallets, and aggregated fee records across all 11 platforms and 4 chains.
             </p>
 
             <h3 className="mt-6 text-[14px] font-semibold text-[var(--text-primary)]">Parameters</h3>
@@ -460,7 +460,7 @@ curl https://claimscan.tech/api/v2/fees?wallet=0x... \\
               <span className="text-[11px] text-[var(--text-tertiary)]">via x402</span>
             </div>
             <p className="text-[15px] leading-[1.75] text-[var(--text-secondary)]">
-              Returns every fee record for a wallet across all 10 platforms and 4 chains. Each record includes earned, claimed, unclaimed amounts (BigInt) and current USD value.
+              Returns every fee record for a wallet across all 11 platforms and 4 chains. Each record includes earned, claimed, unclaimed amounts (BigInt) and current USD value.
             </p>
 
             <h3 className="mt-6 text-[14px] font-semibold text-[var(--text-primary)]">Parameters</h3>
@@ -686,11 +686,11 @@ curl https://claimscan.tech/api/v2/export?wallet=0xEvmAddress...&format=json`}</
               {[
                 {
                   q: 'How does ClaimScan work?',
-                  a: 'Paste a social handle or wallet address. ClaimScan resolves it to wallets and scans 10 platforms across Solana, Base, Ethereum, and BNB Chain in parallel, showing earned, claimed, and unclaimed fees in real time.',
+                  a: 'Paste a social handle or wallet address. ClaimScan resolves it to wallets and scans 11 platforms across Solana, Base, Ethereum, and BNB Chain in parallel, showing earned, claimed, and unclaimed fees in real time.',
                 },
                 {
                   q: 'What platforms are supported?',
-                  a: '10 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana, plus Clanker, Zora, Bankr, and Flaunch on Base/ETH/BSC.',
+                  a: '11 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana, plus Clanker, Zora, Bankr, and Flaunch on Base/ETH, and Flap on BSC.',
                 },
                 {
                   q: 'Is ClaimScan free?',
@@ -795,7 +795,7 @@ curl https://claimscan.tech/api/v2/export?wallet=0xEvmAddress...&format=json`}</
                   <span className="text-[11px] text-[var(--text-tertiary)]">Current · Live</span>
                 </div>
                 <div className="columns-1 sm:columns-2 gap-x-6 space-y-1.5">
-                  {['9 platform support (Solana + Base + BSC)','Multi-identity search (Twitter, GitHub, Farcaster, Wallet)','Real-time streaming scan results','Bags.fm direct claim (zero-custody)','Pre-sign transaction simulation','Smart caching with background indexing','Multi-source USD price aggregation','V2 paid API via x402 protocol','Rate limiting and abuse prevention','Privacy-preserving analytics'].map((item)=>(
+                  {['11 platform support (Solana + Base + Ethereum + BSC)','Multi-identity search (Twitter, GitHub, Farcaster, Wallet)','Real-time streaming scan results','Bags.fm direct claim (zero-custody)','Pre-sign transaction simulation','Smart caching with background indexing','Multi-source USD price aggregation','V2 paid API via x402 protocol','Rate limiting and abuse prevention','Privacy-preserving analytics'].map((item)=>(
                     <div key={item} className="flex items-start gap-2 break-inside-avoid text-[12px] text-[var(--text-secondary)]">
                       <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
                       {item}

@@ -7,7 +7,7 @@ import type { InlineKeyboardButton } from 'grammy/types';
 
 const START_TEXT = `<b>🔎 ClaimScan</b>
 
-Track unclaimed creator fees across 9 DeFi launchpads on Solana, Base, and BSC.
+Track unclaimed creator fees across 11 DeFi launchpads on Solana, Base, Ethereum, and BSC.
 
 Paste any token CA in the chat and I'll show you the fee breakdown, no command needed.
 
@@ -50,7 +50,7 @@ export async function handleStart(ctx: Context): Promise<void> {
 const HELP_TEXT = `<b>🎮 Commands</b>
 
 <code>/scan @handle</code>
-Full creator fee report. Resolves wallets, scans all 10 platforms, shows aggregated fees and top unclaimed tokens.
+Full creator fee report. Resolves wallets, scans all 11 platforms, shows aggregated fees and top unclaimed tokens.
 
 <code>/leaderboard</code> (or <code>/top</code>)
 Top 10 creators ranked by total fees earned across all platforms. Live from claimscan.tech.

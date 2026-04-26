@@ -17,8 +17,8 @@ export function EmptyFeesCallout({ handle, provider }: EmptyFeesCalloutProps) {
   const headline = isWallet ? 'No tracked fees on this wallet' : 'No fees found yet';
 
   const body = isWallet
-    ? `We scanned all 10 launchpads across Solana, Base, Ethereum and BNB Chain. This wallet hasn't earned creator fees on any of them.`
-    : `We scanned all 10 launchpads across Solana, Base, Ethereum and BNB Chain. ${handle ? `@${handle}` : 'This account'} hasn't earned creator fees on any of them. The account might be new, or hasn't been indexed yet.`;
+    ? `We scanned all 11 launchpads across Solana, Base, Ethereum and BNB Chain. This wallet hasn't earned creator fees on any of them.`
+    : `We scanned all 11 launchpads across Solana, Base, Ethereum and BNB Chain. ${handle ? `@${handle}` : 'This account'} hasn't earned creator fees on any of them. The account might be new, or hasn't been indexed yet.`;
 
   return (
     <div className="animate-fade-in-up delay-200 px-5 py-12 sm:px-12 sm:py-16">

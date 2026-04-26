@@ -213,7 +213,7 @@ background:
 - Gap between lines: 4px
 
 **Subtitle:**
-- "Paste any @handle or wallet. See what you've earned, claimed, and left on the table across 10 launchpads. Learn how it works"
+- "Paste any @handle or wallet. See what you've earned, claimed, and left on the table across 11 launchpads. Learn how it works"
 - Inter 16px/normal, line-height 1.6, color `var(--text-tertiary)`, text-align center
 - Max-width: 620px
 
