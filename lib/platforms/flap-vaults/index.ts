@@ -5,6 +5,7 @@ import type { BscAddress } from '@/lib/chains/types';
 import {
   VAULT_PORTAL_ABI,
   V2_PROBE_ABI,
+  SPLITVAULT_USERBALANCES_ABI,
   VAULT_CATEGORY_MAP,
   type FlapVaultKind,
   type FlapVaultHandler,
@@ -18,6 +19,7 @@ import {
 const TRY_GET_VAULT_SELECTOR = '0xd493059b' as const;
 import { baseV1Handler } from './base-v1';
 import { baseV2Handler } from './base-v2';
+import { splitVaultHandler } from './split-vault';
 import { unknownHandler } from './unknown';
 import { createLogger } from '@/lib/logger';
 
@@ -76,6 +78,7 @@ export async function lookupVaultAddress(
 const HANDLERS: Record<FlapVaultKind, FlapVaultHandler> = {
   'base-v1': baseV1Handler,
   'base-v2': baseV2Handler,
+  'split-vault': splitVaultHandler,
   'unknown': unknownHandler,
 };
 
@@ -155,6 +158,24 @@ export async function resolveVaultKind(
     });
     log.child({ vault: vaultAddress.slice(0, 10) }).info('probe_v1_hit');
     return 'base-v1';
+  } catch {
+    // Continue to SplitVault probe.
+  }
+
+  // 4. Fallback C: probe SplitVault marker (userBalances(0x0)). [Phase 12.1 NEW]
+  //    SplitVault uses `mapping(address => UserBalance)` (Solidity public getter
+  //    returns a 2-tuple). Mutual exclusion empirically verified (RESEARCH
+  //    §"Probe Order Mutual Exclusion" L566-588): V1's claimable reverts on
+  //    SplitVault, and SplitVault's userBalances reverts on V1/V2.
+  try {
+    await bscClient.readContract({
+      address: vaultAddress as `0x${string}`,
+      abi: SPLITVAULT_USERBALANCES_ABI,
+      functionName: 'userBalances',
+      args: ['0x0000000000000000000000000000000000000000'],
+    });
+    log.child({ vault: vaultAddress.slice(0, 10) }).info('probe_split_vault_hit');
+    return 'split-vault';
   } catch {
     // All probes failed → unknown.
   }
