@@ -38,6 +38,17 @@ function toLamports(val: string | number | null | undefined): bigint {
   }
 }
 
+/** Convert a Bags API decimal-SOL value (e.g. 201.957356787) to lamports BigInt.
+ * Used for the new custom-fee-vault schema's `claimableDisplayAmount`, which is
+ * expressed in SOL units rather than lamports. Math.round absorbs the IEEE-754
+ * drift you get from values like 201.957356787 * 1e9 = 201957356786.99997. */
+function solToLamports(val: string | number | null | undefined): bigint {
+  if (val == null) return 0n;
+  const n = typeof val === 'string' ? Number(val) : val;
+  if (!Number.isFinite(n) || n < 0) return 0n;
+  return BigInt(Math.round(n * 1e9));
+}
+
 // ═══════════════════════════════════════════════
 // Bags.fm API Types
 // ═══════════════════════════════════════════════
@@ -57,10 +68,23 @@ interface BagsWalletPayload {
 
 /**
  * Convert a Bags claimable position to a TokenFee entry.
- * Bags API V2 field naming is misleading:
- *   totalClaimableLamportsUserShare = TOTAL EARNED (not unclaimed!)
- *   Real unclaimed = virtualPool + dammPool + userVault pool fields
- *   claimed = earned - unclaimed
+ *
+ * Bags API V2 returns positions in two different schemas, distinguished by the
+ * presence of the per-pool *ClaimableLamportsUserShare fields:
+ *
+ *   LEGACY schema (pre custom-fee-vault migration):
+ *     totalClaimableLamportsUserShare = lifetime earned (lamports)
+ *     unclaimed = virtualPool + dammPool + userVault lamport fields
+ *     claimed = earned - unclaimed
+ *
+ *   NEW custom-fee-vault schema:
+ *     totalClaimableLamportsUserShare = currently claimable (lamports), NOT lifetime
+ *     unclaimed = claimableDisplayAmount (in SOL units, NOT lamports)
+ *     The lamport pool fields are absent. There is no claimed history in the API —
+ *     it must come from DB preservation in fee-sync.ts.
+ *
+ * The `isCustomFeeVault` flag is unreliable for schema detection (it's true on
+ * many legacy rows). Schema is detected by absence of the lamport fields.
  *
  * @param dustLamports - minimum earned threshold to filter noise (0n = no filter)
  */
@@ -71,10 +95,20 @@ function positionToFee(
   if (!p.baseMint) return null;
 
   const earned = toLamports(p.totalClaimableLamportsUserShare);
-  const unclaimed = toLamports(p.virtualPoolClaimableLamportsUserShare)
-                  + toLamports(p.dammPoolClaimableLamportsUserShare)
-                  + toLamports(p.userVaultClaimableLamportsUserShare);
-  // Clamp unclaimed to earned to maintain invariant: earned >= unclaimed
+
+  const hasLegacyLamportFields =
+    p.virtualPoolClaimableLamportsUserShare !== undefined ||
+    p.dammPoolClaimableLamportsUserShare !== undefined ||
+    p.userVaultClaimableLamportsUserShare !== undefined;
+
+  const unclaimed = hasLegacyLamportFields
+    ? toLamports(p.virtualPoolClaimableLamportsUserShare)
+      + toLamports(p.dammPoolClaimableLamportsUserShare)
+      + toLamports(p.userVaultClaimableLamportsUserShare)
+    : solToLamports(p.claimableDisplayAmount);
+
+  // Clamp unclaimed to earned to maintain invariant: earned >= unclaimed.
+  // Also absorbs sub-lamport float drift on solToLamports conversions.
   const clampedUnclaimed = unclaimed > earned ? earned : unclaimed;
   const claimed = earned - clampedUnclaimed;
 
@@ -93,6 +127,11 @@ function positionToFee(
     royaltyBps: p.userBps ?? null,
   };
 }
+
+/** Test-only export so unit tests can exercise schema branches without
+ *  spinning up the full adapter / mocking the Bags API. Not part of the
+ *  public adapter contract — do not call from app code. */
+export const __positionToFee = positionToFee;
 
 // ═══════════════════════════════════════════════
 // Helpers
