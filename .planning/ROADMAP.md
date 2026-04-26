@@ -65,3 +65,20 @@ Plans:
 ## Post-Milestone
 
 **Ao completar Phase 12:** rodar `/gsd-complete-milestone`, depois promover Quality & Testing v1 do backlog via `/gsd-review-backlog` (ou move manual de `.planning/backlog/milestones/quality-testing-v1/` de volta pra raiz `.planning/`).
+
+### Phase 12.1: SplitVault handler — implement third Flap vault type (3979 instances, 58.6% of all 6792 vault tokens). Adds vault_type='split-vault' to schema CHECK constraint, new handler lib/platforms/flap-vaults/split-vault.ts reading userBalances(creator).accumulated minus claimed (BNB native), probe order in resolveVaultKind: getVaultCategory then V2 vaultUISchema then V1 claimable then SplitVault userBalances then unknown. Display-only in v1, no claim flow yet. (INSERTED)
+
+**Goal:** Graduate ~3979 (58.6%) of Flap vault tokens from `vault_type='unknown'` to `vault_type='split-vault'` by adding a third polymorphic vault handler reading SplitVault.userBalances(creator) returning (uint128 accumulated, uint128 claimed) tuple. Display-only in v1: claimable BNB rendered without "Claim method unknown" badge, no claim flow. Migration 035 extends BOTH flap_tokens.vault_type AND fee_records.vault_type CHECK constraints atomically. After ship, ~3979 unknown rows reclassified via post-deploy script run.
+**Requirements:** SV-01, SV-02, SV-03, SV-04, SV-05, SV-06, SV-07, SV-08, SV-09
+**Depends on:** Phase 12
+**Plans:** 8 plans
+
+Plans:
+- [x] 12.1-01-PLAN.md — Wave 0 test stubs: split-vault.test.ts new + flap-vaults.test.ts extended + flap.test.ts extended (SV-08)
+- [x] 12.1-02-PLAN.md — Wave 0 BLOCKING: Migration 035 SQL + rollback + STAGING apply (SV-01, SV-07)
+- [x] 12.1-03-PLAN.md — Wave 1: Type widening (FlapVaultKind + TokenFee.vaultType + supabase/types.ts) + SPLITVAULT_USERBALANCES_ABI const (SV-03)
+- [x] 12.1-04-PLAN.md — Wave 2: split-vault.ts handler + drive 3 unit test stubs to GREEN (SV-02)
+- [x] 12.1-05-PLAN.md — Wave 3: index.ts probe ladder extension + HANDLERS map entry + drive 2 flap-vaults.test.ts stubs to GREEN (SV-04, SV-05)
+- [x] 12.1-06-PLAN.md — Wave 4: scripts/classify-flap.ts mirror — 7 touchpoints + drift parity grep (SV-06)
+- [x] 12.1-07-PLAN.md — Wave 4: Integration test find-one-at-runtime parity + descriptive skipIf (SV-08)
+- [ ] 12.1-08-PLAN.md — Wave 5 BLOCKING: Apply migration 035 to PRODUCTION + run classify-flap.ts + DB sanity SELECT (SV-07, SV-09) [in progress: classify-flap loop running]

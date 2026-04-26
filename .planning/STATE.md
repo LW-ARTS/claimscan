@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: completed
-last_updated: "2026-04-25T03:02:36.060Z"
+status: executing
+last_updated: "2026-04-26T04:50:00.000Z"
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 2
-  total_plans: 12
-  completed_plans: 12
-  percent: 100
+  total_plans: 20
+  completed_plans: 19
+  percent: 95
 ---
 
 # ClaimScan — Project State
@@ -21,18 +21,18 @@ progress:
 
 ## Current Position
 
-Phase: 12 (flap-adapter-bsc) — EXECUTING
-Plan: Not started
+Phase: 12.1 (splitvault-handler) — EXECUTING
+Plan: 08 (in progress — classify-flap.ts loop drains remaining ~5769 unknown rows)
 
-- **Phase:** 12
-- **Active Phase:** 12
-- **Status:** Milestone complete
-- **Resume file:** `.planning/phases/12-flap-adapter-bsc/12-CONTEXT.md`
+- **Phase:** 12.1
+- **Active Phase:** 12.1
+- **Status:** Plans 01-07 complete (code shipped to local main). Plan 08 task 1 done (migration applied via Supabase MCP). Plan 08 task 2 in progress (classify-flap loop). Plan 08 task 3 pending.
+- **Resume file:** `.planning/phases/12.1-splitvault-handler-implement-third-flap-vault-type-3979-inst/12.1-HANDOFF.md`
 
 ## Last Activity
 
-- **Date:** 2026-04-24
-- **Action:** Phase 12 discuss-phase concluído — 15 áreas discutidas, CONTEXT.md + DISCUSSION-LOG.md escritos. Bitquery one-shot backfill locked (D-01/D-02/D-03), endereços Flap + fixture wallet delegados pro research agent (D-05/D-09), unknown vault UX com badge de warning (D-04), Sentry observability para lag > 500K blocos (D-08) e unknown vaults (D-16).
+- **Date:** 2026-04-26
+- **Action:** Phase 12.1 autonomous overnight execution — Migration 035 applied via MCP, executor agent shipped 6 code commits (test stubs, type widening, handler, probe ladder, script mirror, integration test) + migration commit, all 210 tests GREEN, tsc clean. classify-flap batch 1 done (641 split-vault, 310 base-v2, 49 unknown-failed in 1000 rows). Loop running for remaining 5769 unknowns (~70 min). User must `git push origin main` in morning to deploy 9 unpushed commits via Vercel.
 
 ## Accumulated Context
 
@@ -42,6 +42,10 @@ Plan: Not started
 - Decisão de override: PROJECT.md original tinha "Novos launchpads" em Out of Scope; override explícito do fundador em 2026-04-20 moveu pra Active. Q&T milestone parkeado, não descartado.
 - Chave técnica Flaunch: `RevenueManager.balances(wallet)` é agregado (não per-coin), daí o synthetic token ID `BASE:flaunch-revenue` seguindo pattern Pump.
 - Chave técnica Flap: indexer próprio + one-shot Bitquery backfill do bonus signup (descartável), vault handler registry polimórfico com fallback `unknown` (badge UI "Claim method unknown"), event spoof protection via `log.address === FLAP_PORTAL`.
+
+### Roadmap Evolution
+
+- Phase 12.1 inserted after Phase 12: SplitVault handler — third Flap vault type discovered post-Phase 12 verification (3979/6792 = 58.6% of vault tokens use SplitVault implementation `0xd6a92acc...`, only 1 token uses canonical V2 `0xd5051e83...`). Existing v1/v2/unknown trichotomy too coarse; pivoting backfill from Portal.TokenCreated to VaultPortal.FlapTaxVaultTokenCreated mapped the universe. (URGENT — adapter currently shows "Claim method unknown" for the 58.6%)
 
 ## Blockers
 
