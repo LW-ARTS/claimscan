@@ -61,20 +61,16 @@ export default async function Home() {
     { name: 'x402', src: null },
   ];
 
-  // Derive per-chain launchpad counts from PLATFORM_CONFIG (single source of truth).
-  // Base/ETH/BSC share EVM platforms (Clanker runs on Base + BSC, Zora on Base + ETH).
-  const platformsByChain = Object.values(PLATFORM_CONFIG).reduce<Record<string, number>>(
-    (acc, p) => {
-      acc[p.chain] = (acc[p.chain] ?? 0) + 1;
-      return acc;
-    },
-    {},
-  );
+  // Per-chain launchpad counts. EVM platforms span multiple chains
+  // (Clanker on Base+BSC, Zora on Base+ETH, Bankr on Base+ETH+BSC), so we
+  // count effective coverage rather than just primary chain assignment.
+  // Solana is single-chain; Base/ETH/BSC counts include extended-chain support.
+  const solCount = Object.values(PLATFORM_CONFIG).filter((p) => p.chain === 'sol').length;
   const chainCards = [
-    { name: 'Solana', launchpads: platformsByChain.sol ?? 0 },
-    { name: 'Base', launchpads: platformsByChain.base ?? 0 },
-    { name: 'Ethereum', launchpads: 1 }, // Zora extends to ETH L1
-    { name: 'BSC', launchpads: 2 }, // Clanker extends to BSC + Flap primary
+    { name: 'Solana', launchpads: solCount },                 // 6: Pump, Bags, Believe, RevShare, Coinbarrel, Raydium
+    { name: 'Base', launchpads: 4 },                          // Clanker, Zora, Bankr, Flaunch
+    { name: 'Ethereum', launchpads: 2 },                      // Zora, Bankr
+    { name: 'BSC', launchpads: 3 },                           // Clanker, Bankr, Flap
   ];
 
   const steps = [

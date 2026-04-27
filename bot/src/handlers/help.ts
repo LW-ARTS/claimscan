@@ -21,7 +21,7 @@ Paste any token CA in the chat and I'll show you the fee breakdown, no command n
 
 <b>🏷 Platforms</b>
 Pump.fun · Believe · Bags.fm · Clanker · Zora
-Bankr · RevShare · Coinbarrel · Raydium`;
+Bankr · RevShare · Coinbarrel · Raydium · Flaunch · Flap`;
 
 const START_BUTTONS: InlineKeyboardButton[][] = [
   [
