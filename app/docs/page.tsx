@@ -791,7 +791,7 @@ curl https://claimscan.tech/api/v2/export?wallet=0xEvmAddress...&format=json`}</
             <div className="mt-6 space-y-6">
               <div className="rounded-[10px] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="rounded-[6px] bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--text-inverse)]">V1.5</span>
+                  <span className="rounded-[6px] bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--text-inverse)]">V2.8</span>
                   <span className="text-[11px] text-[var(--text-tertiary)]">Current · Live</span>
                 </div>
                 <div className="columns-1 sm:columns-2 gap-x-6 space-y-1.5">
