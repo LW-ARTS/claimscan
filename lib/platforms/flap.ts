@@ -8,10 +8,14 @@ import type {
 import type { IdentityProvider } from '@/lib/supabase/types';
 import { createServiceClient } from '@/lib/supabase/service';
 import { asBscAddress } from '@/lib/chains/types';
+import { bscClient } from '@/lib/chains/bsc';
+import { parseAbi } from 'viem';
 import { resolveHandler, fundRecipientHandler } from './flap-vaults';
 import type { FlapVaultKind } from './flap-vaults/types';
 import { createLogger } from '@/lib/logger';
 import { sanitizeTokenSymbol, sanitizeTokenName } from '@/lib/utils';
+
+const ERC20_SYMBOL_ABI = parseAbi(['function symbol() view returns (string)']);
 
 const log = createLogger('flap');
 
@@ -194,9 +198,18 @@ export const flapAdapter: PlatformAdapter = {
         // first dispatch.
         if (cumulative === 0n) continue;
         const cumulativeStr = cumulative.toString();
+        let tokenSymbol: string | null = null;
+        try {
+          const raw = await bscClient.readContract({
+            address: row.token_address as `0x${string}`,
+            abi: ERC20_SYMBOL_ABI,
+            functionName: 'symbol',
+          });
+          tokenSymbol = sanitizeTokenSymbol(raw);
+        } catch { /* silent — symbol is cosmetic, not critical */ }
         fees.push({
           tokenAddress: row.token_address,
-          tokenSymbol: null,        // v1: no symbol cache; UI shows address prefix
+          tokenSymbol,
           chain: 'bsc',
           platform: 'flap',
           totalEarned: cumulativeStr,
@@ -262,8 +275,5 @@ export const flapAdapter: PlatformAdapter = {
   },
 };
 
-// Suppress unused-import warnings for helpers we're saving for future expansion:
-// sanitizeTokenSymbol / sanitizeTokenName are wired for when backfill script
-// populates token_symbol / token_name columns (out of scope v1).
-void sanitizeTokenSymbol;
+// sanitizeTokenName kept for future use (token_name backfill out of scope v1).
 void sanitizeTokenName;

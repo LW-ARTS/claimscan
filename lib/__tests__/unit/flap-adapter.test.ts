@@ -43,6 +43,15 @@ vi.mock('@/lib/platforms/flap-vaults', () => ({
 // adapter only uses the branded address to pass to readClaimable (mocked).
 vi.mock('@/lib/chains/types', () => ({
   asBscAddress: (addr: string) => addr as `0x${string}`,
+  asBaseAddress: (addr: string) => addr as `0x${string}`,
+}));
+
+// bscClient is imported by flap.ts for ERC20 symbol reads — mock readContract.
+const { mockBscReadContract } = vi.hoisted(() => ({
+  mockBscReadContract: vi.fn().mockResolvedValue('SYMBOL'),
+}));
+vi.mock('@/lib/chains/bsc', () => ({
+  bscClient: { readContract: mockBscReadContract },
 }));
 
 // Silence logger output in tests — still verifies the module loads.
