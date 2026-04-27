@@ -778,12 +778,12 @@ a:focus-visible,
   40%            { transform: scale(1.7); opacity: 0.8; }
 }
 @keyframes signalNameScan {
-  0%, 10%   { color: rgba(255,255,255,0.70); }
-  11%, 100% { color: rgba(255,255,255,0.32); }
+  0%, 8%    { color: rgba(255,255,255,0.70); }
+  9%, 100%  { color: rgba(255,255,255,0.32); }
 }
 @keyframes signalDotScan {
-  0%, 10%   { opacity: 1; background: #F5F5F7; }
-  11%, 100% { opacity: 0; }
+  0%, 8%    { opacity: 1; background: #F5F5F7; }
+  9%, 100%  { opacity: 0; }
 }
 @keyframes signalCardIn {
   from { opacity: 0; transform: scale(0.96) translateY(8px); }
@@ -908,7 +908,7 @@ a:focus-visible,
   white-space: nowrap;
   position: relative;
   padding-left: 10px;
-  animation: signalNameScan 10.8s linear infinite;
+  animation: signalNameScan 13.2s linear infinite;
   animation-delay: var(--scan-delay, 0s);
 }
 .signal-platform::before {
@@ -922,7 +922,7 @@ a:focus-visible,
   border-radius: 50%;
   background: rgba(255,255,255,0.20);
   opacity: 0;
-  animation: signalDotScan 10.8s linear infinite;
+  animation: signalDotScan 13.2s linear infinite;
   animation-delay: var(--scan-delay, 0s);
 }
 
