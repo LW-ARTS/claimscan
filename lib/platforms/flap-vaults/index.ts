@@ -25,6 +25,15 @@ const log = createLogger('flap-vaults:registry');
 // tests) keep working unchanged.
 export { lookupVaultAddress, TRY_GET_VAULT_SELECTOR } from './vault-portal';
 
+// Phase 13: token-level fund-recipient detection + handler. Detection lives at this
+// layer (NOT inside resolveVaultKind) because fund-recipient tokens have no vault to
+// probe — see RESEARCH §"Critical Architectural Deviation". The cron orchestrator
+// (app/api/cron/index-flap/route.ts — Wave 3) calls detectFundRecipient when
+// lookupVaultAddress returns null. The Phase 13 adapter (lib/platforms/flap.ts —
+// Wave 4) imports fundRecipientHandler directly and bypasses the HANDLERS registry.
+export { detectFundRecipient, fundRecipientHandler } from './fund-recipient';
+export type { FundRecipientResult } from './fund-recipient';
+
 // ═══════════════════════════════════════════════
 // Dispatch by vault_type string (cached in flap_tokens.vault_type)
 // ═══════════════════════════════════════════════
