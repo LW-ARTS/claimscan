@@ -58,7 +58,7 @@ export default function DocsPage() {
             name: 'What platforms does ClaimScan support?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'ClaimScan supports 11 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana, plus Clanker, Zora, Bankr, and Flaunch on Base/ETH, and Flap on BSC.',
+              text: 'ClaimScan supports 11 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana; Clanker (Base + BSC), Zora (Base + ETH), Bankr (Base + ETH + BSC), Flaunch (Base), and Flap (BSC) across EVM chains.',
             },
           },
           {
@@ -199,8 +199,8 @@ export default function DocsPage() {
                   {[
                     { chain: 'Solana', id: 'N/A', decimals: '9', platforms: 'Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, Raydium' },
                     { chain: 'Base', id: '8453', decimals: '18', platforms: 'Clanker, Zora, Bankr, Flaunch' },
-                    { chain: 'Ethereum', id: '1', decimals: '18', platforms: 'Zora' },
-                    { chain: 'BSC', id: '56', decimals: '18', platforms: 'Clanker, Flap' },
+                    { chain: 'Ethereum', id: '1', decimals: '18', platforms: 'Zora, Bankr' },
+                    { chain: 'BSC', id: '56', decimals: '18', platforms: 'Clanker, Bankr, Flap' },
                   ].map((row, i) => (
                     <tr key={row.chain} className={i % 2 === 0 ? 'bg-[var(--bg-input)]' : 'bg-[#FFFFFF04]'}>
                       <td className="px-4 py-3 font-mono text-[13px] font-semibold text-white">{row.chain}</td>
@@ -243,7 +243,7 @@ export default function DocsPage() {
                   <span className="text-[11px] text-[var(--text-tertiary)]">5 platforms</span>
                 </div>
                 <div className="space-y-0 divide-y divide-[var(--border-subtle)]">
-                  {[['Clanker','Farcaster launcher (Base + BSC)'],['Zora','Protocol rewards (Base + ETH)'],['Bankr','AI trading fee splits (Base)'],['Flaunch','Takeover.fun coins (Base)'],['Flap','Memecoin Portal (BSC)']].map(([n,d])=>(
+                  {[['Clanker','Farcaster launcher (Base + BSC)'],['Zora','Protocol rewards (Base + ETH)'],['Bankr','AI trading fee splits (Base + ETH + BSC)'],['Flaunch','Takeover.fun coins (Base)'],['Flap','Memecoin Portal (BSC)']].map(([n,d])=>(
                     <div key={n} className="flex items-center justify-between py-2.5">
                       <span className="text-[13px] font-semibold text-[var(--text-primary)]">{n}</span>
                       <span className="text-[11px] text-[var(--text-tertiary)]">{d}</span>
