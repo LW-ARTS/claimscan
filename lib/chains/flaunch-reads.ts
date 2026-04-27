@@ -52,10 +52,22 @@ export async function readFlaunchBalances(
     });
     return value as bigint;
   } catch (err) {
+    // ME-11-A: 0n on RPC failure is indistinguishable from a real zero balance.
+    // Promote to Sentry so prod RPC degradation is visible. Caller still gets 0n
+    // for backwards compat — refactoring callers to discriminate would touch
+    // multiple paths and is deferred. The Sentry breadcrumb is the actionable
+    // signal.
     log.warn('readFlaunchBalances_failed', {
       recipient: recipient.slice(0, 10),
       error: err instanceof Error ? err.message : String(err),
     });
+    try {
+      const Sentry = await import('@sentry/nextjs');
+      Sentry.captureException(err, {
+        tags: { module: 'flaunch-reads', op: 'readFlaunchBalances' },
+        extra: { recipient: recipient.slice(0, 10) },
+      });
+    } catch { /* Sentry optional */ }
     return 0n;
   }
 }
@@ -113,6 +125,7 @@ export type FlaunchPerCoinEarnings = Map<string, bigint>;
 export type FlaunchEarningsResult =
   | { kind: 'ok'; perCoin: FlaunchPerCoinEarnings; total: bigint }
   | { kind: 'degraded'; perCoin: FlaunchPerCoinEarnings; total: bigint; successRatio: number }
+  | { kind: 'aborted' }   // ME-11-B: SSE wallclock abort, NOT an error — don't alert
   | { kind: 'error' };
 
 /**
@@ -142,7 +155,7 @@ export async function readFlaunchHistoricalEarnings(
       }),
     );
 
-    if (signal?.aborted) return { kind: 'error' };
+    if (signal?.aborted) return { kind: 'aborted' };
 
     const tokenIds = round1.map((r) =>
       r.status === 'success' ? (r.result as bigint) : null,
@@ -169,7 +182,7 @@ export async function readFlaunchHistoricalEarnings(
       }),
     );
 
-    if (signal?.aborted) return { kind: 'error' };
+    if (signal?.aborted) return { kind: 'aborted' };
 
     const poolIds = round2.map((r) =>
       r.status === 'success' ? (r.result as `0x${string}`) : null,
@@ -209,7 +222,10 @@ export async function readFlaunchHistoricalEarnings(
       }
     }
 
-    const successRatio = successCount / validByPoolId.length;
+    // HI-11-B: denominator must be the original input size, not Round-3
+    // survivors. Earlier-round failures (poolId resolution) shrunk validByPoolId
+    // before the ratio check, making the degraded threshold meaningless.
+    const successRatio = successCount / Math.max(tokenAddresses.length, 1);
 
     if (successRatio < MIN_SUCCESS_RATIO) {
       return { kind: 'degraded', perCoin, total, successRatio };

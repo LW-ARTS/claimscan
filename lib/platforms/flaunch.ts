@@ -12,6 +12,7 @@ import { readFlaunchBalances, readFlaunchHistoricalEarnings } from '@/lib/chains
 import { fetchCoinsByCreator } from '@/lib/flaunch/client';
 import { FLAUNCH_TAKEOVER_POSITION_MANAGER } from '@/lib/constants-evm';
 import { createLogger } from '@/lib/logger';
+import { sanitizeTokenSymbol } from '@/lib/utils';
 
 const log = createLogger('flaunch');
 
@@ -113,9 +114,18 @@ export const flaunchAdapter: PlatformAdapter = {
         : Promise.resolve({ kind: 'ok' as const, perCoin: new Map<string, bigint>(), total: 0n }),
     ]);
 
-    // Bail on degraded or errored historical reads. fee-sync.ts has 'flaunch'
+    // Bail on degraded, errored, or aborted historical reads. fee-sync.ts has 'flaunch'
     // in PRUNE_EXEMPT_PLATFORMS, so returning [] keeps the previously-cached
     // rows in the DB instead of flapping the user-visible values down.
+    // ME-11-B: 'aborted' is intentional (SSE wallclock) — log at info, not warn,
+    // so it doesn't inflate Sentry error counts.
+    if (earningsResult.kind === 'aborted') {
+      log.info('historical_earnings_aborted', {
+        wallet: wallet.slice(0, 10),
+        newPmTokenCount: newPmAddresses.length,
+      });
+      return [];
+    }
     if (earningsResult.kind === 'error' || earningsResult.kind === 'degraded') {
       log.warn('historical_earnings_skipped', {
         kind: earningsResult.kind,
@@ -147,7 +157,7 @@ export const flaunchAdapter: PlatformAdapter = {
 
       fees.push({
         tokenAddress: key,
-        tokenSymbol: coin.symbol,
+        tokenSymbol: sanitizeTokenSymbol(coin.symbol),
         chain: 'base',
         platform: 'flaunch',
         totalEarned: earned.toString(),
