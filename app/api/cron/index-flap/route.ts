@@ -10,6 +10,7 @@ import {
 import {
   resolveVaultKind,
   lookupVaultAddress,
+  detectFundRecipient,
 } from '@/lib/platforms/flap-vaults';
 import {
   FLAP_PORTAL,
@@ -219,6 +220,7 @@ export async function GET(request: Request) {
     //    Bounded by MAX_CLASSIFICATIONS_PER_RUN AND remaining wallclock. Rows
     //    left unresolved stay `vault_type='unknown'` and get picked up next run.
     let classifiedCount = 0;
+    let fundRecipientMatched = 0;
     if (Date.now() - started < WALLCLOCK_MS) {
       const { data: pending, error: pendingErr } = await supabase
         .from('flap_tokens')
@@ -244,7 +246,46 @@ export async function GET(request: Request) {
               row.token_address as BscAddress,
             );
             if (!vaultAddr) {
-              // Mark with sentinel so we don't retry every run.
+              // Phase 13 Wave 3: when no vault is registered, the token may
+              // still be a fund-recipient launch (auto-forward fees as native
+              // BNB to a recipient EOA via per-token TaxProcessor clones).
+              // Probe-ladder runs 4 RPC reads (lookupVaultAddress + taxProcessor
+              // + marketAddress + getCode); each guarded by try/catch returning
+              // matched=false. RPC budget concern: detectFundRecipient internally
+              // re-calls lookupVaultAddress (Step 1), so we pay that lookup
+              // twice per still-unknown row — acceptable at MAX_CLASSIFICATIONS_PER_RUN=5
+              // (~5 × 4 reads = 20 reads/run, fits Alchemy free tier).
+              // Future optimization: thread the prior vaultAddr=null result
+              // into detectFundRecipient as a hint to skip Step 1.
+              const fr = await detectFundRecipient(
+                row.token_address as `0x${string}`,
+              );
+              if (fr.matched && fr.marketAddress && fr.taxProcessor) {
+                // Match: persist as fund-recipient. vault_address stays null
+                // (no vault to point at). Row exits the pending-classify
+                // query because vault_type='unknown' filter no longer matches —
+                // no sentinel needed, no risk of re-probe loops.
+                await supabase
+                  .from('flap_tokens')
+                  .update({
+                    vault_type: 'fund-recipient',
+                    recipient_address: fr.marketAddress.toLowerCase(),
+                    tax_processor_address: fr.taxProcessor.toLowerCase(),
+                  })
+                  .eq('token_address', row.token_address);
+
+                classifiedCount++;
+                fundRecipientMatched++;
+                childLog.info('classify.fund_recipient_matched', {
+                  token: row.token_address.slice(0, 10),
+                  recipient: fr.marketAddress.slice(0, 10),
+                  taxProcessor: fr.taxProcessor.slice(0, 10),
+                });
+                continue;
+              }
+
+              // Not a fund-recipient either — truly unknown. Mark with sentinel
+              // so we don't retry every run.
               await supabase
                 .from('flap_tokens')
                 .update({
@@ -288,6 +329,7 @@ export async function GET(request: Request) {
       tokens_discovered: tokensDiscovered,
       decimals_fallback_count: decimalsFallbackCount,
       classified_count: classifiedCount,
+      fund_recipient_matched: fundRecipientMatched,
       elapsed_ms: Date.now() - started,
     });
   } catch (err) {
