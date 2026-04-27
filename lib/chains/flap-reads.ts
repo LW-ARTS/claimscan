@@ -131,14 +131,23 @@ export async function scanTokenCreated(args: {
   );
   const txFromCache = new Map<`0x${string}`, BscAddress>();
   if (txHashes.length > 0) {
-    const txs = await Promise.all(
-      txHashes.map((hash) => bscClient.getTransaction({ hash })),
-    );
-    for (const tx of txs) {
-      txFromCache.set(
-        tx.hash as `0x${string}`,
-        tx.from.toLowerCase() as BscAddress,
+    // Chunk getTransaction calls to avoid unbounded parallel RPC fan-out in
+    // burst-mint windows. 20 concurrent calls stays within Alchemy free-tier
+    // CU budget. Promise.allSettled so one failed lookup doesn't abort the batch.
+    const TX_BATCH = 20;
+    for (let i = 0; i < txHashes.length; i += TX_BATCH) {
+      const slice = txHashes.slice(i, i + TX_BATCH);
+      const results = await Promise.allSettled(
+        slice.map((hash) => bscClient.getTransaction({ hash })),
       );
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          txFromCache.set(
+            result.value.hash as `0x${string}`,
+            result.value.from.toLowerCase() as BscAddress,
+          );
+        }
+      }
     }
   }
 
@@ -207,12 +216,13 @@ export async function batchVaultClaimable(
       allowFailure: true,
     });
     const chunk = chunkRaw as Array<RawMulticallResult<bigint>>;
-    for (const result of chunk) {
+    for (let j = 0; j < chunk.length; j++) {
+      const result = chunk[j];
       if (result.status === 'success') {
         out.push({ status: 'success', result: result.result });
       } else {
         log.warn('batchVaultClaimable.failure', {
-          vault: (slice[chunk.indexOf(result)]?.vault ?? '').slice(0, 10),
+          vault: (slice[j]?.vault ?? '').slice(0, 10),
           error: result.error?.message ?? 'unknown',
         });
         out.push({
