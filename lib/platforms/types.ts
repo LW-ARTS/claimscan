@@ -54,9 +54,11 @@ export interface TokenFee {
   claimRightLost?: boolean;
   /** Flap-specific vault classification used for UI badge routing (D-04).
    *  'base-v1', 'base-v2', and 'split-vault' = known handler, row renders normally.
+   *  'fund-recipient' = Phase 13 token-level fund-recipient case (no VaultPortal
+   *  registration; auto-forwarded native BNB tracked via TaxProcessor accumulator).
    *  'unknown' = vault ABI not recognized, UI renders "Claim method unknown" badge
    *  next to the external link. Absent for non-Flap rows. */
-  vaultType?: 'base-v1' | 'base-v2' | 'split-vault' | 'unknown';
+  vaultType?: 'base-v1' | 'base-v2' | 'split-vault' | 'fund-recipient' | 'unknown';
 }
 
 // ═══════════════════════════════════════════════

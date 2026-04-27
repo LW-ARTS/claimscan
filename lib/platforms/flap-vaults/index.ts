@@ -75,10 +75,27 @@ export async function lookupVaultAddress(
 // Dispatch by vault_type string (cached in flap_tokens.vault_type)
 // ═══════════════════════════════════════════════
 
+// Phase 13 NOTE on 'fund-recipient' entry below:
+//
+// Fund-recipient tokens have NO VaultPortal registration → resolveVaultKind
+// never returns 'fund-recipient' (detection happens at token-level via
+// detectFundRecipient() in this same file — Wave 3). The Phase 13 adapter
+// (lib/platforms/flap.ts — Wave 4) dispatches fund-recipient rows directly
+// by importing { fundRecipientHandler } from './fund-recipient' WITHOUT
+// going through resolveHandler(). The entry below exists ONLY to satisfy
+// the Record<FlapVaultKind, FlapVaultHandler> exhaustiveness check and
+// provide a safe fallback (unknownHandler returns 0n + Sentry warn) in
+// the event a future caller accidentally routes a 'fund-recipient' row
+// through the registry.
+//
+// DO NOT change this entry to fundRecipientHandler — fundRecipientHandler
+// has a different signature (readCumulative(taxProcessor) instead of
+// readClaimable(vault, user)) and would break the registry's contract.
 const HANDLERS: Record<FlapVaultKind, FlapVaultHandler> = {
   'base-v1': baseV1Handler,
   'base-v2': baseV2Handler,
   'split-vault': splitVaultHandler,
+  'fund-recipient': unknownHandler, // intentional safety stub — see comment above
   'unknown': unknownHandler,
 };
 
