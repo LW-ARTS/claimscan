@@ -10,8 +10,10 @@
 -- index-fees cron when it writes a SplitVault row.
 --
 -- Postgres CHECK constraints cannot be ALTERed in place - must DROP + ADD.
--- The constraint names are Postgres-auto-generated from migration 034's inline
--- CHECK clauses (pattern: <table>_<column>_check).
+-- The constraint names below are EXPLICIT (set in this migration's ADD CONSTRAINT
+-- clause). The original 034 auto-generated names matched this pattern, so the
+-- DROP IF EXISTS targets them correctly on first apply. On re-apply the DROP also
+-- targets the explicitly-named constraint from this migration's prior ADD -- idempotent.
 
 BEGIN;
 
