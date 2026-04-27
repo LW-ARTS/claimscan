@@ -205,9 +205,7 @@ export const flapAdapter: PlatformAdapter = {
             abi: ERC20_SYMBOL_ABI,
             functionName: 'symbol',
           });
-          // sanitizeTokenName allows Unicode (Chinese, Japanese, emoji) — BSC token
-          // symbols are often non-ASCII. sanitizeTokenSymbol strips to \w only.
-          tokenSymbol = sanitizeTokenName(raw);
+          tokenSymbol = sanitizeTokenSymbol(raw);
         } catch { /* silent — symbol is cosmetic, not critical */ }
         fees.push({
           tokenAddress: row.token_address,

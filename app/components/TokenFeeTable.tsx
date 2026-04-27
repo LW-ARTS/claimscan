@@ -37,7 +37,9 @@ function tokenDisplay(fee: FeeRecord): { label: string; badge: string } {
   if (fee.token_address === 'BASE:flaunch-legacy') {
     return { label: 'Flaunch (claimable)', badge: 'F' };
   }
-  const cleaned = (fee.token_symbol || '').replace(/[^\w\s\-\.]/g, '').trim();
+  // Unicode-aware: \w only matches ASCII so CJK / emoji symbols would silently
+  // disappear. \p{L}\p{N}\p{Extended_Pictographic} preserves international tokens.
+  const cleaned = (fee.token_symbol || '').replace(/[^\p{L}\p{N}\p{Extended_Pictographic}\s\-\.]/gu, '').trim();
   const symbol = cleaned.split(/\s+/)[0]?.slice(0, 20) ?? '';
   if (symbol) {
     return { label: `$${symbol}`, badge: symbol[0] };

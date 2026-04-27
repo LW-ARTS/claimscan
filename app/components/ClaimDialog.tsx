@@ -231,7 +231,7 @@ export function ClaimDialog({
                         <div className="flex items-center justify-between py-3 sm:py-4">
                           <span className="text-xs sm:text-sm font-semibold text-foreground truncate max-w-[100px] sm:max-w-none" style={{ fontFamily: 'var(--font-sans)' }}>
                             {fee.token_symbol
-                              ? `$${fee.token_symbol.replace(/[^\w\s\-\.]/g, '').trim().slice(0, 16)}`
+                              ? `$${fee.token_symbol.replace(/[^\p{L}\p{N}\p{Extended_Pictographic}\s\-\.]/gu, '').trim().slice(0, 16)}`
                               : fee.token_address.slice(0, 8) + '...'}
                           </span>
                           <div className="flex items-center gap-1.5 sm:gap-2">

@@ -170,7 +170,11 @@ export function sanitizeAmountString(val: unknown): string {
  */
 export function sanitizeTokenSymbol(val: unknown): string | null {
   if (typeof val !== 'string') return null;
-  return val.replace(/[^\w\-\.]/g, '').slice(0, 20) || null;
+  // Unicode-aware: allow letters (CJK, Cyrillic, Latin, etc.), numbers, emoji.
+  // \w would strip non-ASCII silently (e.g. '疯狂的石头' → ''). The regex below
+  // preserves international tokens while still stripping control chars and
+  // potentially-deceptive symbols ($, brackets, etc.).
+  return val.replace(/[^\p{L}\p{N}\p{Extended_Pictographic}\-\.]/gu, '').slice(0, 20) || null;
 }
 
 /**
