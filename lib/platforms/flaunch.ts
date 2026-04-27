@@ -160,29 +160,27 @@ export const flaunchAdapter: PlatformAdapter = {
 
     // Legacy row: holds the wallet-wide current claimable.
     //
-    // Emitted when:
-    //   - The wallet has any claimable balance (could be from old or new PM).
-    //   - OR the wallet has old-PM coins but no per-coin breakdown is available
-    //     (compatibility with the pre-2026-04-21 single-row UX).
+    // ALWAYS emitted (even when claimable === 0n) so that after a user claims
+    // externally the next sync overwrites any stale "totalUnclaimed=X" row in the
+    // DB with totalUnclaimed='0'. Without this, 'flaunch' being in
+    // PRUNE_EXEMPT_PLATFORMS means a post-claim stale row persists forever.
     //
     // The earned value here is the claimable amount itself: from the user's
     // perspective the legacy row represents "money currently sitting in the
     // RevenueManager waiting to be claimed", so earned == unclaimed and
     // claimed == 0 for that bucket. The per-coin rows above already
     // accounted for what was historically claimed.
-    if (claimable > 0n || (oldPmCoins.length > 0 && fees.length === 0)) {
-      fees.push({
-        tokenAddress: LEGACY_TOKEN_ID,
-        tokenSymbol: 'ETH',
-        chain: 'base',
-        platform: 'flaunch',
-        totalEarned: claimable.toString(),
-        totalClaimed: '0',
-        totalUnclaimed: claimable.toString(),
-        totalEarnedUsd: null,
-        royaltyBps: null,
-      });
-    }
+    fees.push({
+      tokenAddress: LEGACY_TOKEN_ID,
+      tokenSymbol: 'ETH',
+      chain: 'base',
+      platform: 'flaunch',
+      totalEarned: claimable.toString(),
+      totalClaimed: '0',
+      totalUnclaimed: claimable.toString(),
+      totalEarnedUsd: null,
+      royaltyBps: null,
+    });
 
     return fees;
   },
