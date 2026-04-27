@@ -5,12 +5,20 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // distributed-lock, fee-sync, claim-hmac unit tests).
 vi.mock('server-only', () => ({}));
 
-// Mock the supabase service client — adapter is the first to read its own
-// primary data from Supabase, so we capture the query chain and inject canned
-// flap_tokens rows without hitting a real DB.
-const mockEq = vi.fn();
-const mockSelect = vi.fn(() => ({ eq: mockEq }));
-const mockFrom = vi.fn(() => ({ select: mockSelect }));
+// vi.hoisted() runs before vi.mock() hoisting, making these variables safe to
+// reference inside vi.mock() factory functions.
+const { mockOr, mockEq, mockSelect, mockFrom, mockReadClaimable, mockReadCumulative } = vi.hoisted(() => {
+  const mockOr = vi.fn();
+  const mockEq = vi.fn();
+  const mockSelect = vi.fn(() => ({ or: mockOr, eq: mockEq }));
+  const mockFrom = vi.fn(() => ({ select: mockSelect }));
+  const mockReadClaimable = vi.fn();
+  const mockReadCumulative = vi.fn();
+  return { mockOr, mockEq, mockSelect, mockFrom, mockReadClaimable, mockReadCumulative };
+});
+
+// Mock the supabase service client — adapter reads flap_tokens rows from Supabase.
+// Phase 13: adapter uses .or() dual-axis clause instead of .eq('creator', lower).
 vi.mock('@/lib/supabase/service', () => ({
   createServiceClient: () => ({ from: mockFrom }),
 }));
@@ -18,12 +26,16 @@ vi.mock('@/lib/supabase/service', () => ({
 // Mock the vault handler registry — we only need to verify dispatch happens,
 // not that the real handler correctly reads onchain. Each test provides its
 // own readClaimable implementation.
-const mockReadClaimable = vi.fn();
+// Phase 13: also mock fundRecipientHandler for the fund-recipient dispatch path.
 vi.mock('@/lib/platforms/flap-vaults', () => ({
   resolveHandler: (vaultType: string) => ({
     kind: vaultType,
     readClaimable: mockReadClaimable,
   }),
+  fundRecipientHandler: {
+    kind: 'fund-recipient',
+    readCumulative: mockReadCumulative,
+  },
 }));
 
 // asBscAddress calls getAddress() via viem which does EIP-55 checksum — we
@@ -57,23 +69,31 @@ describe('FP-06: flap adapter', () => {
   beforeEach(() => {
     mockFrom.mockClear();
     mockSelect.mockClear();
+    mockOr.mockClear();
     mockEq.mockClear();
     mockReadClaimable.mockReset();
+    mockReadCumulative.mockReset();
   });
 
-  it('reads flap_tokens filtered by creator (lowercase)', async () => {
-    mockEq.mockResolvedValueOnce({ data: [], error: null });
+  it('reads flap_tokens filtered by creator (lowercase) via OR clause', async () => {
+    mockOr.mockResolvedValueOnce({ data: [], error: null });
     await flapAdapter.getHistoricalFees(WALLET);
 
     expect(mockFrom).toHaveBeenCalledWith('flap_tokens');
-    expect(mockEq).toHaveBeenCalledWith('creator', WALLET.toLowerCase());
+    // Phase 13: adapter uses .or() dual-axis clause instead of .eq('creator', lower).
+    expect(mockOr).toHaveBeenCalledTimes(1);
+    const orClause = (mockOr.mock.calls[0]?.[0] ?? '') as string;
+    // Must include creator.eq.<lowercased wallet> and recipient_address.eq.<lowercased wallet>.
+    const lower = WALLET.toLowerCase();
+    expect(orClause).toContain(`creator.eq.${lower}`);
+    expect(orClause).toContain(`recipient_address.eq.${lower}`);
     // Confirm lowercase normalization (no uppercase chars leaked through).
-    const creatorArg = (mockEq.mock.calls[0]?.[1] ?? '') as string;
-    expect(creatorArg).toBe(creatorArg.toLowerCase());
+    expect(orClause).toBe(orClause.toLowerCase());
   });
 
   it('dispatches to resolveHandler(row.vault_type) per token', async () => {
-    mockEq.mockResolvedValueOnce({
+    // Phase 13: mock data includes new columns; vault-having rows use non-fund-recipient types.
+    mockOr.mockResolvedValueOnce({
       data: [
         {
           token_address: TOKEN_A,
@@ -83,6 +103,8 @@ describe('FP-06: flap adapter', () => {
           decimals: 18,
           source: 'native_indexer',
           created_block: 40_000_000,
+          recipient_address: null,
+          tax_processor_address: null,
         },
         {
           token_address: TOKEN_B,
@@ -92,6 +114,8 @@ describe('FP-06: flap adapter', () => {
           decimals: 18,
           source: 'native_indexer',
           created_block: 40_000_001,
+          recipient_address: null,
+          tax_processor_address: null,
         },
       ],
       error: null,
@@ -100,7 +124,7 @@ describe('FP-06: flap adapter', () => {
 
     const fees = await flapAdapter.getHistoricalFees(WALLET);
 
-    // One call per classified row, receiving the (vault, user) branded pair.
+    // One call per vault-having row, receiving the (vault, user) branded pair.
     expect(mockReadClaimable).toHaveBeenCalledTimes(2);
     expect(mockReadClaimable.mock.calls[0]?.[0]).toBe(VAULT_A);
     expect(mockReadClaimable.mock.calls[0]?.[1]).toBe(WALLET);
@@ -111,7 +135,7 @@ describe('FP-06: flap adapter', () => {
   });
 
   it('filters rows where claimable === 0n (D-12)', async () => {
-    mockEq.mockResolvedValueOnce({
+    mockOr.mockResolvedValueOnce({
       data: [
         {
           token_address: TOKEN_A,
@@ -121,6 +145,8 @@ describe('FP-06: flap adapter', () => {
           decimals: 18,
           source: 'native_indexer',
           created_block: 40_000_000,
+          recipient_address: null,
+          tax_processor_address: null,
         },
         {
           token_address: TOKEN_B,
@@ -130,6 +156,8 @@ describe('FP-06: flap adapter', () => {
           decimals: 18,
           source: 'native_indexer',
           created_block: 40_000_001,
+          recipient_address: null,
+          tax_processor_address: null,
         },
       ],
       error: null,
@@ -145,7 +173,7 @@ describe('FP-06: flap adapter', () => {
   });
 
   it('emits TokenFee with vaultType matching flap_tokens.vault_type', async () => {
-    mockEq.mockResolvedValueOnce({
+    mockOr.mockResolvedValueOnce({
       data: [
         {
           token_address: TOKEN_A,
@@ -155,6 +183,8 @@ describe('FP-06: flap adapter', () => {
           decimals: 18,
           source: 'native_indexer',
           created_block: 40_000_000,
+          recipient_address: null,
+          tax_processor_address: null,
         },
       ],
       error: null,
