@@ -1,0 +1,12 @@
+{
+  "wallet": "0xe4cC6a1fa41e48BB968E0Dd29Df09092b25A4457",
+  "token": "0x5f28b56a2f6e396a69fc912aec8d42d8afa17777",
+  "tax_processor": "0xf9113d169a093E174b29776049638A6684F2C9a7",
+  "vault": null,
+  "expected_vault_type": "fund-recipient",
+  "expected_cumulative_at_least_wei": "70000000000000000000",
+  "observed_block": 94565815,
+  "observed_at_utc": "2026-04-26T00:00:00Z",
+  "caveat": "TaxProcessor.totalQuoteSentToMarketing() is monotonic so cumulative will only grow; threshold 70 BNB is conservative as of research time (~72.65 BNB measured 2026-04-26). Recipient is mutable via TaxProcessor.setReceivers (BscScan-verified onlyOwner gate); if test starts failing, run `npx tsx scripts/classify-flap.ts` with RECLASSIFY_TOKEN=0x5f28b56a2f6e396a69fc912aec8d42d8afa17777 to re-read marketAddress(). FlapTaxTokenV3 impl 0x024f1829... and TaxProcessor impl 0x802b5888... source-verified on BscScan.",
+  "source": "User report 2026-04-26 (token auto-forwards 71.28 BNB to recipient, missing from ClaimScan profile). RESEARCH.md §'Critical Architectural Deviation' verified live RPC: tryGetVault(token) returns found=false; token.taxProcessor() = 0xf9113d16...; taxProcessor.marketAddress() = 0xe4cC6a... (EOA, getCode === '0x'); taxProcessor.totalQuoteSentToMarketing() = 72651582067009655073n (~72.65 BNB)."
+}
