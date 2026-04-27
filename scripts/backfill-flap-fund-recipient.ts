@@ -324,6 +324,12 @@ async function detectFundRecipient(taxToken: Address): Promise<FundRecipientResu
     return { matched: false };
   }
 
+  // Zero-address guard: reject before getCode to avoid ghost fund-recipient rows.
+  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+  if (marketAddress.toLowerCase() === ZERO_ADDRESS) {
+    return { matched: false };
+  }
+
   // Step 4: marketAddress must be EOA (no bytecode).
   let code: `0x${string}` | undefined;
   try {

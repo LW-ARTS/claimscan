@@ -297,4 +297,17 @@ describe('FR-01: detectFundRecipient — token-level fund-recipient probe', () =
     expect(fr.taxProcessor!.toLowerCase()).toBe(TAX_PROCESSOR.toLowerCase());
     expect(fr.marketAddress!.toLowerCase()).toBe(RECIPIENT.toLowerCase());
   });
+
+  it('lookupVaultAddress null + taxProcessor ok + marketAddress is zero address → matched=false, getCode NOT called', async () => {
+    const ZERO = '0x0000000000000000000000000000000000000000' as `0x${string}`;
+    callMock.mockResolvedValueOnce(FOUND_FALSE_RESPONSE);
+    readContractMock.mockImplementation(async (args: { functionName: string }) => {
+      if (args.functionName === 'taxProcessor') return TAX_PROCESSOR;
+      if (args.functionName === 'marketAddress') return ZERO;
+      throw new Error('unexpected call');
+    });
+    const fr = await detectFundRecipient(TOKEN);
+    expect(fr.matched).toBe(false);
+    expect(getCodeMock).not.toHaveBeenCalled();
+  });
 });
