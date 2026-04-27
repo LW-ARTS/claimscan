@@ -7,14 +7,18 @@ vi.mock('server-only', () => ({}));
 
 // Hoisted mocks — use vi.hoisted so the fn refs are initialized before the
 // vi.mock factories run (vi.mock is hoisted to the top of the file).
-const { readContractMock, captureMessageMock } = vi.hoisted(() => ({
+const { readContractMock, captureMessageMock, getCodeMock, callMock } = vi.hoisted(() => ({
   readContractMock: vi.fn(),
   captureMessageMock: vi.fn(),
+  getCodeMock: vi.fn(),
+  callMock: vi.fn(),
 }));
 
 vi.mock('@/lib/chains/bsc', () => ({
   bscClient: {
     readContract: readContractMock,
+    getCode: getCodeMock,
+    call: callMock,
   },
 }));
 
@@ -36,6 +40,7 @@ import { baseV1Handler } from '@/lib/platforms/flap-vaults/base-v1';
 import { baseV2Handler } from '@/lib/platforms/flap-vaults/base-v2';
 import { unknownHandler } from '@/lib/platforms/flap-vaults/unknown';
 import { splitVaultHandler } from '@/lib/platforms/flap-vaults/split-vault';
+import { detectFundRecipient } from '@/lib/platforms/flap-vaults';
 
 // Stable test fixtures — addresses from RESEARCH.md §Fixture Wallet but
 // treated as opaque since bscClient is mocked.
@@ -216,5 +221,80 @@ describe('FP-04: baseV1Handler + baseV2Handler — delegate to bscClient.readCon
     readContractMock.mockRejectedValueOnce(new Error('rpc down'));
     const result = await baseV2Handler.readClaimable(VAULT_ADDRESS, USER);
     expect(result).toBe(0n);
+  });
+});
+
+describe('FR-01: detectFundRecipient — token-level fund-recipient probe', () => {
+  const TOKEN = asBscAddress('0x5f28b56a2f6e396a69fc912aec8d42d8afa17777');
+  const TAX_PROCESSOR = asBscAddress('0xf9113d169a093E174b29776049638A6684F2C9a7');
+  const RECIPIENT = asBscAddress('0xe4cC6a1fa41e48BB968E0Dd29Df09092b25A4457');
+
+  // tryGetVault(taxToken) eth_call response layout:
+  //   0..32  bool found, 32..64 struct offset, 64..96 vault address slot
+  // We use callMock to control lookupVaultAddress's branch.
+  const FOUND_FALSE_RESPONSE = {
+    data: ('0x' + '0'.repeat(64) + '0'.repeat(64) + '0'.repeat(64)) as `0x${string}`,
+  };
+  const FOUND_TRUE_WITH_VAULT = {
+    data: ('0x' + '0'.repeat(63) + '1' + '0'.repeat(64) + '0'.repeat(24) + '321354e6f01e765f220eb275f315d1d79ee24a33') as `0x${string}`,
+  };
+
+  beforeEach(() => {
+    readContractMock.mockReset();
+    getCodeMock.mockReset();
+    callMock.mockReset();
+  });
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('lookupVaultAddress returns a vault → matched=false (vault-having branch)', async () => {
+    callMock.mockResolvedValueOnce(FOUND_TRUE_WITH_VAULT);
+    const fr = await detectFundRecipient(TOKEN);
+    expect(fr.matched).toBe(false);
+  });
+
+  it('lookupVaultAddress null + taxProcessor reverts → matched=false', async () => {
+    callMock.mockResolvedValueOnce(FOUND_FALSE_RESPONSE);
+    readContractMock.mockImplementationOnce(async () => { throw new Error('taxProcessor revert'); });
+    const fr = await detectFundRecipient(TOKEN);
+    expect(fr.matched).toBe(false);
+  });
+
+  it('lookupVaultAddress null + taxProcessor ok + marketAddress reverts → matched=false', async () => {
+    callMock.mockResolvedValueOnce(FOUND_FALSE_RESPONSE);
+    readContractMock.mockImplementation(async (args: { functionName: string }) => {
+      if (args.functionName === 'taxProcessor') return TAX_PROCESSOR;
+      if (args.functionName === 'marketAddress') throw new Error('marketAddress revert');
+      throw new Error('unexpected call');
+    });
+    const fr = await detectFundRecipient(TOKEN);
+    expect(fr.matched).toBe(false);
+  });
+
+  it('lookupVaultAddress null + all probes ok + getCode returns non-empty bytecode → matched=false (contract, not EOA)', async () => {
+    callMock.mockResolvedValueOnce(FOUND_FALSE_RESPONSE);
+    readContractMock.mockImplementation(async (args: { functionName: string }) => {
+      if (args.functionName === 'taxProcessor') return TAX_PROCESSOR;
+      if (args.functionName === 'marketAddress') return RECIPIENT;
+      throw new Error('unexpected call');
+    });
+    getCodeMock.mockResolvedValueOnce('0x6080604052' as `0x${string}`);
+    const fr = await detectFundRecipient(TOKEN);
+    expect(fr.matched).toBe(false);
+  });
+
+  it('lookupVaultAddress null + all probes ok + getCode === 0x (EOA) → matched=true with addresses', async () => {
+    callMock.mockResolvedValueOnce(FOUND_FALSE_RESPONSE);
+    readContractMock.mockImplementation(async (args: { functionName: string }) => {
+      if (args.functionName === 'taxProcessor') return TAX_PROCESSOR;
+      if (args.functionName === 'marketAddress') return RECIPIENT;
+      throw new Error('unexpected call');
+    });
+    getCodeMock.mockResolvedValueOnce('0x' as `0x${string}`);
+    const fr = await detectFundRecipient(TOKEN);
+    expect(fr.matched).toBe(true);
+    expect(fr.taxProcessor!.toLowerCase()).toBe(TAX_PROCESSOR.toLowerCase());
+    expect(fr.marketAddress!.toLowerCase()).toBe(RECIPIENT.toLowerCase());
   });
 });

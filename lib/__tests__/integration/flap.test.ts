@@ -146,4 +146,64 @@ describe.skipIf(!process.env.BSC_RPC_URL)('flapAdapter (integration, live BSC)',
     expect(matchingFee).toBeDefined();
     expect(matchingFee?.vaultType).toBe('split-vault');
   }, 90_000);
+
+  // ════════════════════════════════════════════════
+  // Phase 13 — Fund-recipient adapter routing (D-03/D-04/FR-04)
+  // Recipient sees row, deployer does NOT. getCreatorTokens symmetric.
+  // Deployer wallet looked up at runtime via flap_tokens.creator (NOT hardcoded —
+  // creator equals tx.from of the token-creation tx, may differ from fixture metadata).
+  // ════════════════════════════════════════════════
+
+  it('getHistoricalFees(recipient) returns the fund-recipient row', async () => {
+    const fr_fixture = (await import('../fixtures/wallets/flap-fund-recipient-creator.json')).default;
+    const fees = await flapAdapter.getHistoricalFees(fr_fixture.wallet);
+    const row = fees.find((f) => f.tokenAddress.toLowerCase() === fr_fixture.token.toLowerCase());
+    expect(row).toBeDefined();
+    expect(row!.vaultType).toBe('fund-recipient');
+    expect(BigInt(row!.totalEarned)).toBeGreaterThanOrEqual(BigInt(fr_fixture.expected_cumulative_at_least_wei));
+  }, 60_000);
+
+  it('getHistoricalFees(deployer) does NOT return the fund-recipient row', async () => {
+    const fr_fixture = (await import('../fixtures/wallets/flap-fund-recipient-creator.json')).default;
+    const supabase = createServiceClient();
+    const { data: tokenRow } = await supabase
+      .from('flap_tokens')
+      .select('creator')
+      .eq('token_address', fr_fixture.token.toLowerCase())
+      .maybeSingle();
+    if (!tokenRow?.creator) {
+      // Pre-W5: token may not yet be classified. Skip with descriptive warn (NOT a bug here).
+      console.warn(`fund-recipient deployer test: fixture token not yet in DB or creator NULL, skipping`);
+      return;
+    }
+    const fees = await flapAdapter.getHistoricalFees(tokenRow.creator);
+    const row = fees.find((f) => f.tokenAddress.toLowerCase() === fr_fixture.token.toLowerCase());
+    expect(row).toBeUndefined();
+  }, 60_000);
+
+  it('getCreatorTokens(recipient) returns the fund-recipient row (D-04 leaderboard ranking)', async () => {
+    const fr_fixture = (await import('../fixtures/wallets/flap-fund-recipient-creator.json')).default;
+    const tokens = await flapAdapter.getCreatorTokens(fr_fixture.wallet);
+    const row = tokens.find((t) => t.tokenAddress.toLowerCase() === fr_fixture.token.toLowerCase());
+    expect(row).toBeDefined();
+    expect(row!.platform).toBe('flap');
+    expect(row!.chain).toBe('bsc');
+  }, 60_000);
+
+  it('getCreatorTokens(deployer) does NOT return the fund-recipient row', async () => {
+    const fr_fixture = (await import('../fixtures/wallets/flap-fund-recipient-creator.json')).default;
+    const supabase = createServiceClient();
+    const { data: tokenRow } = await supabase
+      .from('flap_tokens')
+      .select('creator')
+      .eq('token_address', fr_fixture.token.toLowerCase())
+      .maybeSingle();
+    if (!tokenRow?.creator) {
+      console.warn(`fund-recipient deployer getCreatorTokens test: fixture token not yet in DB, skipping`);
+      return;
+    }
+    const tokens = await flapAdapter.getCreatorTokens(tokenRow.creator);
+    const row = tokens.find((t) => t.tokenAddress.toLowerCase() === fr_fixture.token.toLowerCase());
+    expect(row).toBeUndefined();
+  }, 60_000);
 });
