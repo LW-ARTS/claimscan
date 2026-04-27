@@ -3,6 +3,21 @@
 -- Flap.sh (BSC bonding curve) and Flaunch.gg (Base fair launch).
 -- Postgres does not support ADD VALUE mid-transaction with column dependencies,
 -- so we follow the same recreate-enum ceremony as 015_remove_heaven.sql.
+--
+-- WARNING (ME-11-C): only `creator_fee_summary` view is dropped/recreated below.
+-- Migrations 024-031 (leaderboard functions, watch rules, group settings) may
+-- have NEW dependencies on platform_type that are not covered here. Before
+-- re-applying this migration to a fresh project, enumerate ALL dependencies:
+--
+--   SELECT
+--     d.refobjsubid,
+--     pg_describe_object(d.classid, d.objid, d.objsubid) AS dependent
+--   FROM pg_depend d
+--   JOIN pg_type t ON t.oid = d.refobjid
+--   WHERE t.typname = 'platform_type';
+--
+-- Production was OK because earlier migrations were applied incrementally,
+-- but a `supabase db reset` against staging would surface any uncovered deps.
 
 BEGIN;
 
