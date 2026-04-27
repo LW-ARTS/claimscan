@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: completed
-last_updated: "2026-04-26T17:30:00.000Z"
+last_updated: "2026-04-27T15:53:54.332Z"
 progress:
   total_phases: 3
   completed_phases: 3
@@ -22,11 +22,11 @@ progress:
 ## Current Position
 
 Phase: 12.1 (splitvault-handler) — **COMPLETED ✓**
-Plan: All 8 plans done.
+Plan: Not started
 
-- **Phase:** 12.1
+- **Phase:** 13
 - **Active Phase:** none (milestone v1.1 complete + creator-bug fix shipped)
-- **Status:** All 8 Phase 12.1 plans complete + post-deploy creator-integrity fix shipped. Code deployed to prod (deploy `dpl_8bqkodDTuG8hCUQcQE4oTxpPH5Qj` READY). DB 100% repaired: 0 rows with bad creator, 6781/6781 rows updated to real user EOAs. split-vault now has 473 unique creators (was 1), base-v2 has 1372 unique creators (was 2). Live users now see SplitVault data correctly.
+- **Status:** Milestone complete
 - **Resume file:** `.planning/phases/12.1-splitvault-handler-implement-third-flap-vault-type-3979-inst/12.1-HANDOFF.md`
 
 ## Last Activity
