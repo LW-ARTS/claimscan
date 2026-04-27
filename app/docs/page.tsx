@@ -690,7 +690,7 @@ curl https://claimscan.tech/api/v2/export?wallet=0xEvmAddress...&format=json`}</
                 },
                 {
                   q: 'What platforms are supported?',
-                  a: '11 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana, plus Clanker, Zora, Bankr, and Flaunch on Base/ETH, and Flap on BSC.',
+                  a: '11 platforms: Pump.fun, Bags.fm, Believe, RevShare, Coinbarrel, and Raydium on Solana; Clanker (Base + BSC), Zora (Base + ETH), Bankr (Base + ETH + BSC), Flaunch (Base), and Flap (BSC) across EVM chains.',
                 },
                 {
                   q: 'Is ClaimScan free?',
