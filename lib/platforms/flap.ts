@@ -20,7 +20,8 @@ function isEvmAddress(s: string): s is `0x${string}` {
 }
 
 // Shape of a row read from flap_tokens (service client bypasses RLS).
-// Mirrors migration 034 column list.
+// Mirrors migration 034 column list, extended in Phase 13 (migration 036) with
+// fund-recipient columns. NULL on non-fund-recipient rows.
 interface FlapTokenRow {
   token_address: string;
   creator: string;
@@ -29,6 +30,9 @@ interface FlapTokenRow {
   decimals: number;
   source: string;
   created_block: number;
+  // Phase 13: fund-recipient extension columns. NULL for non-fund-recipient rows.
+  recipient_address: string | null;
+  tax_processor_address: string | null;
 }
 
 export const flapAdapter: PlatformAdapter = {
@@ -58,10 +62,19 @@ export const flapAdapter: PlatformAdapter = {
 
     try {
       const supabase = createServiceClient();
+      // Phase 13 D-03/D-04: dual-axis WHERE clause. A wallet can be the deployer
+      // (creator) of vault-having tokens AND/OR the recipient (recipient_address)
+      // of fund-recipient tokens. The two branches are mutually exclusive on
+      // vault_type, so a wallet that's both deployer and recipient of the same
+      // token only matches via the second branch (no row duplication).
+      // `lower` is regex-validated as 0x[a-f0-9]{40} above (isEvmAddress) — no
+      // PostgREST injection vector even with raw template-literal interpolation.
       const { data, error } = await supabase
         .from('flap_tokens')
-        .select('token_address, vault_type')
-        .eq('creator', lower);
+        .select('token_address, vault_type, recipient_address, tax_processor_address')
+        .or(
+          `and(creator.eq.${lower},vault_type.neq.fund-recipient),and(vault_type.eq.fund-recipient,recipient_address.eq.${lower})`,
+        );
 
       if (error) {
         log.warn('getCreatorTokens.db_error', {
@@ -98,10 +111,17 @@ export const flapAdapter: PlatformAdapter = {
     let rows: FlapTokenRow[] = [];
     try {
       const supabase = createServiceClient();
+      // Phase 13 D-03/D-04: dual-axis WHERE clause. Same OR clause as
+      // getCreatorTokens above; SELECT widens to include the new fund-recipient
+      // columns (recipient_address, tax_processor_address) for the dispatch loop.
       const { data, error } = await supabase
         .from('flap_tokens')
-        .select('token_address, creator, vault_address, vault_type, decimals, source, created_block')
-        .eq('creator', lower);
+        .select(
+          'token_address, creator, recipient_address, tax_processor_address, vault_address, vault_type, decimals, source, created_block',
+        )
+        .or(
+          `and(creator.eq.${lower},vault_type.neq.fund-recipient),and(vault_type.eq.fund-recipient,recipient_address.eq.${lower})`,
+        );
 
       if (error) {
         log.warn('getHistoricalFees.db_error', {
