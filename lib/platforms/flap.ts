@@ -8,7 +8,7 @@ import type {
 import type { IdentityProvider } from '@/lib/supabase/types';
 import { createServiceClient } from '@/lib/supabase/service';
 import { asBscAddress } from '@/lib/chains/types';
-import { resolveHandler } from './flap-vaults';
+import { resolveHandler, fundRecipientHandler } from './flap-vaults';
 import type { FlapVaultKind } from './flap-vaults/types';
 import { createLogger } from '@/lib/logger';
 import { sanitizeTokenSymbol, sanitizeTokenName } from '@/lib/utils';
@@ -141,18 +141,87 @@ export const flapAdapter: PlatformAdapter = {
 
     if (rows.length === 0) return [];
 
-    // Drop rows that haven't been classified yet (cron probes vault in a
-    // later run). Pending rows would render zero balance with no badge —
-    // confusing UX. Once classified, they reappear.
-    const classified = rows.filter((r) => r.vault_address !== null);
-    if (classified.length === 0) return [];
+    // Phase 13: split rows by axis. Fund-recipient rows have NULL vault_address
+    // by design (no VaultPortal registration — see RESEARCH §"Critical
+    // Architectural Deviation") and must skip the vault_address-null filter
+    // that drops unclassified vault-having rows.
+    //
+    // - fundRecipientRows: vault_type='fund-recipient' AND recipient + tax
+    //   processor both populated (D-05 null-recipient skip + defensive guard
+    //   on tax_processor_address — should not happen per migration 036
+    //   invariant but cheap defense).
+    // - vaultHavingRows: vault_type != 'fund-recipient' AND vault_address
+    //   classified (existing Phase 12 filter — drops unclassified rows that
+    //   would render zero balance with no badge, confusing UX).
+    const fundRecipientRows = rows.filter(
+      (r) =>
+        r.vault_type === 'fund-recipient' &&
+        r.recipient_address !== null &&
+        r.tax_processor_address !== null,
+    );
+    const vaultHavingRows = rows.filter(
+      (r) => r.vault_type !== 'fund-recipient' && r.vault_address !== null,
+    );
+    if (fundRecipientRows.length === 0 && vaultHavingRows.length === 0) return [];
 
-    // Read claimable per row via the handler registry. Each handler already
-    // catches errors internally and returns 0n on failure — we don't need to
-    // wrap in Promise.allSettled here because individual failures become 0n
-    // and get filtered by the D-12 zero-balance filter below.
+    // Both dispatch loops push into the same `fees` accumulator.
     const fees: TokenFee[] = [];
-    for (const row of classified) {
+
+    // Phase 13: fund-recipient path. Direct dispatch (NOT through HANDLERS
+    // registry) because fundRecipientHandler.readCumulative(taxProcessor) has
+    // a different signature from FlapVaultHandler.readClaimable(vault, user).
+    // totalUnclaimed=0 because fees are already in the recipient's wallet
+    // (auto-forwarded on each swap, no claim action needed).
+    //
+    // CLAUDE.md "Stat card vs filter invariant" holds: the Unclaimed filter
+    // (`totalUnclaimed > 0`) correctly drops fund-recipient rows; recipient
+    // profile still sees them in the all-rows view via the "Auto-forwarded"
+    // badge (D-12). totalEarned = totalClaimed = cumulative WBNB forwarded
+    // (= native BNB 1:1 post-unwrap, per RESEARCH §"Verified ABI Set").
+    for (const row of fundRecipientRows) {
+      if (signal?.aborted) break;
+      try {
+        const taxProcessorBranded = asBscAddress(
+          row.tax_processor_address! as `0x${string}`,
+        );
+        const cumulative = await fundRecipientHandler.readCumulative(
+          taxProcessorBranded,
+          signal,
+        );
+        // D-12: skip zero-balance rows to reduce visual noise (consistent
+        // with vault-having path). Fund-recipient rows with cumulative===0
+        // have never received an auto-forward — surface them only after
+        // first dispatch.
+        if (cumulative === 0n) continue;
+        const cumulativeStr = cumulative.toString();
+        fees.push({
+          tokenAddress: row.token_address,
+          tokenSymbol: null,        // v1: no symbol cache; UI shows address prefix
+          chain: 'bsc',
+          platform: 'flap',
+          totalEarned: cumulativeStr,
+          totalClaimed: cumulativeStr,
+          totalUnclaimed: '0',
+          totalEarnedUsd: null,     // D-11: no spot price reads (flash-loan risk)
+          royaltyBps: null,
+          vaultType: 'fund-recipient',
+        });
+      } catch (err) {
+        log.warn('flap.fund_recipient_dispatch_failed', {
+          token: row.token_address.slice(0, 10),
+          taxProcessor: row.tax_processor_address?.slice(0, 10) ?? null,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    // Existing vault-having path — unchanged dispatch body, only the
+    // iteration source variable is renamed (classified → vaultHavingRows).
+    // Each handler already catches errors internally and returns 0n on
+    // failure — we don't need to wrap in Promise.allSettled here because
+    // individual failures become 0n and get filtered by the D-12
+    // zero-balance filter below.
+    for (const row of vaultHavingRows) {
       if (signal?.aborted) break;
       const handler = resolveHandler(row.vault_type);
       const vaultBranded = asBscAddress(row.vault_address! as `0x${string}`);
@@ -178,7 +247,8 @@ export const flapAdapter: PlatformAdapter = {
     log.info('getHistoricalFees.ok', {
       wallet: lower.slice(0, 10),
       total_rows: rows.length,
-      classified: classified.length,
+      fund_recipient_rows: fundRecipientRows.length,
+      vault_having_rows: vaultHavingRows.length,
       non_zero: fees.length,
     });
 
