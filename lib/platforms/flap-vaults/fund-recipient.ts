@@ -1,5 +1,6 @@
 import 'server-only';
 
+import * as Sentry from '@sentry/nextjs';
 import { bscClient } from '@/lib/chains/bsc';
 import { asBscAddress, type BscAddress } from '@/lib/chains/types';
 import { FLAP_VAULT_PORTAL } from '@/lib/constants-evm';
@@ -94,6 +95,16 @@ export async function detectFundRecipient(taxToken: `0x${string}`): Promise<Fund
     return { matched: false };
   }
 
+  // Zero-address guard: reject before getCode — zero address has no bytecode,
+  // would pass the EOA check, and would create ghost fund-recipient rows in DB.
+  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+  if (marketAddress.toLowerCase() === ZERO_ADDRESS) {
+    log.warn('fundRecipient.marketAddress_is_zero', {
+      taxProcessor: taxProcessor.slice(0, 10),
+    });
+    return { matched: false };
+  }
+
   // Step 4: marketAddress must be EOA (no bytecode).
   let code: `0x${string}` | undefined;
   try {
@@ -152,6 +163,13 @@ export const fundRecipientHandler = {
       log.warn('fundRecipient.readCumulative_failed', {
         taxProcessor: taxProcessor.slice(0, 10),
         error: err instanceof Error ? err.message : String(err),
+        note: 'returning 0n — will be filtered by D-12; check BSC RPC health',
+      });
+      Sentry.captureException(err, {
+        extra: {
+          taxProcessor: taxProcessor.slice(0, 10),
+          context: 'readCumulative — BSC RPC failure; D-12 filter will drop this row',
+        },
       });
       return 0n;
     }
