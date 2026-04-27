@@ -196,6 +196,7 @@ const NATIVE_TOKEN_FEE_PLATFORMS = new Set([
   'bags',       // SOL (lamports) from claimable-positions
   'bankr',      // WETH (wei) from Uniswap V3 pool fees (WETH ≈ ETH)
   'flaunch',    // ETH (wei) from RevenueManager + FeeEscrow (Base)
+  'flap',       // BNB (wei) from VaultPortal claimable + TaxProcessor auto-forward (BSC)
 ]);
 
 /**

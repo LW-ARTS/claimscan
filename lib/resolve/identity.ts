@@ -125,11 +125,15 @@ export async function resolveWallets(
     }
     if (isValidEvmAddress(handle)) {
       // Normalize to EIP-55 checksummed form to prevent case-sensitive DB duplicates.
-      // Return BOTH chains so Zora (ETH mainnet) fees are also captured.
+      // Return all 3 EVM chains: Base (Clanker/Flaunch), ETH (Zora), BSC (Flap).
+      // EVM addresses are shared across all EVM chains so the same address is
+      // valid on each. Including bsc means Flap fees appear without CROSS_CHAIN_BSC
+      // hacks and PlatformBreakdown can find a bsc wallet for Flap.
       const normalized = normalizeEvmAddress(handle);
       return [
         { address: normalized, chain: 'base', sourcePlatform: 'clanker' },
         { address: normalized, chain: 'eth', sourcePlatform: 'zora' },
+        { address: normalized, chain: 'bsc', sourcePlatform: 'flap' },
       ];
     }
     return [];
@@ -221,18 +225,11 @@ export async function fetchAllFees(
   // and resolveIdentity only returns 'base' wallets to avoid double-dispatch.
   const CROSS_CHAIN_EVM: Set<string> = new Set(['zora']);
 
-  // BSC adapters that must also run for wallets resolved as base/eth. EVM addresses are
-  // shared across all EVM chains, so a wallet resolved without BSC activity still has the
-  // same address on BSC. Flap is DB-backed (queries flap_tokens) — no extra RPC cost.
-  const CROSS_CHAIN_BSC: Set<string> = new Set(['flap']);
-
   for (const wallet of wallets) {
     for (const adapter of allAdapters) {
       // Zora cross-chain: dispatch for ETH wallets only (Zora exists on Base+ETH, not BSC)
-      // Flap cross-chain: dispatch for any EVM wallet (base/eth) since EVM addresses are shared
       const chainMatch = adapter.chain === wallet.chain
-        || (CROSS_CHAIN_EVM.has(adapter.platform) && wallet.chain === 'eth' && adapter.chain === 'base')
-        || (CROSS_CHAIN_BSC.has(adapter.platform) && (wallet.chain === 'base' || wallet.chain === 'eth') && adapter.chain === 'bsc');
+        || (CROSS_CHAIN_EVM.has(adapter.platform) && wallet.chain === 'eth' && adapter.chain === 'base');
       if (!chainMatch) continue;
       taskMeta.push({ platform: adapter.platform, wallet: wallet.address, type: 'historical' });
       tasks.push(adapter.getHistoricalFees(wallet.address));
@@ -248,8 +245,7 @@ export async function fetchAllFees(
   for (const wallet of wallets) {
     for (const adapter of liveAdapters) {
       const chainMatch = adapter.chain === wallet.chain
-        || (CROSS_CHAIN_EVM.has(adapter.platform) && wallet.chain === 'eth' && adapter.chain === 'base')
-        || (CROSS_CHAIN_BSC.has(adapter.platform) && (wallet.chain === 'base' || wallet.chain === 'eth') && adapter.chain === 'bsc');
+        || (CROSS_CHAIN_EVM.has(adapter.platform) && wallet.chain === 'eth' && adapter.chain === 'base');
       if (!chainMatch) continue;
       if (adapter.historicalCoversLive) continue;
       taskMeta.push({ platform: adapter.platform, wallet: wallet.address, type: 'live' });

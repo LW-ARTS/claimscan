@@ -28,16 +28,21 @@ export default function Loading() {
   }
   const urlMatch = display.match(/(?:tiktok\.com|twitter\.com|x\.com|github\.com|warpcast\.com)\/@?([a-zA-Z0-9_.\-]{2,40})/i);
   if (urlMatch) display = urlMatch[1];
-  const handle = display.replace(/^@/, '');
+  const rawHandle = display.replace(/^@/, '');
+  // Abbreviate long wallet addresses to fit the card (e.g. 0xe4cC…A457)
+  const isWallet = /^0x[a-fA-F0-9]{40}$/.test(rawHandle);
+  const handle = isWallet
+    ? `${rawHandle.slice(0, 6)}…${rawHandle.slice(-4)}`
+    : rawHandle;
 
   return (
     <div role="status" aria-label="Scanning creator fees" className="signal-stage min-h-[60vh] flex items-center justify-center px-6 py-10">
       <div className="signal-glass-card flex flex-col items-center">
 
         {/* Handle */}
-        <div className="signal-fade-up signal-handle mb-1.5 flex items-baseline gap-0.5 text-[22px] tracking-[-0.5px]">
-          <span className="font-sans font-bold text-foreground">@</span>
-          <span className="font-sans font-bold text-foreground">{handle}</span>
+        <div className="signal-fade-up signal-handle mb-1.5 flex items-baseline gap-0.5 text-[22px] tracking-[-0.5px] max-w-full">
+          <span className="font-sans font-bold text-foreground shrink-0">@</span>
+          <span className="font-sans font-bold text-foreground truncate">{handle}</span>
         </div>
 
         {/* SCANNING label */}
