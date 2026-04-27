@@ -18,10 +18,16 @@ const mocks = vi.hoisted(() => ({
   assertDeployBlockNotPlaceholderMock: vi.fn(),
   verifyCronSecretMock: vi.fn(),
   resolveVaultKindMock: vi.fn(),
+  lookupVaultAddressMock: vi.fn(),
+  detectFundRecipientMock: vi.fn(),
   // Supabase stub callables captured so tests can assert / drive them.
   supabaseMaybeSingleMock: vi.fn(),
   supabaseUpsertMock: vi.fn(),
+  // supabaseUpdateMock: controls the resolved value returned from .eq() in update chains.
   supabaseUpdateMock: vi.fn(),
+  // supabaseUpdatePatchMock: captures the patch object passed to .update(patch) without
+  // mutating the resolved value. Tests assert via supabaseUpdatePatchMock.mock.calls[i][0].
+  supabaseUpdatePatchMock: vi.fn(),
   supabasePendingSelectMock: vi.fn(),
 }));
 
@@ -51,6 +57,8 @@ vi.mock('@/lib/supabase/service', () => ({
 
 vi.mock('@/lib/platforms/flap-vaults', () => ({
   resolveVaultKind: mocks.resolveVaultKindMock,
+  lookupVaultAddress: mocks.lookupVaultAddressMock,
+  detectFundRecipient: mocks.detectFundRecipientMock,
 }));
 
 import { GET } from '@/app/api/cron/index-flap/route';
@@ -80,10 +88,6 @@ function buildSupabaseStub() {
     }),
   };
 
-  const updateChain = {
-    eq: (_col: string, _val: unknown) => mocks.supabaseUpdateMock(),
-  };
-
   return {
     from: (table: string) => ({
       select: (cols: string) => {
@@ -97,9 +101,14 @@ function buildSupabaseStub() {
       },
       upsert: (rows: unknown, opts: unknown) =>
         mocks.supabaseUpsertMock(table, rows, opts),
+      // update(patch): capture patch via supabaseUpdatePatchMock (for assertions),
+      // then return a chain whose .eq() resolves via supabaseUpdateMock (for error control).
+      // This keeps patch recording and resolved-value control fully independent.
       update: (patch: unknown) => {
-        mocks.supabaseUpdateMock.mockImplementationOnce?.(() => patch);
-        return updateChain;
+        mocks.supabaseUpdatePatchMock(patch);
+        return {
+          eq: (_col: string, _val: unknown) => mocks.supabaseUpdateMock(),
+        };
       },
     }),
   };
@@ -140,6 +149,11 @@ function wireDefaultHappyPath() {
   mocks.scanTokenCreatedMock.mockResolvedValue([]);
   mocks.batchReadDecimalsMock.mockResolvedValue([]);
   mocks.resolveVaultKindMock.mockResolvedValue('unknown');
+  // Default: every token has a vault — classify path never reaches fund-recipient.
+  mocks.lookupVaultAddressMock.mockResolvedValue(
+    '0x321354e6f01e765f220eb275f315d1d79ee24a33',
+  );
+  mocks.detectFundRecipientMock.mockResolvedValue({ matched: false });
 }
 
 describe('FP-05: cron index-flap', () => {
@@ -313,6 +327,242 @@ describe('FP-05: cron index-flap', () => {
         resolvedDecimals: 18,
         fallback: true,
       }),
+    });
+  });
+
+  // ═══════════════════════════════════════════════
+  // Classify path tests (HI-12-02)
+  // ═══════════════════════════════════════════════
+
+  it('classify: fund-recipient path — UPDATE called with vault_type fund-recipient when lookupVaultAddress=null + detectFundRecipient matched', async () => {
+    const FLAP_DEPLOY = 39_980_228n;
+    const token = '0xaaaa000000000000000000000000000000000001';
+    const marketAddr = '0xbbbb000000000000000000000000000000000002';
+    const taxProcessorAddr = '0xcccc000000000000000000000000000000000003';
+
+    mocks.supabaseMaybeSingleMock.mockResolvedValue({
+      data: { last_scanned_block: Number(FLAP_DEPLOY) },
+    });
+    mocks.getBlockNumberMock.mockResolvedValue(FLAP_DEPLOY); // no new blocks → no scan loop
+    mocks.supabasePendingSelectMock.mockResolvedValue({
+      data: [{ token_address: token }],
+      error: null,
+    });
+
+    // lookupVaultAddress returns null → fund-recipient probe triggered
+    mocks.lookupVaultAddressMock.mockResolvedValue(null);
+    mocks.detectFundRecipientMock.mockResolvedValue({
+      matched: true,
+      marketAddress: marketAddr,
+      taxProcessor: taxProcessorAddr,
+    });
+
+    const res = await GET(buildRequest('Bearer secret'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.classified_count).toBe(1);
+    expect(body.fund_recipient_matched).toBe(1);
+    expect(body.db_errors).toBe(0);
+
+    // Assert UPDATE was called with the fund-recipient patch
+    expect(mocks.supabaseUpdatePatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vault_type: 'fund-recipient',
+        recipient_address: marketAddr.toLowerCase(),
+        tax_processor_address: taxProcessorAddr.toLowerCase(),
+      }),
+    );
+  });
+
+  it('classify: sentinel path — UPDATE called with zero-address sentinel when lookupVaultAddress=null + detectFundRecipient not matched', async () => {
+    const FLAP_DEPLOY = 39_980_228n;
+    const token = '0xaaaa000000000000000000000000000000000004';
+
+    mocks.supabaseMaybeSingleMock.mockResolvedValue({
+      data: { last_scanned_block: Number(FLAP_DEPLOY) },
+    });
+    mocks.getBlockNumberMock.mockResolvedValue(FLAP_DEPLOY);
+    mocks.supabasePendingSelectMock.mockResolvedValue({
+      data: [{ token_address: token }],
+      error: null,
+    });
+
+    mocks.lookupVaultAddressMock.mockResolvedValue(null);
+    mocks.detectFundRecipientMock.mockResolvedValue({ matched: false });
+
+    const res = await GET(buildRequest('Bearer secret'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    // Sentinel path does NOT increment classifiedCount
+    expect(body.classified_count).toBe(0);
+    expect(body.fund_recipient_matched).toBe(0);
+    expect(body.db_errors).toBe(0);
+
+    // Assert UPDATE was called with sentinel patch
+    expect(mocks.supabaseUpdatePatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vault_address: '0x0000000000000000000000000000000000000000',
+        vault_type: 'unknown',
+      }),
+    );
+  });
+
+  it('classify: vault-kind path — UPDATE called with vault_address + vault_type when lookupVaultAddress returns address', async () => {
+    const FLAP_DEPLOY = 39_980_228n;
+    const token = '0xaaaa000000000000000000000000000000000005';
+    const vaultAddr = '0x321354e6f01e765f220eb275f315d1d79ee24a33';
+
+    mocks.supabaseMaybeSingleMock.mockResolvedValue({
+      data: { last_scanned_block: Number(FLAP_DEPLOY) },
+    });
+    mocks.getBlockNumberMock.mockResolvedValue(FLAP_DEPLOY);
+    mocks.supabasePendingSelectMock.mockResolvedValue({
+      data: [{ token_address: token }],
+      error: null,
+    });
+
+    mocks.lookupVaultAddressMock.mockResolvedValue(vaultAddr);
+    mocks.resolveVaultKindMock.mockResolvedValue('base-v2');
+
+    const res = await GET(buildRequest('Bearer secret'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.classified_count).toBe(1);
+    expect(body.fund_recipient_matched).toBe(0);
+    expect(body.db_errors).toBe(0);
+
+    // Assert UPDATE was called with the vault-kind patch
+    expect(mocks.supabaseUpdatePatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vault_address: vaultAddr.toLowerCase(),
+        vault_type: 'base-v2',
+      }),
+    );
+  });
+
+  it('classify: fund-recipient UPDATE returns error → classifiedCount NOT incremented, db_errors increments', async () => {
+    const FLAP_DEPLOY = 39_980_228n;
+    const token = '0xaaaa000000000000000000000000000000000006';
+
+    mocks.supabaseMaybeSingleMock.mockResolvedValue({
+      data: { last_scanned_block: Number(FLAP_DEPLOY) },
+    });
+    mocks.getBlockNumberMock.mockResolvedValue(FLAP_DEPLOY);
+    mocks.supabasePendingSelectMock.mockResolvedValue({
+      data: [{ token_address: token }],
+      error: null,
+    });
+
+    mocks.lookupVaultAddressMock.mockResolvedValue(null);
+    mocks.detectFundRecipientMock.mockResolvedValue({
+      matched: true,
+      marketAddress: '0xbbbb000000000000000000000000000000000007',
+      taxProcessor: '0xcccc000000000000000000000000000000000008',
+    });
+    // DB write fails
+    mocks.supabaseUpdateMock.mockResolvedValueOnce({
+      error: { message: 'constraint violation' },
+    });
+
+    const res = await GET(buildRequest('Bearer secret'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    // classifiedCount must NOT increment when write fails
+    expect(body.classified_count).toBe(0);
+    expect(body.fund_recipient_matched).toBe(0);
+    expect(body.db_errors).toBe(1);
+  });
+
+  it('classify: vault-kind UPDATE returns error → classifiedCount NOT incremented, db_errors increments', async () => {
+    const FLAP_DEPLOY = 39_980_228n;
+    const token = '0xaaaa000000000000000000000000000000000009';
+    const vaultAddr = '0x321354e6f01e765f220eb275f315d1d79ee24a33';
+
+    mocks.supabaseMaybeSingleMock.mockResolvedValue({
+      data: { last_scanned_block: Number(FLAP_DEPLOY) },
+    });
+    mocks.getBlockNumberMock.mockResolvedValue(FLAP_DEPLOY);
+    mocks.supabasePendingSelectMock.mockResolvedValue({
+      data: [{ token_address: token }],
+      error: null,
+    });
+
+    mocks.lookupVaultAddressMock.mockResolvedValue(vaultAddr);
+    mocks.resolveVaultKindMock.mockResolvedValue('base-v1');
+    // DB write fails
+    mocks.supabaseUpdateMock.mockResolvedValueOnce({
+      error: { message: 'network error' },
+    });
+
+    const res = await GET(buildRequest('Bearer secret'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.classified_count).toBe(0);
+    expect(body.db_errors).toBe(1);
+  });
+
+  it('classify: 3 unknown rows processed in single run — each takes a different branch', async () => {
+    const FLAP_DEPLOY = 39_980_228n;
+    const tokenFundRecipient = '0xaaaa000000000000000000000000000000000010';
+    const tokenSentinel = '0xaaaa000000000000000000000000000000000011';
+    const tokenVaultKind = '0xaaaa000000000000000000000000000000000012';
+    const vaultAddr = '0x321354e6f01e765f220eb275f315d1d79ee24a33';
+    const marketAddr = '0xbbbb000000000000000000000000000000000013';
+    const taxProcessorAddr = '0xcccc000000000000000000000000000000000014';
+
+    mocks.supabaseMaybeSingleMock.mockResolvedValue({
+      data: { last_scanned_block: Number(FLAP_DEPLOY) },
+    });
+    mocks.getBlockNumberMock.mockResolvedValue(FLAP_DEPLOY);
+    mocks.supabasePendingSelectMock.mockResolvedValue({
+      data: [
+        { token_address: tokenFundRecipient },
+        { token_address: tokenSentinel },
+        { token_address: tokenVaultKind },
+      ],
+      error: null,
+    });
+
+    // Row 1: fund-recipient (lookupVaultAddress=null, detectFundRecipient matched)
+    mocks.lookupVaultAddressMock.mockResolvedValueOnce(null);
+    mocks.detectFundRecipientMock.mockResolvedValueOnce({
+      matched: true,
+      marketAddress: marketAddr,
+      taxProcessor: taxProcessorAddr,
+    });
+
+    // Row 2: sentinel (lookupVaultAddress=null, detectFundRecipient not matched)
+    mocks.lookupVaultAddressMock.mockResolvedValueOnce(null);
+    mocks.detectFundRecipientMock.mockResolvedValueOnce({ matched: false });
+
+    // Row 3: vault-kind (lookupVaultAddress returns address)
+    mocks.lookupVaultAddressMock.mockResolvedValueOnce(vaultAddr);
+    mocks.resolveVaultKindMock.mockResolvedValueOnce('split-vault');
+
+    const res = await GET(buildRequest('Bearer secret'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    // fund-recipient + vault-kind both increment classifiedCount; sentinel does not
+    expect(body.classified_count).toBe(2);
+    expect(body.fund_recipient_matched).toBe(1);
+    expect(body.db_errors).toBe(0);
+
+    // Three UPDATE calls were made (one per row)
+    expect(mocks.supabaseUpdatePatchMock).toHaveBeenCalledTimes(3);
+    expect(mocks.supabaseUpdatePatchMock.mock.calls[0][0]).toMatchObject({
+      vault_type: 'fund-recipient',
+    });
+    expect(mocks.supabaseUpdatePatchMock.mock.calls[1][0]).toMatchObject({
+      vault_address: '0x0000000000000000000000000000000000000000',
+    });
+    expect(mocks.supabaseUpdatePatchMock.mock.calls[2][0]).toMatchObject({
+      vault_type: 'split-vault',
     });
   });
 });
