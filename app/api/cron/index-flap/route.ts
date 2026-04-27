@@ -221,6 +221,7 @@ export async function GET(request: Request) {
     //    left unresolved stay `vault_type='unknown'` and get picked up next run.
     let classifiedCount = 0;
     let fundRecipientMatched = 0;
+    let dbErrors = 0;
     if (Date.now() - started < WALLCLOCK_MS) {
       const { data: pending, error: pendingErr } = await supabase
         .from('flap_tokens')
@@ -265,7 +266,7 @@ export async function GET(request: Request) {
                 // (no vault to point at). Row exits the pending-classify
                 // query because vault_type='unknown' filter no longer matches —
                 // no sentinel needed, no risk of re-probe loops.
-                await supabase
+                const { error: frErr } = await supabase
                   .from('flap_tokens')
                   .update({
                     vault_type: 'fund-recipient',
@@ -273,6 +274,17 @@ export async function GET(request: Request) {
                     tax_processor_address: fr.taxProcessor.toLowerCase(),
                   })
                   .eq('token_address', row.token_address);
+                if (frErr) {
+                  childLog.warn('classify.fund_recipient_update_failed', {
+                    token: row.token_address.slice(0, 10),
+                    error: frErr.message,
+                  });
+                  Sentry.captureException(frErr, {
+                    extra: { token: row.token_address.slice(0, 10), branch: 'fund-recipient' },
+                  });
+                  dbErrors = dbErrors + 1;
+                  continue;
+                }
 
                 classifiedCount++;
                 fundRecipientMatched++;
@@ -286,13 +298,23 @@ export async function GET(request: Request) {
 
               // Not a fund-recipient either — truly unknown. Mark with sentinel
               // so we don't retry every run.
-              await supabase
+              const { error: sentinelErr } = await supabase
                 .from('flap_tokens')
                 .update({
                   vault_address: '0x0000000000000000000000000000000000000000',
                   vault_type: 'unknown',
                 })
                 .eq('token_address', row.token_address);
+              if (sentinelErr) {
+                childLog.warn('classify.sentinel_update_failed', {
+                  token: row.token_address.slice(0, 10),
+                  error: sentinelErr.message,
+                });
+                Sentry.captureException(sentinelErr, {
+                  extra: { token: row.token_address.slice(0, 10), branch: 'sentinel' },
+                });
+                dbErrors = dbErrors + 1;
+              }
               continue;
             }
 
@@ -302,13 +324,24 @@ export async function GET(request: Request) {
               vaultAddr,
             );
 
-            await supabase
+            const { error: kindErr } = await supabase
               .from('flap_tokens')
               .update({
                 vault_address: vaultAddr.toLowerCase(),
                 vault_type: kind,
               })
               .eq('token_address', row.token_address);
+            if (kindErr) {
+              childLog.warn('classify.vault_kind_update_failed', {
+                token: row.token_address.slice(0, 10),
+                error: kindErr.message,
+              });
+              Sentry.captureException(kindErr, {
+                extra: { token: row.token_address.slice(0, 10), branch: 'vault-kind' },
+              });
+              dbErrors = dbErrors + 1;
+              continue;
+            }
 
             classifiedCount++;
           } catch (err) {
@@ -330,6 +363,7 @@ export async function GET(request: Request) {
       decimals_fallback_count: decimalsFallbackCount,
       classified_count: classifiedCount,
       fund_recipient_matched: fundRecipientMatched,
+      db_errors: dbErrors,
       elapsed_ms: Date.now() - started,
     });
   } catch (err) {
