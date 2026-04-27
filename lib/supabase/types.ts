@@ -380,31 +380,40 @@ export interface Database {
           token_address: string;
           creator: string;
           vault_address: string | null;
-          vault_type: 'base-v1' | 'base-v2' | 'split-vault' | 'unknown';
+          vault_type: 'base-v1' | 'base-v2' | 'split-vault' | 'fund-recipient' | 'unknown';
           decimals: number;
           source: 'bitquery_backfill' | 'native_indexer';
           created_block: number;
           indexed_at: string;
+          // Phase 13 (migration 036): fund-recipient vault type captures recipient EOA + cached TaxProcessor clone.
+          recipient_address: string | null;
+          tax_processor_address: string | null;
         };
         Insert: {
           token_address: string;
           creator: string;
           vault_address?: string | null;
-          vault_type: 'base-v1' | 'base-v2' | 'split-vault' | 'unknown';
+          vault_type: 'base-v1' | 'base-v2' | 'split-vault' | 'fund-recipient' | 'unknown';
           decimals?: number;
           source: 'bitquery_backfill' | 'native_indexer';
           created_block: number;
           indexed_at?: string;
+          // Phase 13 (migration 036): fund-recipient vault type captures recipient EOA + cached TaxProcessor clone.
+          recipient_address?: string | null;
+          tax_processor_address?: string | null;
         };
         Update: {
           token_address?: string;
           creator?: string;
           vault_address?: string | null;
-          vault_type?: 'base-v1' | 'base-v2' | 'split-vault' | 'unknown';
+          vault_type?: 'base-v1' | 'base-v2' | 'split-vault' | 'fund-recipient' | 'unknown';
           decimals?: number;
           source?: 'bitquery_backfill' | 'native_indexer';
           created_block?: number;
           indexed_at?: string;
+          // Phase 13 (migration 036): fund-recipient vault type captures recipient EOA + cached TaxProcessor clone.
+          recipient_address?: string | null;
+          tax_processor_address?: string | null;
         };
         Relationships: [];
       };
