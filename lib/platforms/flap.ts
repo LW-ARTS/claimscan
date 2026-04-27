@@ -157,6 +157,27 @@ export const flapAdapter: PlatformAdapter = {
     // - vaultHavingRows: vault_type != 'fund-recipient' AND vault_address
     //   classified (existing Phase 12 filter — drops unclassified rows that
     //   would render zero balance with no badge, confusing UX).
+    // Pre-filter observability: log any fund-recipient rows with missing columns.
+    // These rows result from a cron classify UPDATE failure (HI-12-01 pattern) that
+    // wrote vault_type='fund-recipient' but failed before writing recipient/tax_processor.
+    // Without this log, a blank profile is undiagnosable.
+    const incompleteCount = rows.filter(
+      (r) =>
+        r.vault_type === 'fund-recipient' &&
+        (!r.recipient_address || !r.tax_processor_address),
+    ).length;
+    if (incompleteCount > 0) {
+      const sampleToken = rows.find(
+        (r) =>
+          r.vault_type === 'fund-recipient' &&
+          (!r.recipient_address || !r.tax_processor_address),
+      )?.token_address;
+      log.warn('flap.fund_recipient_missing_tax_processor', {
+        count: incompleteCount,
+        sample_token: sampleToken?.slice(0, 10) ?? null,
+      });
+    }
+
     const fundRecipientRows = rows.filter(
       (r) =>
         r.vault_type === 'fund-recipient' &&
@@ -196,7 +217,13 @@ export const flapAdapter: PlatformAdapter = {
         // with vault-having path). Fund-recipient rows with cumulative===0
         // have never received an auto-forward — surface them only after
         // first dispatch.
-        if (cumulative === 0n) continue;
+        if (cumulative === 0n) {
+          log.info('flap.fund_recipient_zero_or_failed', {
+            token: row.token_address.slice(0, 10),
+            taxProcessor: row.tax_processor_address?.slice(0, 10) ?? null,
+          });
+          continue;
+        }
         const cumulativeStr = cumulative.toString();
         let tokenSymbol: string | null = null;
         try {
