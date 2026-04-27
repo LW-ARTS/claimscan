@@ -80,6 +80,22 @@ const V1_PROBE_ABI = parseAbi([
   'function claimable(address user) view returns (uint256)',
 ]);
 
+// ─── Phase 13 fund-recipient ABIs (mirrors lib/platforms/flap-vaults/types.ts) ──
+// Inlined because tsx doesn't resolve `@/lib/...` aliases. detectFundRecipient
+// below uses these to probe taxToken.taxProcessor() → taxProcessor.marketAddress()
+// and discriminate fund-recipient launches from vault-having ones.
+const FLAP_TAX_TOKEN_V3_ABI_INLINE = parseAbi([
+  'function taxProcessor() view returns (address)',
+]);
+const TAX_PROCESSOR_ABI_INLINE = parseAbi([
+  'function marketAddress() view returns (address)',
+  'function totalQuoteSentToMarketing() view returns (uint256)',
+]);
+
+// Phase 13: hoisted to module scope (was scoped to main() at L220 in Phase 12.1).
+// Used by the bulk no-vault branch + the RECLASSIFY_TOKEN escape hatch added below.
+const NO_VAULT_SENTINEL = '0x0000000000000000000000000000000000000000';
+
 // VaultCategory enum from BscScan-verified IVaultPortal.sol — both currently
 // defined values map to 'unknown' (orthogonal axis, see types.ts comments).
 // Probe fallback handles v1/v2 discrimination at runtime.
@@ -196,6 +212,62 @@ async function resolveVaultKind(
   return 'unknown';
 }
 
+// ─── Phase 13: detectFundRecipient (mirrors lib/platforms/flap-vaults/fund-recipient.ts) ──
+//
+// Inlined because tsx can't resolve @/lib/... aliases. Used by the no-vault branch +
+// the RECLASSIFY_TOKEN escape hatch.
+//
+// 4-step probe (all must pass):
+//   1. getVaultAddress(taxToken) returns null   (no VaultPortal registration)
+//   2. taxToken.taxProcessor() succeeds          (Flap tax token impl)
+//   3. taxProcessor.marketAddress() succeeds     (TaxProcessor wired)
+//   4. bscClient.getCode(marketAddress) is empty/'0x'  (recipient is EOA)
+//
+// Step 4 is the mutual-exclusion gate: base-v2 + split-vault tokens have a
+// taxProcessor too, but their marketAddress is a contract (typically the vault).
+// Verified 0/60 false positives in a 60-token sample — RESEARCH §"Universe Sizing".
+async function detectFundRecipient(
+  taxToken: Address,
+): Promise<{ matched: boolean; taxProcessor?: Address; marketAddress?: Address }> {
+  const vault = await getVaultAddress(taxToken);
+  if (vault !== null) return { matched: false };
+
+  let taxProcessor: Address;
+  try {
+    const raw = (await bscClient.readContract({
+      address: taxToken,
+      abi: FLAP_TAX_TOKEN_V3_ABI_INLINE,
+      functionName: 'taxProcessor',
+    })) as Address;
+    taxProcessor = raw;
+  } catch {
+    return { matched: false };
+  }
+
+  let marketAddress: Address;
+  try {
+    const raw = (await bscClient.readContract({
+      address: taxProcessor,
+      abi: TAX_PROCESSOR_ABI_INLINE,
+      functionName: 'marketAddress',
+    })) as Address;
+    marketAddress = raw;
+  } catch {
+    return { matched: false };
+  }
+
+  let code: `0x${string}` | undefined;
+  try {
+    code = await bscClient.getCode({ address: marketAddress });
+  } catch {
+    return { matched: false };
+  }
+  const isEOA = !code || code === '0x';
+  if (!isEOA) return { matched: false };
+
+  return { matched: true, taxProcessor, marketAddress };
+}
+
 // ─── main loop ────────────────────────────────────────────────────
 async function main() {
   const sampleLimit = process.env.SAMPLE_LIMIT
@@ -211,18 +283,107 @@ async function main() {
     : null;
   const sampleOrderDesc = process.env.SAMPLE_ORDER_DESC === '1';
 
+  // ─── Phase 13 D-09 mutable-recipient escape hatch ────────────────
+  // Single-token re-probe via env var. Runs the same probe sequence
+  // (vault → fund-recipient → unknown) and updates the row authoritatively.
+  // Idempotent. Use case: TaxProcessor.setReceivers() was called post-deploy and
+  // ClaimScan needs to refresh the recipient_address.
+  //
+  // Example: RECLASSIFY_TOKEN=0x5f28b56a...7777 npx tsx scripts/classify-flap.ts
+  if (process.env.RECLASSIFY_TOKEN) {
+    const token = process.env.RECLASSIFY_TOKEN.toLowerCase();
+    if (!/^0x[a-f0-9]{40}$/.test(token)) {
+      console.error(`Invalid RECLASSIFY_TOKEN: ${token}`);
+      process.exit(1);
+    }
+    console.log(`Reclassify single token: ${token}`);
+    const tokenAddr = token as Address;
+    const vaultAddress = await getVaultAddress(tokenAddr);
+    if (vaultAddress) {
+      const kind = await resolveVaultKind(tokenAddr, vaultAddress);
+      const { error } = await supabase
+        .from('flap_tokens')
+        .update({
+          vault_address: (vaultAddress as Address).toLowerCase(),
+          vault_type: kind,
+          recipient_address: null,
+          tax_processor_address: null,
+        })
+        .eq('token_address', token);
+      if (error) {
+        console.error(`Update failed: ${error.message}`);
+        process.exit(1);
+      }
+      console.log(JSON.stringify({
+        event: 'reclassify_token_complete',
+        token,
+        verdict: kind,
+        vault_address: (vaultAddress as Address).toLowerCase(),
+      }));
+      process.exit(0);
+    }
+    const fr = await detectFundRecipient(tokenAddr);
+    if (fr.matched) {
+      const { error } = await supabase
+        .from('flap_tokens')
+        .update({
+          vault_address: null,
+          vault_type: 'fund-recipient',
+          recipient_address: fr.marketAddress!.toLowerCase(),
+          tax_processor_address: fr.taxProcessor!.toLowerCase(),
+        })
+        .eq('token_address', token);
+      if (error) {
+        console.error(`Update failed: ${error.message}`);
+        process.exit(1);
+      }
+      console.log(JSON.stringify({
+        event: 'reclassify_token_complete',
+        token,
+        verdict: 'fund-recipient',
+        recipient_address: fr.marketAddress!.toLowerCase(),
+        tax_processor_address: fr.taxProcessor!.toLowerCase(),
+      }));
+      process.exit(0);
+    }
+    // Neither vault nor fund-recipient → mark sentinel + null out FR columns.
+    const { error } = await supabase
+      .from('flap_tokens')
+      .update({
+        vault_address: NO_VAULT_SENTINEL,
+        vault_type: 'unknown',
+        recipient_address: null,
+        tax_processor_address: null,
+      })
+      .eq('token_address', token);
+    if (error) {
+      console.error(`Update failed: ${error.message}`);
+      process.exit(1);
+    }
+    console.log(JSON.stringify({
+      event: 'reclassify_token_complete',
+      token,
+      verdict: 'unknown',
+    }));
+    process.exit(0);
+  }
+
+  // Phase 13 widening: drop the .neq(NO_VAULT_SENTINEL) filter so we re-probe rows that
+  // Phase 12.1 marked as sentinel (lookupVaultAddress was null at first probe). Those
+  // rows are exactly the population that may contain fund-recipient tokens. RPC budget
+  // impact: ~25-50 min for the full ~229,971 unknown population per RESEARCH §"Discovery
+  // & Backfill". Use SAMPLE_LIMIT env flag for batched runs.
+  //
   // Pull rows that need classification:
   //   - vault_type='unknown' AND vault_address NULL → never probed (legacy)
-  //   - vault_type='unknown' AND vault_address set (from VaultPortal backfill)
+  //   - vault_type='unknown' AND vault_address sentinel → Phase 12.1 said no-vault; Phase 13
+  //     re-probes for fund-recipient
+  //   - vault_type='unknown' AND vault_address set non-sentinel (from VaultPortal backfill)
   //     → vault address known, just need V1/V2 probe
-  // Exclude rows pre-flagged with the sentinel '0x0' (no-vault) so we don't
-  // hammer the chain re-confirming proven-empty rows.
-  const NO_VAULT_SENTINEL = '0x0000000000000000000000000000000000000000';
   let query = supabase
     .from('flap_tokens')
     .select('token_address,vault_address,created_block')
-    .eq('vault_type', 'unknown')
-    .neq('vault_address', NO_VAULT_SENTINEL);
+    .eq('vault_type', 'unknown');
   if (sampleFromBlock !== null) query = query.gte('created_block', sampleFromBlock);
   if (sampleOrderDesc) query = query.order('created_block', { ascending: false });
   if (sampleLimit !== null) query = query.limit(sampleLimit);
@@ -244,6 +405,7 @@ async function main() {
   let baseV1 = 0;
   let baseV2 = 0;
   let splitVaultCount = 0;
+  let fundRecipientCount = 0;
   let unknownCount = 0;
   let noVault = 0;
   let dbErrors = 0;
@@ -260,12 +422,32 @@ async function main() {
       // and skip the tryGetVault round-trip. We still need the V1/V2 probe.
       const vaultAddress = preknownVault ?? (await getVaultAddress(token));
       if (!vaultAddress) {
-        // Token has no vault on the portal (rare — abandoned/edge case).
-        // Mark it 'unknown' with a sentinel vault_address so we don't re-process.
+        // Phase 13: token has no VaultPortal vault — could be fund-recipient OR truly unknown.
+        const fr = await detectFundRecipient(token);
+        if (fr.matched) {
+          const { error: frUpErr } = await supabase
+            .from('flap_tokens')
+            .update({
+              vault_address: null,
+              vault_type: 'fund-recipient',
+              recipient_address: fr.marketAddress!.toLowerCase(),
+              tax_processor_address: fr.taxProcessor!.toLowerCase(),
+            })
+            .eq('token_address', token);
+          if (frUpErr) {
+            console.error(`[${i + 1}/${total}] ${token.slice(0, 10)} fund-recipient db error: ${frUpErr.message}`);
+            dbErrors++;
+          } else {
+            fundRecipientCount++;
+            classified++;
+          }
+          continue;
+        }
+        // Existing sentinel-write fallthrough — unchanged from Phase 12.1.
         const { error: upErr } = await supabase
           .from('flap_tokens')
           .update({
-            vault_address: '0x0000000000000000000000000000000000000000',
+            vault_address: NO_VAULT_SENTINEL,
             vault_type: 'unknown',
           })
           .eq('token_address', token);
@@ -307,7 +489,7 @@ async function main() {
       const rate = (i + 1) / elapsed;
       const remaining = ((total - i - 1) / rate).toFixed(0);
       console.log(
-        `[${i + 1}/${total}] v1=${baseV1} v2=${baseV2} splitVault=${splitVaultCount} unknown=${unknownCount} no-vault=${noVault} | ${rate.toFixed(1)}/s | ETA ${remaining}s`,
+        `[${i + 1}/${total}] v1=${baseV1} v2=${baseV2} splitVault=${splitVaultCount} fr=${fundRecipientCount} unknown=${unknownCount} no-vault=${noVault} | ${rate.toFixed(1)}/s | ETA ${remaining}s`,
       );
     }
 
@@ -323,9 +505,23 @@ async function main() {
   console.log(`  base-v1: ${baseV1}`);
   console.log(`  base-v2: ${baseV2}`);
   console.log(`  split-vault: ${splitVaultCount}`);
+  console.log(`  fund-recipient: ${fundRecipientCount}`);
   console.log(`  unknown (probes failed): ${unknownCount}`);
   console.log(`  no-vault (sentinel 0x0): ${noVault}`);
   console.log(`DB errors: ${dbErrors}`);
+  // Phase 13 D-18 — structured single-line JSON for log aggregator parsing
+  console.log(JSON.stringify({
+    event: 'classify_complete',
+    started_unknown: total,
+    graduated_to_fund_recipient: fundRecipientCount,
+    still_unknown: unknownCount,
+    base_v1: baseV1,
+    base_v2: baseV2,
+    split_vault: splitVaultCount,
+    no_vault_sentinel: noVault,
+    db_errors: dbErrors,
+    elapsed_seconds: parseFloat(elapsed),
+  }));
 }
 
 main().catch((e) => {
