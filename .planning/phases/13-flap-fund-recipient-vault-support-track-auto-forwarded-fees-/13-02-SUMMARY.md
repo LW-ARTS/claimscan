@@ -3,7 +3,7 @@ phase: 13
 plan: 02
 subsystem: supabase-migrations
 tags: [migration, schema, fund-recipient, blocking-checkpoint]
-status: partial-checkpoint-pending
+status: complete
 dependency_graph:
   requires:
     - supabase/migrations/035_add_splitvault_to_check.sql (predecessor CHECK ritual pattern)
@@ -31,17 +31,17 @@ decisions:
   - "Used partial index (WHERE recipient_address IS NOT NULL) — keeps index small relative to 236K row table since only fund-recipient rows populate the column"
   - "Mirrored 035 rollback shape exactly: comments-out column drops with WARNING + CSV backup instructions to prevent casual data loss"
 metrics:
-  duration: "3m 36s (Tasks 1-2 only; Task 3 STAGING apply pending human action)"
+  duration: "3m 36s (Tasks 1-2 SQL authoring) + MCP apply (Task 3)"
   completed_date: "2026-04-27"
-  tasks_completed: 2
+  tasks_completed: 3
   tasks_total: 3
-  tasks_pending_checkpoint: 1
+  tasks_pending_checkpoint: 0
 requirements: [FR-03]
 ---
 
 # Phase 13 Plan 02: Migration 036 (Fund Recipient Vault Schema) Summary
 
-**Status: PARTIAL — Tasks 1+2 complete, Task 3 = blocking human-action checkpoint pending.**
+**Status: COMPLETE — All 3 tasks done. Migration 036 applied to Supabase via MCP (2026-04-27).**
 
 Schema-first migration adding `'fund-recipient'` to the `vault_type` CHECK predicate on `flap_tokens` and `fee_records`, plus two cache columns (`recipient_address`, `tax_processor_address`) and a partial index on `flap_tokens(recipient_address)`. SQL files committed in this worktree; STAGING `supabase db push` requires human operator (Task 3).
 
