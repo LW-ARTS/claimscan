@@ -1,13 +1,16 @@
 <div align="center">
   <img src="assets/icon.png" alt="ClaimScan" width="80" />
   <h1>ClaimScan</h1>
-  <p><strong>Cross-chain creator fee scanner, claimer, and paid intelligence API for 12 DeFi launchpads on Solana, Base, Ethereum, and BNB Chain</strong></p>
+  <p><strong>Cross-chain creator fee scanner, claimer, and paid intelligence API for 13 DeFi launchpads on Solana, Base, Ethereum, BNB Chain, Arbitrum, Avalanche, and Mantle</strong></p>
 
   <p>
     <img src="https://img.shields.io/badge/Solana-Mainnet-9945FF?logo=solana&logoColor=white" alt="Solana" />
     <img src="https://img.shields.io/badge/Base-Mainnet-0052FF?logo=coinbase&logoColor=white" alt="Base" />
     <img src="https://img.shields.io/badge/Ethereum-Mainnet-627EEA?logo=ethereum&logoColor=white" alt="Ethereum" />
     <img src="https://img.shields.io/badge/BNB_Chain-Mainnet-F0B90B?logo=binance&logoColor=white" alt="BNB Chain" />
+    <img src="https://img.shields.io/badge/Arbitrum-Mainnet-12AAFF?logo=arbitrum&logoColor=white" alt="Arbitrum" />
+    <img src="https://img.shields.io/badge/Avalanche-Mainnet-E84142?logo=avalanche&logoColor=white" alt="Avalanche" />
+    <img src="https://img.shields.io/badge/Mantle-Mainnet-000000?logo=mantle&logoColor=white" alt="Mantle" />
     <img src="https://img.shields.io/website?url=https%3A%2F%2Fclaimscan.tech&label=claimscan.tech" alt="Website" />
   </p>
 
@@ -20,7 +23,7 @@
 
 ## What is ClaimScan?
 
-ClaimScan is a free tool that scans and claims unclaimed creator fees across 12 DeFi launchpads on Solana, Base, Ethereum, and BNB Chain.
+ClaimScan is a free tool that scans and claims unclaimed creator fees across 13 DeFi launchpads on Solana, Base, Ethereum, BNB Chain, Arbitrum, Avalanche, and Mantle.
 
 Around 40% of creator fees go unclaimed. Creators launch tokens, generate volume, earn fees, and never collect them. ClaimScan finds that money and lets you claim it.
 
@@ -33,7 +36,7 @@ Around 40% of creator fees go unclaimed. Creators launch tokens, generate volume
 ## How It Works
 
 1. Paste a Twitter handle, TikTok URL, GitHub username, Farcaster name, or wallet address
-2. ClaimScan scans 12 launchpads across Solana, Base, Ethereum, and BNB Chain simultaneously
+2. ClaimScan scans 13 launchpads across Solana, Base, Ethereum, BNB Chain, Arbitrum, Avalanche, and Mantle simultaneously
 3. Full breakdown: earned, claimed, unclaimed in USD with live pricing
 4. Connect your wallet and claim uncollected fees directly from ClaimScan
 
@@ -65,10 +68,15 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 | Flap.sh | BSC | Four vault types, fund-recipient auto-forwarded BNB fees surfaced on recipient profile |
 | Klik | Ethereum + Base | Creator fee tracking with Base 50% creator-share detection, ENS + Farcaster + Twitter identity resolution for 506+ indexed creators |
 
+### Multi-Chain (7 Networks)
+| Platform | Chain | Features |
+|----------|-------|----------|
+| Printr | Solana + ETH + Arbitrum + Base + Avalanche + BNB + Mantle | Database-backed multi-chain discovery, per-chain tab routing, fee sink badges, graduation tracking, CAIP-2/CAIP-10 addressing |
+
 ## Features
 
 ### Scanning
-- **4 chains**: Solana, Base, Ethereum, and BNB Chain in a single scan
+- **7 chains**: Solana, Base, Ethereum, BNB Chain, Arbitrum, Avalanche, and Mantle in a single scan
 - **Identity resolution**: Twitter, TikTok, GitHub, Farcaster handles, ENS, and raw wallet addresses
 - **Real-time streaming**: Scan progress updates as each platform completes via SSE
 - **True real time fees**: The unclaimed total, the status filter, and the token list all read from the same live data stream. What you see and what you can act on are always in sync. Tokens appear within seconds of being detected on chain instead of waiting for the next sync.
@@ -77,7 +85,7 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 - **Privacy-first**: Searches anonymized before logging
 
 ### Leaderboard
-- **Public creator ranking** at [claimscan.tech/leaderboard](https://claimscan.tech/leaderboard) ordered by total fees earned across all 12 platforms
+- **Public creator ranking** at [claimscan.tech/leaderboard](https://claimscan.tech/leaderboard) ordered by total fees earned across all 13 platforms
 - **Filter chips** for platform and chain that scroll horizontally on mobile and wrap on desktop
 - **Deep linkable filter state**, share a filtered view by URL
 - **Mobile cards** with creator avatars, rank trophy for the top 3, and proper responsive sizing down to 360px wide
@@ -121,7 +129,7 @@ V1.5 is the update where ClaimScan went from read-only scanner to full claimer. 
 - **Hardware wallet support**: Full compatibility with Ledger and other hardware signers
 - **Auto-discovery**: Wallet detection via Wallet Standard protocol. No manual wallet imports needed
 
-> More platforms coming in V3. Bags.fm is just the start.
+> More platforms coming soon. Bags.fm is just the start.
 
 ### V2 API: Paid Intelligence for Agents and Developers ✦ New
 
@@ -131,7 +139,7 @@ ClaimScan V2 introduces a paid API powered by the [x402 protocol](https://x402.o
 
 | Endpoint | Price | What you get |
 |----------|-------|--------------|
-| `GET /api/v2/fees?wallet=<address>` | $0.01 | Full fee report across all 12 platforms and 4 chains |
+| `GET /api/v2/fees?wallet=<address>` | $0.01 | Full fee report across all 13 platforms and 7 chains |
 | `GET /api/v2/export?wallet=<address>` | $0.05 | CSV or JSON export of all fee records |
 | `GET /api/v2/intelligence?wallet=<address>` | $0.02 | Intelligence report: ClaimScan fees + Allium cross-chain enrichment |
 | `GET /api/v2/resolve?ows_wallet=<name>` | $0.01 | Resolve an OWS wallet name into multi-chain addresses |
@@ -173,22 +181,22 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 - **CSV injection protection**: All export values sanitized against formula injection before reaching spreadsheets
 
 ### Performance
-- **Fast scans**: All routes optimized for parallel execution across 4 chains
+- **Fast scans**: All routes optimized for parallel execution across 7 chains
 - **Smart caching**: Multi-layer caching (Redis + DB) keeps data fresh without hammering the chain
-- **Background indexing**: Automated token discovery via Helius DAS webhooks
+- **Background indexing**: Automated token discovery via Helius DAS webhooks + database-backed multi-chain indexer
 - **Graceful degradation**: Partial results instead of timeouts
 - **SSE streaming**: Real-time scan progress and live fee updates via Server-Sent Events
 
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
+|-------|------------|
 | Framework | Next.js + React + TypeScript |
 | Styling | Tailwind CSS + Radix UI + Motion |
 | Blockchain | Solana (web3.js) + EVM (Viem) |
 | Database | Supabase (PostgreSQL with row-level security) |
 | Cache | Redis with in-memory fallback |
-| Identity | Cross-platform resolution (Twitter, TikTok, GitHub, Farcaster, wallets) |
+| Identity | Cross-platform resolution (Twitter, TikTok, GitHub, Farcaster, ENS, wallets) |
 | Pricing | Multi-source aggregation (DexScreener, Jupiter, CoinGecko) |
 | Payments | x402 protocol (USDC on Base Mainnet) + bazaar discovery + payment-identifier |
 | Intelligence | Allium (cross-chain wallet data) |
@@ -199,8 +207,8 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 
 ## Stats
 
-- 12 launchpads supported
-- 4 chains (Solana + Base + Ethereum + BNB Chain)
+- 13 launchpads supported
+- 7 chains (Solana + Base + Ethereum + BNB + Arbitrum + Avalanche + Mantle)
 - Under 30 second scan time
 - $0 to scan and claim (always free)
 - Paid API starting at $0.01 per query
@@ -218,8 +226,9 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 | **V2.7** | **Live** | Flaunch.gg as 10th launchpad, per-coin fee breakdown on Base via FeeEscrow (historical earnings read on-chain), Sentry error monitoring restored after malformed DSN was silently dropping events for 30 days. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v2.7.0). |
 | **V2.8** | **Live** | Flap.sh as 11th launchpad (first BSC-native platform), fund-recipient vault type surfaces auto-forwarded BNB fees that were previously invisible, Unicode-aware token symbols for CJK and emoji tickers across all views. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v2.8.0). |
 | **V2.9** | **Live** | Klik as 12th launchpad (Ethereum + Base), dual-chain identity resolution indexer (ENS + Farcaster + Twitter), 506 creators indexed at launch, daily cron, circuit breaker, Flap.sh cron backlog fix. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v2.9.0). |
-| V3 | Next | Token Fee Scanner (paste any contract address), in-app EVM claims via unified wallet adapter (Solana and EVM in one modal), covers Clanker, Zora, Bankr, Flaunch, and Flap |
-| V3.5 | Planned | Automated claim scheduling, creator analytics, portfolio dashboard |
+| **V3.0** | **Live** | Printr as 13th launchpad spanning 7 chains (Solana + ETH + Arbitrum + Base + Avalanche + BNB + Mantle), database-backed multi-chain discovery engine, CAIP-2/CAIP-10 addressing standard, on-chain factory verification, per-chain tab routing with fee sink badges and graduation tracking. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v3.0.0). |
+| V3.5 | Next | In-app EVM claims via unified wallet adapter (Solana + EVM in one modal), per-token fee amounts via verified ABIs, API enrichment for friendly token names |
+| V4.0 | Planned | Automated claim scheduling, creator analytics, portfolio dashboard |
 
 ## Built By
 
