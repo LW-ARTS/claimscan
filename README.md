@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/icon.png" alt="ClaimScan" width="80" />
   <h1>ClaimScan</h1>
-  <p><strong>Cross-chain creator fee scanner, claimer, and paid intelligence API for 12 DeFi launchpads on Solana, Base, Ethereum, and BNB Chain</strong></p>
+  <p><strong>Cross-chain creator fee scanner, one-click claimer, and paid intelligence API. Tracks 13 DeFi launchpads across Solana, Base, Ethereum, BNB Chain, Arbitrum, Avalanche, and Mantle. In-app claim is live on all 6 Solana launchpads.</strong></p>
 
   <p>
     <img src="https://img.shields.io/badge/Solana-Mainnet-9945FF?logo=solana&logoColor=white" alt="Solana" />
@@ -20,9 +20,9 @@
 
 ## What is ClaimScan?
 
-ClaimScan is a free tool that scans and claims unclaimed creator fees across 12 DeFi launchpads on Solana, Base, Ethereum, and BNB Chain.
+ClaimScan is a free tool that scans and claims unclaimed creator fees. Tracking covers 13 DeFi launchpads across 7 chains. In-app one-click claim is live on all 6 Solana launchpads: Pump.fun, Bags.fm, Believe, Coinbarrel, Raydium LaunchLab, and RevShare.
 
-Around 40% of creator fees go unclaimed. Creators launch tokens, generate volume, earn fees, and never collect them. ClaimScan finds that money and lets you claim it.
+Around 40% of creator fees go unclaimed. Creators launch tokens, generate volume, earn fees, and never collect them. ClaimScan finds that money and lets you claim it without leaving the app.
 
 **Paste any @handle or wallet. Get a full breakdown in under 30 seconds.**
 
@@ -32,10 +32,10 @@ Around 40% of creator fees go unclaimed. Creators launch tokens, generate volume
 
 ## How It Works
 
-1. Paste a Twitter handle, TikTok URL, GitHub username, Farcaster name, or wallet address
-2. ClaimScan scans 12 launchpads across Solana, Base, Ethereum, and BNB Chain simultaneously
+1. Paste a Twitter handle, TikTok URL, GitHub username, Farcaster name, ENS, or wallet address
+2. ClaimScan scans 13 launchpads across 7 chains (Solana, Base, Ethereum, BNB Chain, Arbitrum, Avalanche, Mantle) simultaneously
 3. Full breakdown: earned, claimed, unclaimed in USD with live pricing
-4. Connect your wallet and claim uncollected fees directly from ClaimScan
+4. Connect your wallet and claim uncollected fees directly from ClaimScan on any of the 6 supported Solana launchpads
 
 No signup. Read-only scanning. Zero-custody claiming. Always free.
 
@@ -45,15 +45,15 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 
 ## Supported Platforms
 
-### Solana
+### Solana (all 6 with in-app one-click claim)
 | Platform | Features |
 |----------|----------|
-| Bags.fm | Identity resolution, live polling, **direct claim with Turnstile + priority fees** |
-| Pump.fun | Historical + live fee tracking (V1 and V2 supported) |
-| Believe | Creator fee tracking |
-| RevShare | Revenue share scanning |
-| Coinbarrel | Fee discovery |
-| Raydium | LaunchLab LP fee tracking |
+| Bags.fm | Identity resolution, live polling, **direct in-app claim** |
+| Pump.fun | Historical + live fee tracking (V1 and V2), **dual-builder claim covers both bonding curve and PumpSwap AMM in one batch** |
+| Believe | Creator fee tracking, **atomic dual-claim per pool sweeps quote (SOL) and base token in one transaction (Meteora DBC)** |
+| Coinbarrel | Fee discovery, **atomic dual-claim per pool with auto WSOL unwrap** |
+| Raydium | LaunchLab LP fee tracking, **clean-room hand-rolled claim instruction with vault pre-flight gate** |
+| RevShare | Revenue share scanning, **per-mint claim for SPL Token-2022 transfer-fee withdraws, up to 25 mints per batch** |
 
 ### Base + Ethereum + BNB Chain
 | Platform | Chain | Features |
@@ -77,7 +77,7 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
 - **Privacy-first**: Searches anonymized before logging
 
 ### Leaderboard
-- **Public creator ranking** at [claimscan.tech/leaderboard](https://claimscan.tech/leaderboard) ordered by total fees earned across all 12 platforms
+- **Public creator ranking** at [claimscan.tech/leaderboard](https://claimscan.tech/leaderboard) ordered by total fees earned across all 13 launchpads
 - **Filter chips** for platform and chain that scroll horizontally on mobile and wrap on desktop
 - **Deep linkable filter state**, share a filtered view by URL
 - **Mobile cards** with creator avatars, rank trophy for the top 3, and proper responsive sizing down to 360px wide
@@ -100,14 +100,22 @@ No signup. Read-only scanning. Zero-custody claiming. Always free.
   <img src="assets/screenshot-og-finnbags.png" alt="ClaimScan dynamic OG card for @finnbags profile" width="700" />
 </div>
 
-### Claiming (V1.5) ✦ Bags.fm Live
-V1.5 is the update where ClaimScan went from read-only scanner to full claimer. Bags.fm is the first platform with direct on-chain claiming built in. No third-party custody, no approvals, no token permissions. Connect your wallet, review the simulation, sign, done.
+### In-App Claim ✦ Live on all 6 Solana launchpads
+V3.6 is the update where in-app claim coverage went from 1 launchpad (Bags.fm) to 6. Every Solana launchpad ClaimScan tracks is now claimable in one click without leaving the app. No third-party custody, no approvals, no token permissions. Connect your wallet, review the simulation, sign, done.
+
+**Supported claim flows (Solana):**
+- Bags.fm: canonical batched-claim reference flow with 13 security gates
+- Believe (Meteora DBC): atomic dual-claim per pool, sweeps quote and base token in one signed transaction
+- Coinbarrel: atomic dual-claim per pool with auto WSOL unwrap
+- Raydium LaunchLab: clean-room hand-rolled claim instruction, vault balance pre-flight gate, hidden when the Fee Key NFT is not held
+- Pump.fun + PumpSwap: single dispatch route, two hand-rolled builders, both synthetic mint rows clear in one batch
+- RevShare (SPL Token-2022): per-mint WithdrawWithheldTokensFromMint with idempotent ATA creation, up to 25 mints per batch, authority re-verified at transaction build time
 
 **How the claim flow works:**
-1. ClaimScan detects unclaimed fees on Bags.fm for your wallet
+1. ClaimScan detects unclaimed fees on your wallet across all 6 Solana launchpads
 2. A claim transaction is built server-side with optimized compute units
 3. The transaction is simulated before it ever reaches your wallet
-4. You review and sign in your own wallet (Phantom, Backpack, Ledger, or any Wallet Standard compatible wallet)
+4. You review and sign in your own wallet (Phantom, Backpack, Solflare, Ledger, or any Wallet Standard compatible wallet)
 5. ClaimScan tracks the transaction from submission through on-chain finalization
 6. Claim status updates in real time: `pending → signing → submitted → confirmed → finalized`
 
@@ -115,13 +123,15 @@ V1.5 is the update where ClaimScan went from read-only scanner to full claimer. 
 - **Zero-custody**: Your keys never leave your wallet. Transactions are constructed server-side but signed exclusively client-side
 - **Pre-sign simulation**: Every transaction is simulated on-chain before the wallet prompt appears, so failed claims are caught before you spend gas
 - **Priority fees**: Dynamic compute unit pricing calibrated per transaction for reliable confirmation, even during network congestion
+- **Pre-flight balance gates**: Routes that risk a wasted on-chain attempt (Raydium creator vault, RevShare withhold authority) check on-chain state before charging gas or burning a claim attempt slot
 - **Turnstile-gated**: Every claim request is verified through Cloudflare Turnstile to prevent bot abuse and replay attacks
 - **Finalization tracking**: Claims are tracked end-to-end with immutable state transitions. Once finalized, a claim cannot be reverted or replayed
 - **Cryptographic verification**: Claim requests are signed and verified at every step, from client to server to chain
 - **Hardware wallet support**: Full compatibility with Ledger and other hardware signers
 - **Auto-discovery**: Wallet detection via Wallet Standard protocol. No manual wallet imports needed
+- **Transparent fees**: Flat 0.85% service fee deducted on-chain from the claimed amount. Zero hidden fees, zero subscription, zero monthly cost
 
-> More platforms coming in V3. Bags.fm is just the start.
+> EVM claims (Clanker, Zora, Bankr, Flaunch, Flap, Klik) are next on the roadmap.
 
 ### V2 API: Paid Intelligence for Agents and Developers ✦ New
 
@@ -131,7 +141,7 @@ ClaimScan V2 introduces a paid API powered by the [x402 protocol](https://x402.o
 
 | Endpoint | Price | What you get |
 |----------|-------|--------------|
-| `GET /api/v2/fees?wallet=<address>` | $0.01 | Full fee report across all 12 platforms and 4 chains |
+| `GET /api/v2/fees?wallet=<address>` | $0.01 | Full fee report across all 13 launchpads and 7 chains |
 | `GET /api/v2/export?wallet=<address>` | $0.05 | CSV or JSON export of all fee records |
 | `GET /api/v2/intelligence?wallet=<address>` | $0.02 | Intelligence report: ClaimScan fees + Allium cross-chain enrichment |
 | `GET /api/v2/resolve?ows_wallet=<name>` | $0.01 | Resolve an OWS wallet name into multi-chain addresses |
@@ -199,10 +209,10 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 
 ## Stats
 
-- 12 launchpads supported
-- 4 chains (Solana + Base + Ethereum + BNB Chain)
+- 13 launchpads supported (6 with one-click in-app claim, 7 display-only)
+- 7 chains (Solana + Base + Ethereum + BNB Chain + Arbitrum + Avalanche + Mantle)
 - Under 30 second scan time
-- $0 to scan and claim (always free)
+- $0 to scan, 0.85% flat service fee on claim (always free to scan)
 - Paid API starting at $0.01 per query
 
 ## Roadmap
@@ -218,8 +228,10 @@ ows pay request "https://claimscan.tech/api/v2/intelligence?wallet=0x..." --wall
 | **V2.7** | **Live** | Flaunch.gg as 10th launchpad, per-coin fee breakdown on Base via FeeEscrow (historical earnings read on-chain), Sentry error monitoring restored after malformed DSN was silently dropping events for 30 days. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v2.7.0). |
 | **V2.8** | **Live** | Flap.sh as 11th launchpad (first BSC-native platform), fund-recipient vault type surfaces auto-forwarded BNB fees that were previously invisible, Unicode-aware token symbols for CJK and emoji tickers across all views. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v2.8.0). |
 | **V2.9** | **Live** | Klik as 12th launchpad (Ethereum + Base), dual-chain identity resolution indexer (ENS + Farcaster + Twitter), 506 creators indexed at launch, daily cron, circuit breaker, Flap.sh cron backlog fix. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v2.9.0). |
-| V3 | Next | Token Fee Scanner (paste any contract address), in-app EVM claims via unified wallet adapter (Solana and EVM in one modal), covers Clanker, Zora, Bankr, Flaunch, and Flap |
-| V3.5 | Planned | Automated claim scheduling, creator analytics, portfolio dashboard |
+| **V3.0** | **Live** | Printr as 13th launchpad (Solana + Ethereum + Arbitrum + Base + Avalanche + BNB Chain + Mantle), 7-chain coverage, CAIP-2/CAIP-10 helpers, native-token USD math regression-protected. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v3.0.0). |
+| **V3.6** | **Live** | **Biggest update since V2.0: in-app claim coverage 6x.** All 6 Solana launchpads now claimable in one click. Adds Believe (Meteora DBC), Coinbarrel, Raydium LaunchLab (hand-rolled clean-room instruction), Pump.fun + PumpSwap (dual-builder), and RevShare (SPL Token-2022). Atomic dual-claim per pool, vault pre-flight gates, idempotent ATA, batch caps tuned per platform, flat 0.85% service fee. [Read the full release notes](https://github.com/LW-ARTS/claimscan/releases/tag/v3.6.0). |
+| V4 | Next | In-app EVM claims via unified wallet adapter (Solana and EVM in one modal), covers Clanker, Zora, Bankr, Flaunch, Flap, and Klik. Token Fee Scanner (paste any contract address) |
+| V4.5 | Planned | Automated claim scheduling, creator analytics, portfolio dashboard |
 
 ## Built By
 
